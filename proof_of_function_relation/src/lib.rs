@@ -1,10 +1,6 @@
+mod commitment;
+mod error;
+mod transcript;
+mod util;
+mod virtual_oracle;
 mod zero_over_k;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
-    }
-}
