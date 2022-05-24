@@ -1,0 +1,5 @@
+[workspace]
+
+members = [
+    "proof_of_function_relation"
+]
