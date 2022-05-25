@@ -16,21 +16,22 @@ use ark_std::marker::PhantomData;
 use merlin::Transcript;
 use rand::Rng;
 
-struct Proof<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> {
+pub struct Proof<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> {
     // commitments
-    concrete_oracle_commitments: Vec<PC::Commitment>,
-    m_commitments: Vec<PC::Commitment>,
-    r_commitments: Vec<PC::Commitment>,
-    q1_commit: PC::Commitment,
-    
+    pub concrete_oracles_commitments: Vec<PC::Commitment>,
+    pub m_commitments: Vec<PC::Commitment>,
+    pub r_commitments: Vec<PC::Commitment>,
+    pub q1_commit: PC::Commitment,
+
     // evaluations
-    q1_eval: F,
-    q2_eval: F,
-    h_prime_evals: Vec<F>,
-    m_evals: Vec<F>,
-    
+    pub q1_eval: F,
+    pub q2_eval: F,
+    pub h_prime_evals: Vec<F>,
+    pub m_evals: Vec<F>,
+
     // opening
-    q1_opening: PC::Proof,
-    m_openings: Vec<PC::Proof>,
-    h_prime_openings: Vec<PC::Proof>,
+    pub q1_opening: PC::Proof,
+    pub q2_opening: PC::Proof,
+    pub m_openings: Vec<PC::Proof>,
+    pub h_prime_openings: Vec<PC::Proof>,
 }

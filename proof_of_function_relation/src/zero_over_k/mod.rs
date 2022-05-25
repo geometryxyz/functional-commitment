@@ -14,9 +14,11 @@ use ark_poly::{
 use ark_poly_commit::{LabeledPolynomial, PCRandomness};
 use ark_std::marker::PhantomData;
 use merlin::Transcript;
+use proof::Proof;
 use rand::Rng;
 
 mod proof;
+mod tests;
 
 struct ZeroOverK<F, PC>
 where
@@ -29,17 +31,18 @@ where
 
 impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> ZeroOverK<F, PC> {
     pub fn prove<
-        const NUM_OF_CONCRETE_ORACLES: usize,
         VO: VirtualOracle<F, NUM_OF_CONCRETE_ORACLES>,
         R: Rng,
+        const NUM_OF_CONCRETE_ORACLES: usize,
     >(
         concrete_oracles: &[DensePolynomial<F>; NUM_OF_CONCRETE_ORACLES],
         alphas: &[F; NUM_OF_CONCRETE_ORACLES],
         domain: &GeneralEvaluationDomain<F>,
         ck: &PC::CommitterKey,
         rng: &mut R,
-    ) -> Result<(), Error> {
+    ) -> Result<Proof<F, PC>, Error> {
         let mut transcript = Transcript::new(b"zero_over_k");
+        let one = F::one();
 
         // commit to the random polynomials
         let labeled_concrete_oracles = concrete_oracles
@@ -53,11 +56,11 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> ZeroOverK<F, PC> {
         let (random_polynomials, masking_polynomials) = Self::compute_maskings(domain, alphas, rng);
 
         // commit to the random polynomials
-        let (r_commits, _) =
+        let (r_commitments, _) =
             PC::commit(ck, random_polynomials.iter(), None).map_err(to_pc_error::<F, PC>)?;
 
         // commit to the masking polynomials
-        let (m_commits, _) =
+        let (m_commitments, _) =
             PC::commit(ck, masking_polynomials.iter(), None).map_err(to_pc_error::<F, PC>)?;
 
         // compute the masked oracles
@@ -66,8 +69,6 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> ZeroOverK<F, PC> {
             .zip(masking_polynomials.iter())
             .map(|(oracle, masking_poly)| oracle + masking_poly.polynomial())
             .collect::<Vec<_>>();
-
-        // let h_prime_commitments =
 
         // compute the blinded virtual oracle F'[X]
         let f_prime = VO::instantiate(h_primes.as_slice().try_into().unwrap(), alphas);
@@ -82,11 +83,11 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> ZeroOverK<F, PC> {
         let (q1_commit, q1_rand) = commit_polynomial::<F, PC>(ck, &q1)?;
 
         // round 1
-        let r_commits = r_commits
+        let r_commitments = r_commitments
             .iter()
             .map(|r_c| r_c.commitment().clone())
             .collect::<Vec<_>>();
-        let m_commits = m_commits
+        let m_commitments = m_commitments
             .iter()
             .map(|m_c| m_c.commitment().clone())
             .collect::<Vec<_>>();
@@ -97,8 +98,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> ZeroOverK<F, PC> {
 
         transcript.append(b"oracles", &concrete_oracles_commitments.to_vec());
         transcript.append(b"alphas", &alphas.to_vec());
-        transcript.append(b"rs", &r_commits);
-        transcript.append(b"ms", &m_commits);
+        transcript.append(b"rs", &r_commitments);
+        transcript.append(b"ms", &m_commitments);
         transcript.append(b"q", &q1_commit);
 
         let beta_1: F = transcript.challenge_scalar(b"beta_1");
@@ -117,15 +118,16 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> ZeroOverK<F, PC> {
 
         // open q1 at beta_1
         let q1_eval = q1.evaluate(&beta_1);
-        let q1_open = PC::open(
+        let q1_opening = PC::open(
             ck,
             &[label_polynomial!(q1)],
             &[label_commitment!(q1_commit)],
             &beta_1,
-            F::one(),
+            one,
             &[q1_rand],
             None,
-        );
+        )
+        .map_err(to_pc_error::<F, PC>)?;
 
         // q_2 is defined as r1 + c*r2 + c^2r3 + ...
         let q2 = random_polynomials
@@ -142,29 +144,41 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> ZeroOverK<F, PC> {
 
         // let (q2_commit, q2_rand) = commit_polynomial::<F, PC>(ck, &q2)?;
         let q2_commitment = PC::multi_scalar_mul(
-            &r_commits,
+            &r_commitments,
             powers_of(c)
                 .take(random_polynomials.len())
                 .collect::<Vec<_>>()
                 .as_slice(),
         );
-        let q2_open = PC::open(
+        let q2_opening = PC::open(
             ck,
             &[label_polynomial!(q2)],
             &[label_commitment!(q2_commitment)],
             &beta_2,
-            F::one(),
+            one,
             &[homomorphic_randomness.clone()],
             None,
-        );
+        )
+        .map_err(to_pc_error::<F, PC>)?;
 
-        let one = F::one();
-        let h_openings = h_primes
+        let h_prime_evals = h_primes
+            .iter()
+            .zip(alphas.iter())
+            .map(|(h_prime, &alpha)| h_prime.evaluate(&(alpha * beta_1)))
+            .collect::<Vec<_>>();
+
+        let m_evals = masking_polynomials
+            .iter()
+            .zip(alphas.iter())
+            .map(|(m_poly, &alpha)| m_poly.evaluate(&(alpha * beta_2)))
+            .collect::<Vec<_>>();
+
+        let h_prime_openings = h_primes
             .iter()
             .zip(alphas.iter())
             .zip(concrete_oracles_commitments.iter())
-            .zip(m_commits.iter())
-            .map(|(((h_prime, &alpha_i), oracle_commitment), m_commitment)| {
+            .zip(m_commitments.iter())
+            .map(|(((h_prime, &alpha_i), oracle_commitment), m_commitment)| -> Result<PC::Proof, Error> {
                 let h_prime_commitment = PC::multi_scalar_mul(
                     &[oracle_commitment.clone(), m_commitment.clone()],
                     &[one, one],
@@ -177,28 +191,51 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> ZeroOverK<F, PC> {
                     F::one(),
                     &[homomorphic_randomness.clone()],
                     None,
-                )
+                ).map_err(to_pc_error::<F, PC>)
             })
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>, Error>>()?;
 
         let m_openings = masking_polynomials
             .iter()
-            .zip(m_commits.iter())
+            .zip(m_commitments.iter())
             .zip(alphas.iter())
-            .map(|((m_poly, m_commit), &alpha_i)| {
-                PC::open(
-                    ck,
-                    [m_poly],
-                    &[label_commitment!(m_commit)],
-                    &(alpha_i * beta_2),
-                    F::one(),
-                    &[homomorphic_randomness.clone()],
-                    None,
-                )
-            })
-            .collect::<Vec<_>>();
+            .map(
+                |((m_poly, m_commit), &alpha_i)| -> Result<PC::Proof, Error> {
+                    PC::open(
+                        ck,
+                        [m_poly],
+                        &[label_commitment!(m_commit)],
+                        &(alpha_i * beta_2),
+                        F::one(),
+                        &[homomorphic_randomness.clone()],
+                        None,
+                    )
+                    .map_err(to_pc_error::<F, PC>)
+                },
+            )
+            .collect::<Result<Vec<_>, Error>>()?;
 
-        Ok(())
+        let proof = Proof {
+            // commitments
+            concrete_oracles_commitments,
+            m_commitments,
+            r_commitments,
+            q1_commit,
+
+            // evaluations
+            q1_eval,
+            q2_eval,
+            h_prime_evals,
+            m_evals,
+
+            // opening
+            q1_opening,
+            q2_opening,
+            m_openings,
+            h_prime_openings,
+        };
+
+        Ok(proof)
     }
 
     /// computes array of m_i = ri(alpha_i^-1) * zk(alpha_i^-1)
@@ -223,16 +260,10 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> ZeroOverK<F, PC> {
             let vanishing_shifted =
                 shift_dense_poly(&domain.vanishing_polynomial().into(), &shifting_factor);
 
-            random_polynomials[i] = label_polynomial!(r_shifted.clone());
-            masking_polynomials[i] = label_polynomial!(&r_shifted * &vanishing_shifted);
+            random_polynomials.push(label_polynomial!(r_shifted.clone()));
+            masking_polynomials.push(label_polynomial!(&r_shifted * &vanishing_shifted));
         }
 
         (random_polynomials, masking_polynomials)
-    }
-
-    pub fn verify() -> () {
-        // let a_coeffs = vec![F::from(5), F::from(0), F::from(0), F::from(0)];
-        // let a_poly = DensePolynomial::from_coefficients_slice(&a_coeffs);
-        // let p: P = q.into();
     }
 }
