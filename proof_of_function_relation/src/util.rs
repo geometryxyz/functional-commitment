@@ -69,13 +69,14 @@ mod test {
     use crate::{
         commitment::{HomomorphicPolynomialCommitment, KZG10},
         label_commitment, label_polynomial,
-        util::commit_polynomial,
     };
     use ark_bn254::{Bn254, Fr};
-    use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
-    use ark_poly_commit::{
-        kzg10, sonic_pc::SonicKZG10, LabeledCommitment, PCRandomness, PolynomialCommitment,
+    use ark_ff::Field;
+    use ark_poly::{
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
+        UVPolynomial,
     };
+    use ark_poly_commit::{kzg10, PCRandomness, PolynomialCommitment};
     use ark_std::UniformRand;
     use rand::thread_rng;
     use rand_core::OsRng;
@@ -95,6 +96,27 @@ mod test {
         assert_eq!(
             r_poly.evaluate(&(evaluation_point * shift)),
             r_shifted.evaluate(&evaluation_point)
+        )
+    }
+
+    #[test]
+    fn test_shift_and_unshift() {
+        let rng = &mut thread_rng();
+        let degree = 10;
+        // let domain = GeneralEvaluationDomain::<Fr>::new(degree).unwrap();
+
+        let r_poly = DensePolynomial::<Fr>::rand(degree, rng);
+        // let r_poly = domain.vanishing_polynomial().into();
+
+        let shift = Fr::rand(rng);
+        let r_shifted = shift_dense_poly(&r_poly, &shift);
+
+        let evaluation_point = Fr::rand(rng);
+        let inverse_shift = shift.inverse().unwrap();
+
+        assert_eq!(
+            r_poly.evaluate(&evaluation_point),
+            r_shifted.evaluate(&(evaluation_point * inverse_shift))
         )
     }
 

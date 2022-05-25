@@ -2,6 +2,8 @@
 pub enum Error {
     MaxDegreeExceeded,
     PCError { error: String },
+    Check1Failed,
+    Check2Failed,
 }
 
 /// Convert an ark_poly_commit error

@@ -1,7 +1,7 @@
 use crate::{
     commitment::HomomorphicPolynomialCommitment,
     error::{to_pc_error, Error},
-    label_commitment, label_polynomial,
+    label_commitment, label_polynomial, to_poly,
     transcript::TranscriptProtocol,
     util::{commit_polynomial, powers_of, shift_dense_poly},
     virtual_oracle::VirtualOracle,
@@ -44,7 +44,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> ZeroOverK<F, PC> {
         let mut transcript = Transcript::new(b"zero_over_k");
         let one = F::one();
 
-        // commit to the random polynomials
+        // commit to the concrete oracle
         let labeled_concrete_oracles = concrete_oracles
             .iter()
             .map(|oracle| label_polynomial!(oracle))
@@ -260,10 +260,98 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> ZeroOverK<F, PC> {
             let vanishing_shifted =
                 shift_dense_poly(&domain.vanishing_polynomial().into(), &shifting_factor);
 
-            random_polynomials.push(label_polynomial!(r_shifted.clone()));
+            random_polynomials.push(label_polynomial!(r.clone()));
             masking_polynomials.push(label_polynomial!(&r_shifted * &vanishing_shifted));
         }
 
         (random_polynomials, masking_polynomials)
+    }
+
+    pub fn verify<
+        VO: VirtualOracle<F, NUM_OF_CONCRETE_ORACLES>,
+        const NUM_OF_CONCRETE_ORACLES: usize,
+    >(
+        proof: Proof<F, PC>,
+        domain: &GeneralEvaluationDomain<F>,
+        alphas: &[F; NUM_OF_CONCRETE_ORACLES],
+    ) -> Result<(), Error> {
+        let mut transcript = Transcript::new(b"zero_over_k");
+
+        transcript.append(b"oracles", &proof.concrete_oracles_commitments);
+        transcript.append(b"alphas", &alphas.to_vec());
+        transcript.append(b"rs", &proof.r_commitments);
+        transcript.append(b"ms", &proof.m_commitments);
+        transcript.append(b"q", &proof.q1_commit);
+
+        let beta_1: F = transcript.challenge_scalar(b"beta_1");
+        let beta_2: F = transcript.challenge_scalar(b"beta_2");
+        let c: F = transcript.challenge_scalar(b"c");
+
+        //check that beta_1, beta_2, c in F* \ K
+        assert_ne!(beta_1, F::zero());
+        assert_ne!(domain.evaluate_vanishing_polynomial(beta_1), F::zero());
+
+        assert_ne!(beta_2, F::zero());
+        assert_ne!(domain.evaluate_vanishing_polynomial(beta_2), F::zero());
+
+        assert_ne!(c, F::zero());
+        assert_ne!(domain.evaluate_vanishing_polynomial(c), F::zero());
+
+        let one = F::one();
+
+        // derive commitment to h_prime through additive homomorphism
+        let h_prime_commitments = proof
+            .concrete_oracles_commitments
+            .iter()
+            .zip(proof.m_commitments.iter())
+            .map(|(oracle_commitment, m_commitment)| {
+                PC::multi_scalar_mul(
+                    &[oracle_commitment.clone(), m_commitment.clone()],
+                    &[one, one],
+                )
+            })
+            .collect::<Vec<_>>();
+
+        // derive commitment to q2 through additive homomorphism
+        let q2_commitment = PC::multi_scalar_mul(
+            &proof.r_commitments,
+            powers_of(c)
+                .take(NUM_OF_CONCRETE_ORACLES)
+                .collect::<Vec<_>>()
+                .as_slice(),
+        );
+
+        // compute M(beta_2)
+        let big_m_at_beta_2 = &proof
+            .m_evals
+            .iter()
+            .zip(powers_of(c))
+            .fold(F::zero(), |acc, (&m_eval, c_power)| {
+                acc + (m_eval * c_power)
+            });
+
+        // evaluate z_k(beta_1), z_k(beta_2)
+        let z_k_at_beta_1 = domain.evaluate_vanishing_polynomial(beta_1);
+        let z_k_at_beta_2 = domain.evaluate_vanishing_polynomial(beta_2);
+
+        // compute F_prime(beta_1)
+        let f_prime_eval = VO::query(&proof.h_prime_evals.try_into().unwrap());
+
+        //check that M(beta_2) - q2(beta_2)*zK(beta_2) = 0
+        let check_1 = *big_m_at_beta_2 - proof.q2_eval * z_k_at_beta_2;
+        if check_1 != F::zero() {
+            return Err(Error::Check1Failed);
+        }
+
+        //check that F_prime(beta_1) - q1(beta_1)*zK(beta_1) = 0
+        let check_2 = f_prime_eval - proof.q1_eval * z_k_at_beta_1;
+        if check_2 != F::zero() {
+            return Err(Error::Check2Failed);
+        }
+
+        //TODO
+        // we skip checking openings until we batch them into one commitment
+
+        Ok(())
     }
 }
