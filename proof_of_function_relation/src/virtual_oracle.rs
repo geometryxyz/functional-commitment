@@ -87,7 +87,6 @@ use ark_std::{test_rng, UniformRand};
 ///
 ///  Term (struct)
 ///   Attributes:
-///     - num_concrete_oracles: integer
 ///     - alpha_coeffs: Scalar[]
 ///     - constants: Scalar[]
 ///
@@ -95,7 +94,7 @@ use ark_std::{test_rng, UniformRand};
 ///     - evaluate_as_prover(inputs: Scalar[], concrete_oracles: Polynomial[]) -> Scalar (or Error)
 ///
 ///   Notes:
-///     - the length of alpha_coeffs must be exactly num_concrete_oracles
+///     - the length of alpha_coeffs must be exactly the number of concrete oracles in this term
 ///
 /// ## Important notes
 ///
@@ -114,7 +113,6 @@ use ark_std::{test_rng, UniformRand};
 /// The order of concrete oracles passed to instantiate() should therefore be [f, g, a, b c]
 
 pub struct Term<F: Field> {
-    num_concrete_oracles: usize,
     alpha_coeffs: Vec<F>,
     constants: Vec<F>
 }
@@ -130,12 +128,12 @@ impl<F: Field> Term<F> {
     ) -> Result<F, TermEvalError> {
 
         // The length of inputs and concrete_oracles must equal the number of concrete oracles
-        if inputs.len() != self.num_concrete_oracles || concrete_oracles.len() != self.num_concrete_oracles {
+        if inputs.len() != concrete_oracles.len() {
             return Err(TermEvalError);
         }
 
         // Sum the constants
-        let sum_of_constants = self.constants.iter().fold(F::from(0 as u64), | sum, val| sum + val);
+        let sum_of_constants = self.constants.iter().fold(F::from(0 as u64), |sum, val| sum + val);
 
         // Compute the sum of the evaluations of each concrete oracle
         let mut sum_of_concrete_oracle_evaluations = F::from(0 as u64);
@@ -152,10 +150,12 @@ pub struct Description<F: Field> {
     terms: Vec<Term<F>>
 }
 
+pub struct InstantiationError;
+
 pub trait EvaluableVirtualOracle<F: Field> {
     fn new(description: Description<F>) -> Self;
-    //fn instantiate(concrete_oracles: Vec<DensePolynomial<F>>) -> F;
-    fn query(evaluations: Vec<F>) -> F;
+    fn instantiate(&self, concrete_oracles: Vec<DensePolynomial<F>>) -> Result<DensePolynomial<F>, InstantiationError>;
+    fn query(&self, evaluations: Vec<F>) -> F;
 }
 
 impl<F: Field> EvaluableVirtualOracle<F> for TestVirtualOracle2<F> {
@@ -166,7 +166,34 @@ impl<F: Field> EvaluableVirtualOracle<F> for TestVirtualOracle2<F> {
         };
     }
 
-    fn query(_evaluations: Vec<F>) -> F {
+    fn instantiate(&self, concrete_oracles: Vec<DensePolynomial<F>>) -> Result<DensePolynomial<F>, InstantiationError> {
+        let expected_num_concrete_oracles = self.description.terms.iter().fold(0 as usize, |sum, t| sum + t.alpha_coeffs.len());
+
+        if concrete_oracles.len() != expected_num_concrete_oracles {
+            return Err(InstantiationError);
+        }
+
+        // TODO WIP
+        //// Construct the polynomial which represents the virtual oracle
+        //let mut poly = DensePolynomial::<F>::from_coefficients_slice(&[]);
+        //let mut i = 0 as usize;
+
+        //// For each term
+        //for (term_i, term) in self.description.terms.iter().enumerate() {
+            //// Calculate the product of all concrete oracle in the term
+            //let mut term_prod = DensePolynomial::<F>::from_coefficients_slice(&[]);
+
+            //for _i in 0..term.alpha_coeffs.len() {
+                //term_prod = term_prod.naive_mul(&concrete_oracles[i]);
+            //}
+
+            //// Add the constants
+            //// i 
+        //}
+        return Err(InstantiationError);
+    }
+
+    fn query(&self, _evaluations: Vec<F>) -> F {
         // return a dummy value for now
         return F::from(0 as u64);
     }
