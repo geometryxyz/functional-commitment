@@ -5,6 +5,168 @@ use ark_ff::{Field, One};
 use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
 use ark_std::{test_rng, UniformRand};
 
+/// A abstraction which represents the description of a virtual oracle. A virtual oracle is
+/// composed of an indexed list of concrete oracles, the description of a virtual oracle which
+/// specifies how said concrete oracles must be composed to form the virtual oracle, as well as the
+/// alpha shifting coefficients for inputs to each concrete oracle. Following the definition of
+/// virtual oracles on page 12 of the Efficient Functional Commitments paper, an example of a
+/// virtual oracle h(X) is defined as such: h(X) = f(αX) ⋅ g(X) + β In this case, the concrete
+/// oracles are f (at index 0) and g (at index 1), and β is a constant.  α is a shifting factor for
+/// f and the shifting factor for g is (implicitly) 1.
+///
+/// ## Questions
+///
+/// Question 1: Which operations should be supported? Are there any operations besides
+/// multiplication and addition?
+///
+/// Question 2: Does multiplication take precedence over addition? (Ideally yes)
+///
+/// Question 3: Should brackets be supported? (It would be simpler to not support them, such that
+/// the definition of the virtual oracle is fully expanded.
+///
+///   e.g. the following should not be supported: [a(X) + b(X)][c(X)] but the following equivalent
+///   representation should be supported: c(X) ⋅ a(X) + c(X) ⋅ b(X), even if c(X) is included twice
+///   internally.
+///
+/// Question 4: Consider the following virtual oracle:
+///
+/// h(X) = f(αX) ⋅ g(X) + β
+///
+/// Should constants like β be part of the description (and therefore not hidden from the
+/// verifier)?
+///
+/// ## Who knows/runs what
+///
+/// In the protocol, the prover knows both the virtual oracle's description and the exact
+/// definition of each concrete oracle, but the verifier only knows the description.
+///
+/// If the verifier knows the evaluations of each concrete oracle at X, as well as the description,
+/// they can compute the evaluation of the virtual oracle at X, without needing to know the
+/// definition of any of the concrete oracles.
+///
+/// ## Next steps
+///
+/// The following is a design for the structs/traits I'll write:
+///
+/// UML:
+///
+/// EvaluableVirtualOracle (trait)
+///   Attributes:
+///     - description: Description
+///     - concrete_oracles: ConcreteOracle[]
+///
+///   Functions:
+///     - new(Description) -> VirtualOracle
+///       - returns a new VirtualOracle object
+///
+///     - instantiate(ConcreteOracle[]) -> Polynomial
+///       - returns a Polynomial which exactly defines the virtual oracle. Only the prover may use
+///         this function.
+///       - the order of ConcreteOracles is crucial. See below.
+///
+///     - query(Scalar[]) -> Scalar
+///       - Given a list of evaluations of concrete oracles, returns a value that is the evaluation
+///         of the virtual oracle. The verifier may use this function.
+///
+///
+/// Description (struct)
+///   Attributes:
+///     - terms: Term[]
+///
+///   Functions: none
+///
+///  Term (struct)
+///   Attributes:
+///     - num_concrete_oracles: integer
+///     - alpha_coeffs: Scalar[]
+///     - constants: Scalar[]
+///
+///   Notes:
+///     - the length of alpha_coeffs must be exactly num_concrete_oracles
+///
+/// ## Important notes
+///
+/// The order of concrete oracles passsed to instantiate() is critical. Take for example the
+/// following virtual oracle:
+/// h(X) = f(αX) ⋅ g(X) + β0 + a(X) ⋅ b(X) ⋅ c(X) + β1
+///
+/// h(X) contains two terms:
+///   - Term 0:
+///     - 2 concrete oracles
+///     - 1 constant
+///   - Term 1:
+///     - 3 concrete oracles
+///     - 1 constant
+///
+/// The order of concrete oracles passed to instantiate() should therefore be [f, g, a, b c]
+
+pub struct Term< F: Field> {
+    num_concrete_oracles: usize,
+    alpha_coeffs: F,
+    constants: F
+}
+
+impl<F: Field> Term<F> {
+    // Run by the prover
+    fn evaluate(input: &F, concrete_oracle: DensePolynomial<F>) -> F {
+        // TODO:
+        // 1. c = sum of the constants
+        // 2. d = alpha_coeffs * &input
+        // 3. return concrete_oracle.evaluate(d) + c
+        return *input;
+    }
+}
+
+pub struct Description<F: Field> {
+    terms: Vec<Term<F>>
+}
+
+pub trait EvaluableVirtualOracle<F: Field> {
+    //fn new(description: Description<F>) -> Self;
+    fn new(blah: F) -> Self;
+    //fn instantiate(concrete_oracles: Vec<DensePolynomial<F>>) -> F;
+    fn query(evaluations: Vec<F>) -> F;
+}
+
+impl<F: Field> EvaluableVirtualOracle<F> for TestVirtualOracle2<F> {
+    fn new(blah: F) -> Self {
+        return TestVirtualOracle2::<F>{blah: blah};
+    }
+
+    fn query(_evaluations: Vec<F>) -> F {
+        // return a dummy value for now
+        return F::from(0 as u64);
+    }
+}
+
+pub struct TestVirtualOracle2<F: Field> {
+    blah: F
+}
+
+#[cfg(test)]
+mod new_tests {
+    use super::{TestVirtualOracle2, EvaluableVirtualOracle};
+    use ark_bn254::Fr;
+
+    #[test]
+    fn create_and_evaluate_term() {
+    }
+
+    #[test]
+    fn create_description() {
+    }
+
+    #[test]
+    fn create_test_vo2() {
+        let vo2 = TestVirtualOracle2::<Fr>::new(Fr::from(0 as u64));
+    }
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+// The original code for VirtualOracle is below.
+
 /// Encode a virtual oracle. `alphas` allow to keep track of the shift applied to the input point for each concrete oracle.
 /// The `evaluate` function encodes the function `G` defined in the paper.
 pub trait VirtualOracle<F: Field, const NUM_OF_CONCRETE_ORACLES: usize> {
