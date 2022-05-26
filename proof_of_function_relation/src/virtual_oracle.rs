@@ -30,10 +30,10 @@ use ark_std::{test_rng, UniformRand};
 ///
 /// Question 4: Consider the following virtual oracle:
 ///
-/// h(X) = f(αX) ⋅ g(X) + β
+///   h(X) = f(αX) ⋅ g(X) + β
 ///
-/// Should constants like β be part of the description (and therefore not hidden from the
-/// verifier)?
+///   Should constants like β be part of the description (and therefore not hidden from the
+///   verifier)?
 ///
 /// ## Who knows/runs what
 ///
@@ -53,7 +53,7 @@ use ark_std::{test_rng, UniformRand};
 /// EvaluableVirtualOracle (trait)
 ///   Attributes:
 ///     - description: Description
-///     - concrete_oracles: ConcreteOracle[]
+///     - concrete_oracles: Polynomial[]
 ///
 ///   Functions:
 ///     - new(Description) -> VirtualOracle
@@ -62,7 +62,7 @@ use ark_std::{test_rng, UniformRand};
 ///     - instantiate(ConcreteOracle[]) -> Polynomial
 ///       - returns a Polynomial which exactly defines the virtual oracle. Only the prover may use
 ///         this function.
-///       - the order of ConcreteOracles is crucial. See below.
+///       - the order of the Polynomials in concrete_oracle is crucial. See below.
 ///
 ///     - query(Scalar[]) -> Scalar
 ///       - Given a list of evaluations of concrete oracles, returns a value that is the evaluation
@@ -92,11 +92,11 @@ use ark_std::{test_rng, UniformRand};
 ///
 /// h(X) contains two terms:
 ///   - Term 0:
-///     - 2 concrete oracles
-///     - 1 constant
+///     - 2 concrete oracles (f and g)
+///     - 1 constant (β0)
 ///   - Term 1:
-///     - 3 concrete oracles
-///     - 1 constant
+///     - 3 concrete oracles (a, b, and c)
+///     - 1 constant (β1)
 ///
 /// The order of concrete oracles passed to instantiate() should therefore be [f, g, a, b c]
 
