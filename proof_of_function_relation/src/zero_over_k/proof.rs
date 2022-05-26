@@ -1,11 +1,9 @@
-use crate::{
-    commitment::HomomorphicPolynomialCommitment,
-};
-use ark_ff::{PrimeField};
+use crate::commitment::HomomorphicPolynomialCommitment;
+use ark_ff::PrimeField;
 
 pub struct Proof<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> {
     // commitments
-    pub concrete_oracles_commitments: Vec<PC::Commitment>,
+    // pub concrete_oracles_commitments: Vec<PC::Commitment>,
     pub m_commitments: Vec<PC::Commitment>,
     pub r_commitments: Vec<PC::Commitment>,
     pub q1_commit: PC::Commitment,
