@@ -18,8 +18,10 @@ use ark_std::{test_rng, UniformRand};
 ///
 /// Question 1: Which operations should be supported? Are there any operations besides
 /// multiplication and addition?
+///   Answer: Only multiplication and addition
 ///
-/// Question 2: Does multiplication take precedence over addition? (Ideally yes)
+/// Question 2: Does multiplication take precedence over addition?
+///   Answer: yes
 ///
 /// Question 3: Should brackets be supported? (It would be simpler to not support them, such that
 /// the definition of the virtual oracle is fully expanded.
@@ -28,12 +30,17 @@ use ark_std::{test_rng, UniformRand};
 ///   representation should be supported: c(X) ⋅ a(X) + c(X) ⋅ b(X), even if c(X) is included twice
 ///   internally.
 ///
+///   Answer: for now, just implement virtual oracles in their fully expanded form, without
+///   brackets.
+///
 /// Question 4: Consider the following virtual oracle:
 ///
 ///   h(X) = f(αX) ⋅ g(X) + β
 ///
 ///   Should constants like β be part of the description (and therefore not hidden from the
 ///   verifier)?
+///
+///   Answer: yes.
 ///
 /// ## Who knows/runs what
 ///
@@ -73,13 +80,19 @@ use ark_std::{test_rng, UniformRand};
 ///   Attributes:
 ///     - terms: Term[]
 ///
-///   Functions: none
+///   Functions:
+///     - group_concrete_oracles_by_alphas: Dict{F -> integer[]} (TBD?)
+///       - Returns an associative array where the index of the concrete oracles are grouped by
+///         alpha coefficients. Useful for batch polynomial commitments?
 ///
 ///  Term (struct)
 ///   Attributes:
 ///     - num_concrete_oracles: integer
 ///     - alpha_coeffs: Scalar[]
 ///     - constants: Scalar[]
+///
+///   Functions:
+///     - evaluate_as_prover(inputs: Scalar[], concrete_oracles: Polynomial[]) -> Scalar (or Error)
 ///
 ///   Notes:
 ///     - the length of alpha_coeffs must be exactly num_concrete_oracles
@@ -100,20 +113,38 @@ use ark_std::{test_rng, UniformRand};
 ///
 /// The order of concrete oracles passed to instantiate() should therefore be [f, g, a, b c]
 
-pub struct Term< F: Field> {
+pub struct Term<F: Field> {
     num_concrete_oracles: usize,
-    alpha_coeffs: F,
-    constants: F
+    alpha_coeffs: Vec<F>,
+    constants: Vec<F>
 }
+
+struct TermEvalError;
 
 impl<F: Field> Term<F> {
     // Run by the prover
-    fn evaluate(input: &F, concrete_oracle: DensePolynomial<F>) -> F {
-        // TODO:
-        // 1. c = sum of the constants
-        // 2. d = alpha_coeffs * &input
-        // 3. return concrete_oracle.evaluate(d) + c
-        return *input;
+    fn evaluate_as_prover(
+        &self,
+        inputs: Vec<F>,
+        concrete_oracles: Vec<DensePolynomial<F>>
+    ) -> Result<F, TermEvalError> {
+
+        // The length of inputs and concrete_oracles must equal the number of concrete oracles
+        if inputs.len() != self.num_concrete_oracles || concrete_oracles.len() != self.num_concrete_oracles {
+            return Err(TermEvalError);
+        }
+
+        // Sum the constants
+        let sum_of_constants = self.constants.iter().fold(F::from(0 as u64), | sum, val| sum + val);
+
+        // Compute the sum of the evaluations of each concrete oracle
+        let mut sum_of_concrete_oracle_evaluations = F::from(0 as u64);
+        for (i, c) in concrete_oracles.iter().enumerate() {
+            let m = self.alpha_coeffs[i] * inputs[i];
+            sum_of_concrete_oracle_evaluations += c.evaluate(&m);
+        }
+
+        return Ok(sum_of_concrete_oracle_evaluations + sum_of_constants);
     }
 }
 
@@ -122,15 +153,17 @@ pub struct Description<F: Field> {
 }
 
 pub trait EvaluableVirtualOracle<F: Field> {
-    //fn new(description: Description<F>) -> Self;
-    fn new(blah: F) -> Self;
+    fn new(description: Description<F>) -> Self;
     //fn instantiate(concrete_oracles: Vec<DensePolynomial<F>>) -> F;
     fn query(evaluations: Vec<F>) -> F;
 }
 
 impl<F: Field> EvaluableVirtualOracle<F> for TestVirtualOracle2<F> {
-    fn new(blah: F) -> Self {
-        return TestVirtualOracle2::<F>{blah: blah};
+    fn new(description: Description<F>) -> Self {
+        return TestVirtualOracle2::<F>{
+            description: description,
+            concrete_oracles: Vec::<DensePolynomial<F>>::new()
+        };
     }
 
     fn query(_evaluations: Vec<F>) -> F {
@@ -140,7 +173,8 @@ impl<F: Field> EvaluableVirtualOracle<F> for TestVirtualOracle2<F> {
 }
 
 pub struct TestVirtualOracle2<F: Field> {
-    blah: F
+    description: Description<F>,
+    concrete_oracles: Vec<DensePolynomial<F>>
 }
 
 #[cfg(test)]
