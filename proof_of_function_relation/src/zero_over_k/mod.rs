@@ -1,10 +1,10 @@
-use crate::commitment::HomomorphicPolynomialCommitment;
+use crate::commitment::{aggregate_polynomials, HomomorphicPolynomialCommitment};
 use crate::error::{to_pc_error, Error};
 use crate::util::{commit_polynomial, powers_of};
 use crate::virtual_oracle::VirtualOracle;
 use crate::zero_over_k::piop::PIOPforZeroOverK;
 use crate::zero_over_k::proof::Proof;
-use crate::{label_commitment, label_polynomial};
+use crate::{label_commitment, label_commitment_as_poly, label_polynomial, label_polynomial_named};
 use ark_ff::to_bytes;
 use ark_ff::PrimeField;
 use ark_marlin::rng::FiatShamirRng;
@@ -12,10 +12,12 @@ use ark_poly::{
     univariate::{DenseOrSparsePolynomial, DensePolynomial},
     EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial,
 };
-use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PCRandomness};
-use ark_std::marker::PhantomData;
+use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PCRandomness, QuerySet};
+use ark_std::{marker::PhantomData, UniformRand};
 use digest::Digest;
 use rand::Rng;
+use rand_core::OsRng;
+use std::collections::HashMap;
 
 mod piop;
 mod proof;
@@ -38,6 +40,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         domain: GeneralEvaluationDomain<F>,
         ck: &PC::CommitterKey,
         rng: &mut R,
+        vk: &PC::VerifierKey,
     ) -> Result<Proof<F, PC>, Error> {
         let prover_initial_state =
             PIOPforZeroOverK::prover_init(domain, concrete_oracles, virtual_oracle)?;
@@ -67,7 +70,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
 
         // commit to the masking polynomials
         let (m_commitments, m_rands) =
-            PC::commit(ck, masking_polynomials.iter(), Some(rng)).map_err(to_pc_error::<F, PC>)?;
+            PC::commit(ck, masking_polynomials.iter(), None).map_err(to_pc_error::<F, PC>)?;
 
         // commit to q_1
         let (q1_commit, q1_rand) =
@@ -85,7 +88,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         let (prover_second_msg, prover_second_oracles, prover_state) =
             PIOPforZeroOverK::prover_second_round(&verifier_first_msg, prover_state, rng);
 
-        let points_for_queries = PIOPforZeroOverK::verifier_query_set(verifier_state)?;
+        let points_for_queries = PIOPforZeroOverK::verifier_query_set(&verifier_state)?;
         //------------------------------------------------------------------
 
         let q_2 = prover_second_oracles.q_2;
@@ -93,13 +96,13 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         let beta_2 = points_for_queries.beta_2;
 
         // commit to q_1
-        let (q1_commit, q1_rand) = commit_polynomial::<F, PC>(ck, &q_1, Some(rng))?;
+        let (q1_commit, q1_rand) = commit_polynomial::<F, PC>(ck, &q_1, None)?;
 
         // open q1 at beta_1
         let q1_eval = q_1.evaluate(&beta_1);
         let q1_opening = PC::open(
             ck,
-            &[q_1],
+            &[q_1.clone()],
             &[label_commitment!(q1_commit)],
             &beta_1,
             F::one(),
@@ -129,7 +132,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
 
         let q2_opening = PC::open(
             ck,
-            &[q_2],
+            &[q_2.clone()],
             &[label_commitment!(q2_commitment)],
             &beta_2,
             F::one(),
@@ -228,6 +231,116 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             .map(|m_c| m_c.commitment().clone())
             .collect::<Vec<_>>();
 
+        let mut label_to_poly = HashMap::new();
+
+        for (i, h_prime) in h_primes.iter().enumerate() {
+            label_to_poly.insert(
+                format!("h_prime_{}", i),
+                (h_prime.clone(), h_prime_evals[i]),
+            );
+        }
+        for (i, m) in masking_polynomials.iter().enumerate() {
+            label_to_poly.insert(format!("m_{}", i), (m.polynomial().clone(), m_evals[i]));
+        }
+
+        label_to_poly.insert(String::from("q_1"), (q_1.polynomial().clone(), q1_eval));
+        label_to_poly.insert(String::from("q_2"), (q_2.polynomial().clone(), q2_eval));
+
+        let query_set = PIOPforZeroOverK::verifier_query_set_new(&verifier_state)?;
+
+        let mut point_label_to_point_value = HashMap::new();
+        let mut point_to_polys: HashMap<String, (Vec<DensePolynomial<F>>, Vec<F>)> = HashMap::new();
+
+        for (poly_label, (point_label, point)) in &query_set {
+            point_label_to_point_value.insert(point_label, point);
+
+            let (poly_to_combine, eval) = match label_to_poly.get(poly_label) {
+                Some((poly, eval)) => (poly.clone(), eval.clone()),
+                None => panic!("labels wrong"),
+            };
+            let label = match point_to_polys.get_mut(point_label) {
+                Some((polys, evals)) => {
+                    polys.push(poly_to_combine);
+                    evals.push(eval);
+                }
+                None => {
+                    point_to_polys.insert(point_label.clone(), (vec![poly_to_combine], vec![eval]));
+                }
+            };
+        }
+
+        let mut aggregated_polys = vec![];
+        let mut aggregated_commitments = vec![];
+        let mut aggregated_rands = vec![];
+
+        let mut evaluations = ark_poly_commit::Evaluations::new(); //this is not needed on prover side (here just for testing)
+
+        let mut batched_query_set = QuerySet::new();
+        for (i, (point_label, (polys, evals))) in point_to_polys.iter().enumerate() {
+            let separation_challenge: F = u128::rand(&mut fs_rng).into();
+
+            let poly = aggregate_polynomials(polys, evals, separation_challenge);
+            let poly = label_polynomial_named!(format!("agg_poly_{}", i), poly);
+            aggregated_polys.push(poly.clone());
+
+            let (commitment, randomness) =
+                PC::commit(ck, &[poly.clone()], None).map_err(to_pc_error::<F, PC>)?;
+
+            aggregated_commitments
+                .push(label_commitment_as_poly!(poly, commitment[0].commitment()));
+            aggregated_rands.push(randomness[0].clone());
+
+            let point = match point_label_to_point_value.get(point_label) {
+                Some(point) => point.clone(),
+                None => panic!("Missing point"),
+            };
+
+            batched_query_set.insert((poly.label().clone(), (point_label.to_string(), *point)));
+
+            let poly_eval = poly.polynomial().evaluate(point);
+            evaluations.insert((poly.label().clone(), *point), poly_eval);
+        }
+
+        let separation_challenge: F = u128::rand(&mut fs_rng).into();
+        let homomorphic_randomness = PC::Randomness::empty();
+
+        for p in &aggregated_polys {
+            println!("poly label: {}", p.label());
+        }
+
+        for c in &aggregated_commitments {
+            println!("commitment label: {}", c.label());
+        }
+
+        for (p_label, (point_label, point)) in &batched_query_set {
+            println!("poly label in query_set: {}", p_label);
+        }
+
+        let batch_opening = PC::batch_open(
+            &ck,
+            &aggregated_polys,
+            &aggregated_commitments,
+            &batched_query_set,
+            separation_challenge,
+            &vec![homomorphic_randomness; aggregated_polys.len()],
+            None,
+        )
+        .map_err(to_pc_error::<F, PC>)?;
+
+        let res = match PC::batch_check(
+            vk,
+            &aggregated_commitments,
+            &batched_query_set,
+            &evaluations,
+            &batch_opening,
+            separation_challenge,
+            &mut OsRng,
+        ) {
+            Ok(true) => Ok(()),
+            Ok(false) => Err(Error::ProofVerificationError),
+            Err(e) => panic!("{:?}", e),
+        };
+
         let proof = Proof {
             // commitments
             m_commitments,
@@ -274,7 +387,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
 
         let query_set = PIOPforZeroOverK::verifier_query_set_new(&verifier_state)?;
 
-        let points_for_queries = PIOPforZeroOverK::verifier_query_set(verifier_state)?;
+        let points_for_queries = PIOPforZeroOverK::verifier_query_set(&verifier_state)?;
 
         // derive commitment to h_prime through additive homomorphism
         let h_prime_commitments = concrete_oracle_commitments
@@ -345,15 +458,6 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
                 m_eval,
             );
         }
-
-        //let's say that we have another hash map: poly_label => poly, rand
-
-        // evaluate poly: h_prime_0, in point: beta_1 with value Fp256 "(293D6AB4C074E7502C1DBD28D1151523DB175383DDBC82E5392B6EA5B70C6A7A)"
-        // evaluate poly: h_prime_1, in point: beta_1 with value Fp256 "(293D6AB4C074E7502C1DBD28D1151523DB175383DDBC82E5392B6EA5B70C6A7A)"
-        // evaluate poly: m_0, in point: beta_2 with value Fp256 "(1A6BFDB9903D732617070351C48D21919D5715900E9204C2E3A0970EC36CE81D)"
-        // evaluate poly: m_1, in point: beta_2 with value Fp256 "(1A6BFDB9903D732617070351C48D21919D5715900E9204C2E3A0970EC36CE81D)"
-        // evaluate poly: q_1, in point: beta_1 with value Fp256 "(293D6AB4C074E7502C1DBD28D1151523DB175383DDBC82E5392B6EA5B70C6A7A)"
-        // evaluate poly: q_2, in point: beta_2 with value Fp256 "(1A6BFDB9903D732617070351C48D21919D5715900E9204C2E3A0970EC36CE81D)"
 
         /// point_label = [poly_labels] for each poly label take poly from poly_label map
 

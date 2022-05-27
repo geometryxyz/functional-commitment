@@ -7,6 +7,7 @@ use ark_poly_commit::QuerySet;
 use rand::Rng;
 use std::collections::HashMap;
 
+#[derive(Copy, Clone)]
 pub struct VerifierState<'a, F: PrimeField, VO: VirtualOracle<F>> {
     virtual_oracle: &'a VO,
 
@@ -64,7 +65,7 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
     }
 
     pub fn verifier_query_set<VO: VirtualOracle<F>>(
-        state: VerifierState<F, VO>,
+        state: &VerifierState<F, VO>,
     ) -> Result<VerifierQuerySet<F>, Error> {
         ///map for alpha_value => point_label
         let mut evaluation_points = HashMap::new();
@@ -128,9 +129,12 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
         query_set.insert((String::from("q_1"), (String::from("beta_1"), beta_1)));
         query_set.insert((String::from("q_2"), (String::from("beta_2"), beta_2)));
 
-        for (poly_label, (point_label, point)) in &query_set {
-            println!("evaluate poly: {}, in point: {} with value {}", poly_label, point_label, point);
-        }
+        // for (poly_label, (point_label, point)) in &query_set {
+        //     println!(
+        //         "evaluate poly: {}, in point: {} with value {}",
+        //         poly_label, point_label, point
+        //     );
+        // }
         Ok(query_set)
     }
 

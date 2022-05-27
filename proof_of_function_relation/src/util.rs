@@ -32,6 +32,13 @@ macro_rules! label_polynomial {
 }
 
 #[macro_export]
+macro_rules! label_polynomial_named {
+    ($name:expr, $poly:expr) => {
+        ark_poly_commit::LabeledPolynomial::new($name.clone(), $poly.clone(), None, None)
+    };
+}
+
+#[macro_export]
 macro_rules! label_polynomial_with_bound {
     ($poly:expr, $hiding_bound:expr) => {
         ark_poly_commit::LabeledPolynomial::new(
@@ -40,6 +47,13 @@ macro_rules! label_polynomial_with_bound {
             None,
             $hiding_bound,
         )
+    };
+}
+
+#[macro_export]
+macro_rules! label_commitment_as_poly {
+    ($poly:expr, $comm:expr) => {
+        ark_poly_commit::LabeledCommitment::new($poly.label().clone(), $comm.clone(), None)
     };
 }
 

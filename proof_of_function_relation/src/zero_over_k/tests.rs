@@ -61,15 +61,15 @@ mod test {
         let maximum_degree: usize = 16;
 
         let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
-        let (ck, vk) = PC::trim(&pp, maximum_degree, 1, None).unwrap();
+        let (ck, vk) = PC::trim(&pp, maximum_degree, 0, None).unwrap();
 
         let labeled_concrete_oracles = test_virtual_oracle
             .oracles
             .iter()
-            .map(|oracle| label_polynomial_with_bound!(oracle, Some(1)))
+            .map(|oracle| label_polynomial!(oracle))
             .collect::<Vec<_>>();
         let (concrete_oracles_commitments, concrete_oracle_rands) =
-            PC::commit(&ck, labeled_concrete_oracles.iter(), Some(&mut OsRng)).unwrap();
+            PC::commit(&ck, labeled_concrete_oracles.iter(), None).unwrap();
 
         let concrete_oracles_commitments = concrete_oracles_commitments
             .iter()
@@ -84,6 +84,7 @@ mod test {
             domain,
             &ck,
             &mut OsRng,
+            &vk, //remove this after test
         )
         .unwrap();
 

@@ -164,10 +164,7 @@ fn compute_maskings<R: Rng, F: PrimeField>(
             shift_dense_poly(&domain.vanishing_polynomial().into(), &shifting_factor);
 
         random_polynomials.push(label_polynomial!(r.clone()));
-        masking_polynomials.push(label_polynomial_with_bound!(
-            (&r_shifted * &vanishing_shifted),
-            Some(1)
-        ));
+        masking_polynomials.push(label_polynomial!((&r_shifted * &vanishing_shifted)));
     }
 
     (random_polynomials, masking_polynomials)

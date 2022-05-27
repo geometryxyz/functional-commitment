@@ -4,6 +4,7 @@ pub enum Error {
     PCError { error: String },
     Check1Failed,
     Check2Failed,
+    ProofVerificationError,
 }
 
 /// Convert an ark_poly_commit error
