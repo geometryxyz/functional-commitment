@@ -93,6 +93,7 @@ use ark_std::{test_rng, UniformRand};
 ///
 /// TODO: refactor to use a Marlin-style Evaluator trait
 
+#[derive(Debug)]
 pub struct Term<F: Field> {
     alpha_coeffs: Vec<F>,
     constants: Vec<F>
@@ -131,6 +132,7 @@ impl<F: Field> Term<F> {
 */
 
 /// A Description is just a Vector of Terms
+#[derive(Debug)]
 pub struct Description<F: Field> {
     terms: Vec<Term<F>>
 }
@@ -148,7 +150,9 @@ pub trait EvaluableVirtualOracle<F: Field> {
     fn query(&self, evaluations: Vec<F>) -> Result<F, QueryError>;
 }
 
+#[derive(Debug)]
 pub struct InstantiationError;
+#[derive(Debug)]
 pub struct QueryError;
 
 impl<F: Field> EvaluableVirtualOracle<F> for TestVirtualOracle2<F> {
@@ -301,19 +305,8 @@ mod new_tests {
         let result = vo.query(evaluations);
         assert!(result.is_ok());
 
-        // TODO: figure out why result.unwrap() returns QueryError() even though it is Ok
-        //assert!(result.unwrap() == Fr::from(20 as u64));
+        assert!(result.unwrap() == Fr::from(20 as u64));
 
-        match result {
-            Ok(r) => {
-                assert!(r == Fr::from(20 as u64));
-            }
-            Err(e) => {
-                // This shouldn't happen
-                assert_eq!(true, false);
-            }
-        }
-        
         // Test QueryError by passing in an invalid number of evaluations
         let bad_evaluations = vec![
             Fr::from(1 as u64),
@@ -370,19 +363,11 @@ mod new_tests {
         let result = vo.instantiate(vec![ax, bx, cx, dx]);
         assert!(result.is_ok());
 
-        match result {
-            Ok(r) => {
-                // Evaluate the polynomial at the point 1:
-                // F(1) = [1 + 5] + [1 + 10] + [1] = 6 + 11 + 1 = 18
-                let eval = r.evaluate(&Fr::from(1 as u64));
+        // Evaluate the polynomial at the point 1:
+        // F(1) = [1 + 5] + [1 + 10] + [1] = 6 + 11 + 1 = 18
+        let eval = result.unwrap().evaluate(&Fr::from(1 as u64));
 
-                assert_eq!(eval.into_repr(), Fr::from(18 as u64).into_repr());
-            }
-            Err(e) => {
-                // This shouldn't happen
-                assert_eq!(true, false);
-            }
-        }
+        assert_eq!(eval.into_repr(), Fr::from(18 as u64).into_repr());
     }
 }
 
