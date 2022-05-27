@@ -51,7 +51,10 @@ use ark_std::{test_rng, UniformRand};
 ///         this function.
 ///       - the order of the Polynomials in concrete_oracle is crucial. See below.
 ///
-///     - query(Scalar[]) -> Scalar
+///     - instantiate_and_evaluate(Polynomial[], point: Scalar) -> Scalar
+///         - Evaluates the point at the polynomial which defines the virtual oracle.
+///
+///     - evaluate(Scalar[]) -> Scalar
 ///       - Given a list of evaluations of concrete oracles, returns a value that is the evaluation
 ///         of the virtual oracle. The verifier may use this function.
 ///    
@@ -117,8 +120,9 @@ pub struct VirtualOracle2<F: Field> {
 }
 
 pub trait EvaluationsProvider<F: Field> {
-    fn instantiate(&self, concrete_oracles: Vec<DensePolynomial<F>>) -> Result<DensePolynomial<F>, InstantiationError>;
-    fn query(&self, evaluations: Vec<F>) -> Result<F, QueryError>;
+    fn instantiate(&self, concrete_oracles: &Vec<DensePolynomial<F>>) -> Result<DensePolynomial<F>, InstantiationError>;
+    fn instantiate_and_evaluate(&self, concrete_oracles: &Vec<DensePolynomial<F>>, point: F) -> Result<F, InstantiationError>;
+    fn evaluate(&self, evaluations: Vec<F>) -> Result<F, QueryError>;
 }
 
 pub struct InstantiationError;
@@ -135,7 +139,7 @@ impl<F: Field> VirtualOracle2<F> {
 impl<F: Field> EvaluationsProvider<F> for VirtualOracle2<F> {
     /// Construct the polynomial which represents the virtual oracle. Returns an error if the
     /// length of concrete_oracles differs from the number of concrete oracles in the Description.
-    fn instantiate(&self, concrete_oracles: Vec<DensePolynomial<F>>) -> Result<DensePolynomial<F>, InstantiationError> {
+    fn instantiate(&self, concrete_oracles: &Vec<DensePolynomial<F>>) -> Result<DensePolynomial<F>, InstantiationError> {
         let expected_num_concrete_oracles = self.description.count_concrete_oracles();
 
         if concrete_oracles.len() != expected_num_concrete_oracles {
@@ -176,10 +180,27 @@ impl<F: Field> EvaluationsProvider<F> for VirtualOracle2<F> {
         return Ok(poly);
     }
 
+    fn instantiate_and_evaluate(
+        &self,
+        concrete_oracles: &Vec<DensePolynomial<F>>,
+        point: F
+    ) -> Result<F, InstantiationError> {
+        let poly_or_err = self.instantiate(concrete_oracles);
+
+        match poly_or_err {
+            Ok(p) => {
+                return Ok(p.evaluate(&point));
+            }
+            Err(e) => {
+                Err(e)
+            }
+        }
+    }
+
     /// Return the evaluation of the virtual oracle given a list of evaluations of each concrete
     /// oracle. The length of the input vector of evaluations must equal to the number of concrete
     /// oracles in the Description.
-    fn query(&self, evaluations: Vec<F>) -> Result<F, QueryError> {
+    fn evaluate(&self, evaluations: Vec<F>) -> Result<F, QueryError> {
         let expected_num_concrete_oracles = self.description.count_concrete_oracles();
 
         if evaluations.len() != expected_num_concrete_oracles {
@@ -268,7 +289,7 @@ mod new_tests {
         ];
 
         let vo = VirtualOracle2::new(description);
-        let result = vo.query(evaluations);
+        let result = vo.evaluate(evaluations);
         assert!(result.is_ok());
 
         // TODO: figure out why result.unwrap() returns QueryError() even though it is Ok
@@ -290,7 +311,7 @@ mod new_tests {
             Fr::from(2 as u64),
             Fr::from(3 as u64),
         ];
-        let result = vo.query(bad_evaluations);
+        let result = vo.evaluate(bad_evaluations);
         assert!(result.is_err());
     }
 
@@ -337,16 +358,33 @@ mod new_tests {
         let description = description_case_0();
         let vo = VirtualOracle2::new(description);
 
-        let result = vo.instantiate(vec![ax, bx, cx, dx]);
-        assert!(result.is_ok());
+        let concrete_oracles = vec![ax, bx, cx, dx];
 
-        match result {
+        // Test instantiate()
+        let poly_result = vo.instantiate(&concrete_oracles);
+        assert!(poly_result.is_ok());
+
+        let point = Fr::from(1 as u64);
+
+        match poly_result {
             Ok(r) => {
                 // Evaluate the polynomial at the point 1:
                 // F(1) = [1 + 5] + [1 + 10] + [1] = 6 + 11 + 1 = 18
-                let eval = r.evaluate(&Fr::from(1 as u64));
+                let eval = r.evaluate(&point);
 
                 assert_eq!(eval.into_repr(), Fr::from(18 as u64).into_repr());
+            }
+            Err(e) => {
+                // This shouldn't happen
+                assert_eq!(true, false);
+            }
+        }
+
+        // Test instantiate_and_evaluate()
+        let val = vo.instantiate_and_evaluate(&concrete_oracles, point);
+        match val {
+            Ok(v) => {
+                assert_eq!(v.into_repr(), Fr::from(18 as u64).into_repr());
             }
             Err(e) => {
                 // This shouldn't happen
