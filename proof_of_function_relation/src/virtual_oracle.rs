@@ -14,33 +14,14 @@ use ark_std::{test_rng, UniformRand};
 /// oracles are f (at index 0) and g (at index 1), and β is a constant.  α is a shifting factor for
 /// f and the shifting factor for g is (implicitly) 1.
 ///
-/// ## Questions
+/// ## Implementation notes
 ///
-/// Question 1: Which operations should be supported? Are there any operations besides
-/// multiplication and addition?
-///   Answer: Only multiplication and addition
-///
-/// Question 2: Does multiplication take precedence over addition?
-///   Answer: yes
-///
-/// Question 3: Should brackets be supported? (It would be simpler to not support them, such that
-/// the definition of the virtual oracle is fully expanded.
-///
-///   e.g. the following should not be supported: [a(X) + b(X)][c(X)] but the following equivalent
-///   representation should be supported: c(X) ⋅ a(X) + c(X) ⋅ b(X), even if c(X) is included twice
-///   internally.
-///
-///   Answer: for now, just implement virtual oracles in their fully expanded form, without
-///   brackets.
-///
-/// Question 4: Consider the following virtual oracle:
-///
-///   h(X) = f(αX) ⋅ g(X) + β
-///
-///   Should constants like β be part of the description (and therefore not hidden from the
-///   verifier)?
-///
-///   Answer: yes.
+/// - Only multiplication and addition operations are supported in the representation of the virtual
+///   oracle.
+/// - Multiplication takes precedence over addition.
+/// - Brackets are not supported, as it is much simpler to only represent the fully-expanded version
+///   of the virtual oracle.
+/// - Constants are part of the description, and are therefore visible to the verifier.
 ///
 /// ## Who knows/runs what
 ///
@@ -53,9 +34,7 @@ use ark_std::{test_rng, UniformRand};
 ///
 /// ## Next steps
 ///
-/// The following is a design for the structs/traits I'll write:
-///
-/// UML:
+/// The following is an UML-esque design for the structs/traits:
 ///
 /// EvaluableVirtualOracle (trait)
 ///   Attributes:
@@ -111,16 +90,20 @@ use ark_std::{test_rng, UniformRand};
 ///     - 1 constant (β1)
 ///
 /// The order of concrete oracles passed to instantiate() should therefore be [f, g, a, b c]
+///
+/// TODO: refactor to use a Marlin-style Evaluator trait
 
 pub struct Term<F: Field> {
     alpha_coeffs: Vec<F>,
     constants: Vec<F>
 }
 
+/*
 struct TermEvalError;
 
 impl<F: Field> Term<F> {
     // Run by the prover
+    // TODO: this funciton may not be necessary...
     fn evaluate_as_prover(
         &self,
         inputs: Vec<F>,
@@ -145,81 +128,261 @@ impl<F: Field> Term<F> {
         return Ok(sum_of_concrete_oracle_evaluations + sum_of_constants);
     }
 }
+*/
 
+/// A Description is just a Vector of Terms
 pub struct Description<F: Field> {
     terms: Vec<Term<F>>
 }
 
-pub struct InstantiationError;
+impl<F: Field> Description<F> {
+    fn count_concrete_oracles(&self) -> usize {
+        let r = self.terms.iter().fold(0 as usize, |sum, t| sum + t.alpha_coeffs.len());
+        return r;
+    }
+}
 
 pub trait EvaluableVirtualOracle<F: Field> {
     fn new(description: Description<F>) -> Self;
     fn instantiate(&self, concrete_oracles: Vec<DensePolynomial<F>>) -> Result<DensePolynomial<F>, InstantiationError>;
-    fn query(&self, evaluations: Vec<F>) -> F;
+    fn query(&self, evaluations: Vec<F>) -> Result<F, QueryError>;
 }
+
+pub struct InstantiationError;
+pub struct QueryError;
 
 impl<F: Field> EvaluableVirtualOracle<F> for TestVirtualOracle2<F> {
     fn new(description: Description<F>) -> Self {
         return TestVirtualOracle2::<F>{
-            description: description,
-            concrete_oracles: Vec::<DensePolynomial<F>>::new()
+            description: description
         };
     }
 
+    /// Construct the polynomial which represents the virtual oracle. Returns an error if the
+    /// length of concrete_oracles differs from the number of concrete oracles in the Description.
     fn instantiate(&self, concrete_oracles: Vec<DensePolynomial<F>>) -> Result<DensePolynomial<F>, InstantiationError> {
-        let expected_num_concrete_oracles = self.description.terms.iter().fold(0 as usize, |sum, t| sum + t.alpha_coeffs.len());
+        let expected_num_concrete_oracles = self.description.count_concrete_oracles();
 
         if concrete_oracles.len() != expected_num_concrete_oracles {
             return Err(InstantiationError);
         }
 
-        // TODO WIP
-        //// Construct the polynomial which represents the virtual oracle
-        //let mut poly = DensePolynomial::<F>::from_coefficients_slice(&[]);
-        //let mut i = 0 as usize;
+        // the polynomial to construct and return
+        let mut poly = DensePolynomial::<F>::default();
 
-        //// For each term
-        //for (term_i, term) in self.description.terms.iter().enumerate() {
-            //// Calculate the product of all concrete oracle in the term
-            //let mut term_prod = DensePolynomial::<F>::from_coefficients_slice(&[]);
+        // index to keep track of concrete_oracles
+        let mut i = 0 as usize;
 
-            //for _i in 0..term.alpha_coeffs.len() {
-                //term_prod = term_prod.naive_mul(&concrete_oracles[i]);
-            //}
+        // For each term
+        for term in self.description.terms.iter() {
+            // Sum the constants
+            let constant_sum = term.constants.iter().fold(F::from(0 as u64), |sum, c| sum + c);
 
-            //// Add the constants
-            //// i 
-        //}
-        return Err(InstantiationError);
+            // term_product is the 1-degree polynomial: f(X) = (constant_sum ⋅ x^0)
+            let mut term_product: DensePolynomial<F>;
+
+            if term.alpha_coeffs.len() == 0 {
+                // An empty polynomial
+                term_product = DensePolynomial::<F>::default();
+            } else {
+                // Calculate the product of all concrete oracles in the term
+                term_product = concrete_oracles[i].clone();
+                i += 1;
+
+                for _i in 1..term.alpha_coeffs.len() {
+                    term_product = term_product.naive_mul(&concrete_oracles[i]);
+                    i += 1;
+                }
+            }
+
+            poly = poly + term_product + DensePolynomial::<F>::from_coefficients_slice(&[constant_sum]);
+        }
+
+        return Ok(poly);
     }
 
-    fn query(&self, _evaluations: Vec<F>) -> F {
+    /// Return the evaluation of the virtual oracle given a list of evaluations of each concrete
+    /// oracle. The length of the input vector of evaluations must equal to the number of concrete
+    /// oracles in the Description.
+    fn query(&self, evaluations: Vec<F>) -> Result<F, QueryError> {
+        let expected_num_concrete_oracles = self.description.count_concrete_oracles();
+
+        if evaluations.len() != expected_num_concrete_oracles {
+            return Err(QueryError);
+        }
+
+        let mut total_eval = F::from(0 as u64);
+
+        // index to keep track of concrete_oracles
+        let mut i = 0 as usize;
+
+        // For each term
+        for term in self.description.terms.iter() {
+            // Sum the constants
+            let sum_of_constants = term.constants.iter().fold(F::from(0 as u64), |sum, c| sum + c);
+            let mut product_of_concrete_oracles = F::from(1 as u64);
+
+            // Calculate the evaluation of the term
+            for _i in 0..term.alpha_coeffs.len() {
+                product_of_concrete_oracles *= &evaluations[i];
+                i += 1;
+            }
+
+            total_eval += product_of_concrete_oracles + sum_of_constants;
+        }
+
         // return a dummy value for now
-        return F::from(0 as u64);
+        Ok(total_eval)
     }
 }
 
 pub struct TestVirtualOracle2<F: Field> {
-    description: Description<F>,
-    concrete_oracles: Vec<DensePolynomial<F>>
+    description: Description<F>
 }
 
 #[cfg(test)]
 mod new_tests {
-    use super::{TestVirtualOracle2, EvaluableVirtualOracle};
+    use super::{Term, Description, TestVirtualOracle2, EvaluableVirtualOracle};
+    use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
     use ark_bn254::Fr;
+    use ark_ff::PrimeField;
 
-    #[test]
-    fn create_and_evaluate_term() {
+    fn description_case_0() -> Description<Fr> {
+        // Let the virtual oracle be:
+        // F(X) = [a(X) + 5] + [b(X) ⋅ c(X) + 10] + d(2X)
+        //
+        // Test case 1:
+        //   a(X) = 0
+        //   b(X) = 1
+        //   c(X) = 2
+        //   d(2X) = 3
+        //   F(X) = (0 + 5) + (1 ⋅ 2 + 10) + 3 = 5 + 12 + 3 = 20
+
+        // Define the terms
+
+        // a(X) + 5
+        let term0 = Term::<Fr>{
+            alpha_coeffs: vec![Fr::from(1 as u64)],
+            constants: vec![Fr::from(5 as u64)],
+        };
+
+        // b(X) ⋅ c(X) + 10
+        let term1 = Term::<Fr>{
+            alpha_coeffs: vec![Fr::from(1 as u64), Fr::from(1 as u64)],
+            constants: vec![Fr::from(10 as u64)],
+        };
+
+        // d(2X)
+        let term2 = Term::<Fr>{
+            alpha_coeffs: vec![Fr::from(2 as u64)],
+            constants: vec![Fr::from(0 as u64)],
+        };
+
+        // Define the description
+        Description::<Fr>{ terms: vec![term0, term1, term2] }
     }
 
+    // As the verifier, create and query a description
     #[test]
-    fn create_description() {
+    fn verify_create_and_query_description() {
+        let description = description_case_0();
+
+        assert!(description.count_concrete_oracles() == 4 as usize);
+
+        // Query the description
+        let evaluations = vec![
+            Fr::from(0 as u64),
+            Fr::from(1 as u64),
+            Fr::from(2 as u64),
+            Fr::from(3 as u64),
+        ];
+
+        let vo = TestVirtualOracle2::new(description);
+        let result = vo.query(evaluations);
+        assert!(result.is_ok());
+
+        // TODO: figure out why result.unwrap() returns QueryError() even though it is Ok
+        //assert!(result.unwrap() == Fr::from(20 as u64));
+
+        match result {
+            Ok(r) => {
+                assert!(r == Fr::from(20 as u64));
+            }
+            Err(e) => {
+                // This shouldn't happen
+                assert_eq!(true, false);
+            }
+        }
+        
+        // Test QueryError by passing in an invalid number of evaluations
+        let bad_evaluations = vec![
+            Fr::from(1 as u64),
+            Fr::from(2 as u64),
+            Fr::from(3 as u64),
+        ];
+        let result = vo.query(bad_evaluations);
+        assert!(result.is_err());
     }
 
+    // As the prover, instantiate and evaluate a virtual oracle
     #[test]
-    fn create_test_vo2() {
-        let vo2 = TestVirtualOracle2::<Fr>::new(Fr::from(0 as u64));
+    fn prover_instantiate_and_evaluate() {
+        // Let the virtual oracle be:
+        // F(x) = [a(X) + 5] + [b(X) ⋅ c(X) + 10] + d(2X)
+        //
+        // Let the concrete oracles be:
+        // a(X) = x
+        // b(X) = x^2
+        // c(X) = x^3
+        // d(X) = x^4
+        //
+        // The virtual oracle as a polynomial should be:
+        // F(x) = [x + 5] + [x^5 + 10] + [x^4]
+        let ax = DensePolynomial::<Fr>::from_coefficients_slice(&[
+           Fr::from(0 as u64),
+           Fr::from(1 as u64),
+        ]);
+
+        let bx = DensePolynomial::<Fr>::from_coefficients_slice(&[
+           Fr::from(0 as u64),
+           Fr::from(0 as u64),
+           Fr::from(1 as u64)
+        ]);
+
+        let cx = DensePolynomial::<Fr>::from_coefficients_slice(&[
+           Fr::from(0 as u64),
+           Fr::from(0 as u64),
+           Fr::from(0 as u64),
+           Fr::from(1 as u64)
+        ]);
+
+        let dx = DensePolynomial::<Fr>::from_coefficients_slice(&[
+           Fr::from(0 as u64),
+           Fr::from(0 as u64),
+           Fr::from(0 as u64),
+           Fr::from(0 as u64),
+           Fr::from(1 as u64)
+        ]);
+
+        let description = description_case_0();
+        let vo = TestVirtualOracle2::new(description);
+
+        let result = vo.instantiate(vec![ax, bx, cx, dx]);
+        assert!(result.is_ok());
+
+        match result {
+            Ok(r) => {
+                // Evaluate the polynomial at the point 1:
+                // F(1) = [1 + 5] + [1 + 10] + [1] = 6 + 11 + 1 = 18
+                let eval = r.evaluate(&Fr::from(1 as u64));
+
+                assert_eq!(eval.into_repr(), Fr::from(18 as u64).into_repr());
+            }
+            Err(e) => {
+                // This shouldn't happen
+                assert_eq!(true, false);
+            }
+        }
     }
 }
 
