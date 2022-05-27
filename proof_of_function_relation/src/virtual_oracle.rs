@@ -97,12 +97,14 @@ use ark_std::{test_rng, UniformRand};
 
 /// A term is part of a virtual oracle. It is composed of the product of one or more concrete
 /// oracle, plus the sum of some constants. e.g. if a virtual oracle is defined as:
+#[derive(Debug)]
 pub struct Term<F: Field> {
     alpha_coeffs: Vec<F>,
     constants: Vec<F>
 }
 
 /// A Description is just a Vector of Terms
+#[derive(Debug)]
 pub struct Description<F: Field> {
     terms: Vec<Term<F>>
 }
@@ -115,6 +117,7 @@ impl<F: Field> Description<F> {
     }
 }
 
+#[derive(Debug)]
 pub struct VirtualOracle2<F: Field> {
     description: Description<F>
 }
@@ -125,7 +128,9 @@ pub trait EvaluationsProvider<F: Field> {
     fn evaluate(&self, evaluations: Vec<F>) -> Result<F, QueryError>;
 }
 
+#[derive(Debug)]
 pub struct InstantiationError;
+#[derive(Debug)]
 pub struct QueryError;
 
 impl<F: Field> VirtualOracle2<F> {
@@ -292,18 +297,7 @@ mod new_tests {
         let result = vo.evaluate(evaluations);
         assert!(result.is_ok());
 
-        // TODO: figure out why result.unwrap() returns QueryError() even though it is Ok
-        //assert!(result.unwrap() == Fr::from(20 as u64));
-
-        match result {
-            Ok(r) => {
-                assert!(r == Fr::from(20 as u64));
-            }
-            Err(e) => {
-                // This shouldn't happen
-                assert_eq!(true, false);
-            }
-        }
+        assert!(result.unwrap() == Fr::from(20 as u64));
         
         // Test QueryError by passing in an invalid number of evaluations
         let bad_evaluations = vec![
@@ -364,21 +358,12 @@ mod new_tests {
         let poly_result = vo.instantiate(&concrete_oracles);
         assert!(poly_result.is_ok());
 
+        // Evaluate the polynomial at the point 1:
+        // F(1) = [1 + 5] + [1 + 10] + [1] = 6 + 11 + 1 = 18
         let point = Fr::from(1 as u64);
+        let eval = poly_result.unwrap().evaluate(&point);
 
-        match poly_result {
-            Ok(r) => {
-                // Evaluate the polynomial at the point 1:
-                // F(1) = [1 + 5] + [1 + 10] + [1] = 6 + 11 + 1 = 18
-                let eval = r.evaluate(&point);
-
-                assert_eq!(eval.into_repr(), Fr::from(18 as u64).into_repr());
-            }
-            Err(e) => {
-                // This shouldn't happen
-                assert_eq!(true, false);
-            }
-        }
+        assert_eq!(eval.into_repr(), Fr::from(18 as u64).into_repr());
 
         // Test instantiate_and_evaluate()
         let val = vo.instantiate_and_evaluate(&concrete_oracles, point);
