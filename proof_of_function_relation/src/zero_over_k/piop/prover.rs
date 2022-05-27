@@ -1,9 +1,9 @@
 use super::PIOPforZeroOverK;
 use crate::error::Error;
-use crate::label_polynomial;
 use crate::util::*;
 use crate::zero_over_k::piop::{verifier::VerifierFirstMsg, LabeledPolynomial};
 use crate::zero_over_k::VirtualOracle;
+use crate::{label_polynomial, label_polynomial_with_bound};
 use ark_ff::{PrimeField, Zero};
 use ark_marlin::ahp::prover::ProverMsg;
 use ark_poly::{
@@ -91,7 +91,7 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
                 &domain.vanishing_polynomial(),
             ))
             .unwrap();
-        assert_eq!(r, DensePolynomial::<F>::zero());
+        // assert_eq!(r, DensePolynomial::<F>::zero());
 
         let msg = ProverMsg::EmptyMessage;
 
@@ -164,7 +164,10 @@ fn compute_maskings<R: Rng, F: PrimeField>(
             shift_dense_poly(&domain.vanishing_polynomial().into(), &shifting_factor);
 
         random_polynomials.push(label_polynomial!(r.clone()));
-        masking_polynomials.push(label_polynomial!(&r_shifted * &vanishing_shifted));
+        masking_polynomials.push(label_polynomial_with_bound!(
+            (&r_shifted * &vanishing_shifted),
+            Some(1)
+        ));
     }
 
     (random_polynomials, masking_polynomials)

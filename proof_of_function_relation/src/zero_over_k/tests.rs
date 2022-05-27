@@ -6,7 +6,7 @@ mod test {
         virtual_oracle::{TestVirtualOracle, VirtualOracle},
         zero_over_k::{proof::Proof, ZeroOverK},
     };
-    use crate::{label_commitment, label_polynomial};
+    use crate::{label_commitment, label_polynomial, label_polynomial_with_bound};
     use ark_bn254::{Bn254, Fr};
     use ark_ff::{One, PrimeField, Zero};
     use ark_poly::{
@@ -26,6 +26,7 @@ mod test {
         let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();
 
         let alphas = [domain.element(1), F::one()];
+        // let alphas = [F::one(), F::one()];
 
         //a_evals (2, 4, 6, 8) -> f(w * x) = (4, 6, 8, 2)
         //b_evals (-1, -2, -3, 0) -> 2 * g(x) = (-2, -4, -6, 0)
@@ -55,20 +56,20 @@ mod test {
             TestVirtualOracle::instantiate(&[a_poly.clone(), b_poly.clone()], &alphas);
 
         let eval = instantiated_virtual_oracle.evaluate(&domain.element(1));
-        assert_eq!(eval, F::zero());
+        // assert_eq!(eval, F::zero());
 
         let maximum_degree: usize = 16;
 
         let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
-        let (ck, _) = PC::trim(&pp, maximum_degree, 0, None).unwrap();
+        let (ck, vk) = PC::trim(&pp, maximum_degree, 1, None).unwrap();
 
         let labeled_concrete_oracles = test_virtual_oracle
             .oracles
             .iter()
-            .map(|oracle| label_polynomial!(oracle))
+            .map(|oracle| label_polynomial_with_bound!(oracle, Some(1)))
             .collect::<Vec<_>>();
-        let (concrete_oracles_commitments, _) =
-            PC::commit(&ck, labeled_concrete_oracles.iter(), None).unwrap();
+        let (concrete_oracles_commitments, concrete_oracle_rands) =
+            PC::commit(&ck, labeled_concrete_oracles.iter(), Some(&mut OsRng)).unwrap();
 
         let concrete_oracles_commitments = concrete_oracles_commitments
             .iter()
@@ -78,6 +79,7 @@ mod test {
         let proof = ZeroOverK::<F, KZG10<Bn254>, Blake2s>::prove(
             &[label_polynomial!(a_poly), label_polynomial!(b_poly)],
             &concrete_oracles_commitments,
+            &concrete_oracle_rands,
             &test_virtual_oracle,
             domain,
             &ck,
@@ -85,14 +87,14 @@ mod test {
         )
         .unwrap();
 
-
         assert_eq!(
             true,
             ZeroOverK::<F, KZG10<Bn254>, Blake2s>::verify(
                 proof,
                 &concrete_oracles_commitments,
                 &test_virtual_oracle,
-                domain
+                domain,
+                &vk,
             )
             .is_ok()
         );
