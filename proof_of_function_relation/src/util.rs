@@ -2,6 +2,7 @@ use crate::commitment::HomomorphicPolynomialCommitment;
 use crate::error::{to_pc_error, Error};
 use ark_ff::{Field, PrimeField};
 use ark_poly::{univariate::DensePolynomial, UVPolynomial};
+use rand::RngCore;
 
 #[inline]
 pub fn powers_of<F>(scalar: F) -> impl Iterator<Item = F>
@@ -31,6 +32,32 @@ macro_rules! label_polynomial {
 }
 
 #[macro_export]
+macro_rules! label_polynomial_named {
+    ($name:expr, $poly:expr) => {
+        ark_poly_commit::LabeledPolynomial::new($name.clone(), $poly.clone(), None, None)
+    };
+}
+
+#[macro_export]
+macro_rules! label_polynomial_with_bound {
+    ($poly:expr, $hiding_bound:expr) => {
+        ark_poly_commit::LabeledPolynomial::new(
+            stringify!($poly).to_owned(),
+            $poly.clone(),
+            None,
+            $hiding_bound,
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! label_commitment_as_poly {
+    ($poly:expr, $comm:expr) => {
+        ark_poly_commit::LabeledCommitment::new($poly.label().clone(), $comm.clone(), None)
+    };
+}
+
+#[macro_export]
 macro_rules! label_commitment {
     ($comm:expr) => {
         ark_poly_commit::LabeledCommitment::new(stringify!($comm).to_owned(), $comm.clone(), None)
@@ -40,11 +67,12 @@ macro_rules! label_commitment {
 pub fn commit_polynomial<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>>(
     ck: &PC::CommitterKey,
     poly: &DensePolynomial<F>,
+    rng: Option<&mut dyn RngCore>,
 ) -> Result<(PC::Commitment, PC::Randomness), Error> {
     let labeled_poly = label_polynomial!(poly);
 
     let (poly_commit, randomness) =
-        PC::commit(ck, &[labeled_poly], None).map_err(to_pc_error::<F, PC>)?;
+        PC::commit(ck, &[labeled_poly], rng).map_err(to_pc_error::<F, PC>)?;
 
     Ok((poly_commit[0].commitment().clone(), randomness[0].clone()))
 }
@@ -125,23 +153,23 @@ mod test {
         let degree: usize = 16;
 
         let pp = KZG10::<Bn254>::setup(degree, None, &mut OsRng).unwrap();
-        let (ck, vk) = KZG10::<Bn254>::trim(&pp, degree, 0, None).unwrap();
+        let (ck, vk) = KZG10::<Bn254>::trim(&pp, degree, 1, None).unwrap();
 
         let a_coeffs = vec![
-            Fr::from(1),
-            Fr::from(2),
-            Fr::from(3),
-            Fr::from(4),
-            Fr::from(5),
+            Fr::from(1 as u64),
+            Fr::from(2 as u64),
+            Fr::from(3 as u64),
+            Fr::from(4 as u64),
+            Fr::from(5 as u64),
         ];
         let a_poly = DensePolynomial::<Fr>::from_coefficients_vec(a_coeffs);
 
         let b_coeffs = vec![
-            Fr::from(4),
-            Fr::from(2),
-            Fr::from(3),
-            Fr::from(4),
-            Fr::from(5),
+            Fr::from(4 as u64),
+            Fr::from(2 as u64),
+            Fr::from(3 as u64),
+            Fr::from(4 as u64),
+            Fr::from(5 as u64),
         ];
         let b_poly = DensePolynomial::<Fr>::from_coefficients_vec(b_coeffs);
 
@@ -149,11 +177,19 @@ mod test {
         let a_plus_b_poly = a_poly.clone() + b_poly.clone();
         let a_b_eval = a_plus_b_poly.evaluate(&point);
 
-        let (a_commit, _) =
-            KZG10::<Bn254>::commit(&ck, &[label_polynomial!(a_poly)], None).unwrap();
+        let (a_commit, a_rand) = KZG10::<Bn254>::commit(
+            &ck,
+            &[label_polynomial_with_bound!(a_poly, Some(1))],
+            Some(&mut OsRng),
+        )
+        .unwrap();
 
-        let (b_commit, _) =
-            KZG10::<Bn254>::commit(&ck, &[label_polynomial!(b_poly)], None).unwrap();
+        let (b_commit, b_rand) = KZG10::<Bn254>::commit(
+            &ck,
+            &[label_polynomial_with_bound!(b_poly, Some(1))],
+            Some(&mut OsRng),
+        )
+        .unwrap();
 
         let one = Fr::from(1 as u64);
         let homomorphic_commitment = KZG10::<Bn254>::multi_scalar_mul(
@@ -164,7 +200,8 @@ mod test {
             &[one, one],
         );
 
-        let homomorphic_randomness = kzg10::Randomness::<Fr, DensePolynomial<Fr>>::empty();
+        // let homomorphic_randomness = kzg10::Randomness::<Fr, DensePolynomial<Fr>>::empty();
+        let homomorphic_randomness = a_rand[0].clone() + &b_rand[0];
 
         let proof = KZG10::<Bn254>::open(
             &ck,
