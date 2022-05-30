@@ -4,6 +4,7 @@ use ark_bn254::Fr;
 use ark_ff::ToBytes;
 use ark_ff::{Field, One};
 use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
+use ark_poly_commit::LabeledPolynomial;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Read, SerializationError, Write};
 use ark_std::{test_rng, UniformRand};
 
@@ -11,16 +12,23 @@ use ark_std::{test_rng, UniformRand};
 /// The `evaluate` function encodes the function `G` defined in the paper.
 pub trait VirtualOracle<F: Field> {
     fn alphas(&self) -> Vec<F>;
-    fn evaluate(concrete_oracles: &[DensePolynomial<F>], alphas: &[F], input: &F) -> F;
+    fn evaluate(
+        concrete_oracles: &[LabeledPolynomial<F, DensePolynomial<F>>],
+        alphas: &[F],
+        input: &F,
+    ) -> F;
     fn query(concrete_oracle_evals: &[F]) -> F;
 
-    fn instantiate(concrete_oracles: &[DensePolynomial<F>], alphas: &[F]) -> DensePolynomial<F>;
+    fn instantiate(
+        concrete_oracles: &[LabeledPolynomial<F, DensePolynomial<F>>],
+        alphas: &[F],
+    ) -> DensePolynomial<F>;
 }
 
 //this virtual oracle will encode f(alpha_1*x) + 2*g(alpha_2*x) - 2
 #[derive(CanonicalSerialize)]
 pub struct TestVirtualOracle<F: Field> {
-    pub oracles: Vec<DensePolynomial<F>>,
+    pub oracles: Vec<LabeledPolynomial<F, DensePolynomial<F>>>,
     pub alphas: Vec<F>,
 }
 
@@ -29,7 +37,11 @@ impl<F: Field> VirtualOracle<F> for TestVirtualOracle<F> {
         self.alphas.to_vec()
     }
 
-    fn evaluate(concrete_oracles: &[DensePolynomial<F>], alphas: &[F], input: &F) -> F {
+    fn evaluate(
+        concrete_oracles: &[LabeledPolynomial<F, DensePolynomial<F>>],
+        alphas: &[F],
+        input: &F,
+    ) -> F {
         concrete_oracles[0].evaluate(&(alphas[0] * input))
             + F::from(2 as u64) * concrete_oracles[1].evaluate(&(alphas[1] * input))
             - F::from(2 as u64)
@@ -39,7 +51,10 @@ impl<F: Field> VirtualOracle<F> for TestVirtualOracle<F> {
         concrete_oracle_evals[0] + F::from(2 as u64) * concrete_oracle_evals[1] - F::from(2 as u64)
     }
 
-    fn instantiate(concrete_oracles: &[DensePolynomial<F>], alphas: &[F]) -> DensePolynomial<F> {
+    fn instantiate(
+        concrete_oracles: &[LabeledPolynomial<F, DensePolynomial<F>>],
+        alphas: &[F],
+    ) -> DensePolynomial<F> {
         shift_dense_poly(&concrete_oracles[0], &alphas[0])
             + &shift_dense_poly(&concrete_oracles[1], &alphas[1]) * F::from(2 as u64)
             + to_poly!(-F::from(2 as u64))
@@ -55,6 +70,7 @@ mod tests {
     use ark_bn254::Fr;
     use ark_ff::{Field, One};
     use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
+    use ark_poly_commit::LabeledPolynomial;
     use ark_std::{test_rng, UniformRand};
 
     #[test]
@@ -68,6 +84,7 @@ mod tests {
             Fr::from(1u64),
         ];
         let f_poly = DensePolynomial::from_coefficients_slice(&f_coeffs);
+        let f_poly = LabeledPolynomial::new(String::from("f"), f_poly, None, None);
 
         let g_coeffs = vec![
             Fr::from(-2i64),
@@ -76,6 +93,7 @@ mod tests {
             Fr::from(0u64),
         ];
         let g_poly = DensePolynomial::from_coefficients_slice(&g_coeffs);
+        let g_poly = LabeledPolynomial::new(String::from("g"), g_poly, None, None);
 
         let test_point = Fr::rand(rng);
 
