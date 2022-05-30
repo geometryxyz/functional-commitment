@@ -1,13 +1,12 @@
 #[cfg(test)]
 mod test {
     use crate::{
-        commitment::{HomomorphicPolynomialCommitment, KZG10},
-        error::Error,
+        commitment::KZG10,
         virtual_oracle::{TestVirtualOracle, VirtualOracle},
-        zero_over_k::{proof::Proof, ZeroOverK},
+        zero_over_k::ZeroOverK,
     };
     use ark_bn254::{Bn254, Fr};
-    use ark_ff::{One, PrimeField, Zero};
+    use ark_ff::{One, Zero};
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
         UVPolynomial,
@@ -130,10 +129,10 @@ mod test {
             oracles: [a_poly.clone(), b_poly.clone()].to_vec(),
             alphas: alphas.to_vec(),
         };
-        let instantiated_virtual_oracle =
-            TestVirtualOracle::instantiate(&concrete_oracles, &alphas);
+        // let instantiated_virtual_oracle =
+        //     TestVirtualOracle::instantiate(&concrete_oracles, &alphas);
 
-        let eval = instantiated_virtual_oracle.evaluate(&domain.element(1));
+        // let _ = instantiated_virtual_oracle.evaluate(&domain.element(1));
 
         let maximum_degree: usize = 16;
 

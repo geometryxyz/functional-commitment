@@ -28,11 +28,6 @@ pub struct VerifierFirstMsg<F: PrimeField> {
     pub c: F,
 }
 
-pub struct VerifierQuerySet<F: PrimeField> {
-    pub beta_1: F,
-    pub beta_2: F,
-}
-
 impl<F: PrimeField> PIOPforZeroOverK<F> {
     pub fn verifier_init<'a, VO: VirtualOracle<F>>(
         domain_k: GeneralEvaluationDomain<F>,
