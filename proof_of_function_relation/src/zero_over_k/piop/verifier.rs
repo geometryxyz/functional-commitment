@@ -82,6 +82,7 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
         Ok(VerifierQuerySet { beta_1, beta_2 })
     }
 
+    // TODO: change to use the new VirtualOracle implementation
     pub fn verifier_query_set_new<VO: VirtualOracle<F>>(
         state: &VerifierState<F, VO>,
     ) -> Result<QuerySet<F>, Error> {

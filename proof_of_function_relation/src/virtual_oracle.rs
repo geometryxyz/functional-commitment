@@ -1,11 +1,8 @@
 use crate::to_poly;
 use crate::util::shift_dense_poly;
-use ark_bn254::Fr;
-use ark_ff::ToBytes;
-use ark_ff::{Field, One};
+use ark_ff::Field;
 use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Read, SerializationError, Write};
-use ark_std::{test_rng, UniformRand};
+use ark_serialize::{CanonicalSerialize, SerializationError, Write};
 
 /// A abstraction which represents the description of a virtual oracle. A virtual oracle is
 /// composed of an indexed list of concrete oracles, the description of a virtual oracle which
@@ -44,6 +41,8 @@ use ark_std::{test_rng, UniformRand};
 ///   Functions (as impl):
 ///     - new(Description) -> VirtualOracle
 ///       - returns a new VirtualOracle object
+///     - alphas() -> Scalar[]
+///       - returns a list of alpha coefficients, sorted by term
 ///
 /// EvaluationsProvider (trait)
 ///   - A common interface for the prover and verifier to either:
@@ -93,23 +92,29 @@ use ark_std::{test_rng, UniformRand};
 
 /// A term is part of a virtual oracle. It is composed of the product of one or more concrete
 /// oracle, plus the sum of some constants. e.g. if a virtual oracle is defined as:
+///   F(X) = a(X) + [b(X) ⋅ c(X)] + d(X)
+/// then there are 3 terms: a, [b ⋅ c], and d.
+/// A term does not contain any constants, as we want to be able to linearise the virtual oracle
+/// and commit to each term, and later use homomorphic addition to add the commitments, which is
+/// efficient. Note that this means that the virtual oracle is defined in disjunctive normal form
+/// (DNF).
 #[derive(Debug)]
-pub struct Term<F: Field> {
-    alpha_coeffs: Vec<F>,
-    constants: Vec<F>
+pub struct Term {
+    // TODO: check if usize is acceptable for this attribute
+    num_concrete_oracles: usize,
 }
 
 /// A Description is just a Vector of Terms
 #[derive(Debug)]
 pub struct Description<F: Field> {
-    terms: Vec<Term<F>>
+    terms: Vec<Term>,
+    constant: F
 }
 
 impl<F: Field> Description<F> {
     /// Returns the total number of concrete oracles across all Terms in a Description.
     fn count_concrete_oracles(&self) -> usize {
-        let r = self.terms.iter().fold(0 as usize, |sum, t| sum + t.alpha_coeffs.len());
-        return r;
+        self.terms.iter().fold(0 as usize, |sum, t| sum + t.num_concrete_oracles)
     }
 }
 
@@ -151,13 +156,10 @@ impl<F: Field> EvaluationsProvider<F> for Vec::<DensePolynomial<F>> {
 
         // For each term
         for term in virtual_oracle.description.terms.iter() {
-            // Sum the constants
-            let constant_sum = term.constants.iter().fold(F::from(0 as u64), |sum, c| sum + c);
-
             // term_product is the 1-degree polynomial: f(X) = (constant_sum ⋅ x^0)
             let mut term_product: DensePolynomial<F>;
 
-            if term.alpha_coeffs.len() == 0 {
+            if term.num_concrete_oracles == 0 {
                 // An empty polynomial
                 term_product = DensePolynomial::<F>::default();
             } else {
@@ -165,16 +167,16 @@ impl<F: Field> EvaluationsProvider<F> for Vec::<DensePolynomial<F>> {
                 term_product = self[i].clone();
                 i += 1;
 
-                for _i in 1..term.alpha_coeffs.len() {
+                for _i in 1..term.num_concrete_oracles {
                     term_product = term_product.naive_mul(&self[i]);
                     i += 1;
                 }
             }
 
-            poly = poly + term_product + DensePolynomial::<F>::from_coefficients_slice(&[constant_sum]);
+            poly = poly + term_product;
         }
 
-        Ok(poly.evaluate(&point))
+        Ok(poly.evaluate(&point) + virtual_oracle.description.constant)
     }
 }
 
@@ -189,24 +191,22 @@ impl<F: Field> EvaluationsProvider<F> for Vec::<F> {
             return Err(EvaluationError);
         }
 
-        let mut total_eval = F::from(0 as u64);
+        let mut total_eval = virtual_oracle.description.constant;
 
         // index to keep track of concrete_oracles
         let mut i = 0 as usize;
 
         // For each term
         for term in virtual_oracle.description.terms.iter() {
-            // Sum the constants
-            let sum_of_constants = term.constants.iter().fold(F::from(0 as u64), |sum, c| sum + c);
             let mut product_of_concrete_oracles = F::from(1 as u64);
 
             // Calculate the evaluation of the term
-            for _i in 0..term.alpha_coeffs.len() {
+            for _i in 0..term.num_concrete_oracles {
                 product_of_concrete_oracles *= &self[i];
                 i += 1;
             }
 
-            total_eval += product_of_concrete_oracles + sum_of_constants;
+            total_eval += product_of_concrete_oracles;
         }
 
         Ok(total_eval)
@@ -222,36 +222,33 @@ mod new_tests {
 
     fn description_case_0() -> Description<Fr> {
         // Let the virtual oracle be:
-        // F(X) = [a(X) + 5] + [b(X) ⋅ c(X) + 10] + d(2X)
+        // F(X) = [a(X)] + [b(X) ⋅ c(X)] + d(X) + 15
         //
         // Test case 1:
         //   a(X) = 0
         //   b(X) = 1
         //   c(X) = 2
         //   d(2X) = 3
-        //   F(X) = (0 + 5) + (1 ⋅ 2 + 10) + 3 = 5 + 12 + 3 = 20
+        //   F(X) = (0) + (1 ⋅ 2) + 3 + 15 = 2 + 3 + 15 = 20
 
         // Define the terms
 
         // a(X) + 5
-        let term0 = Term::<Fr>{
-            alpha_coeffs: vec![Fr::from(1 as u64)],
-            constants: vec![Fr::from(5 as u64)],
+        let term0 = Term{
+            num_concrete_oracles: 1
         };
 
         // b(X) ⋅ c(X) + 10
-        let term1 = Term::<Fr>{
-            alpha_coeffs: vec![Fr::from(1 as u64), Fr::from(1 as u64)],
-            constants: vec![Fr::from(10 as u64)],
+        let term1 = Term{
+            num_concrete_oracles: 2
         };
 
-        // d(2X)
-        let term2 = Term::<Fr>{
-            alpha_coeffs: vec![Fr::from(2 as u64)],
-            constants: vec![Fr::from(0 as u64)],
+        // d(X)
+        let term2 = Term{
+            num_concrete_oracles: 1
         };
 
-        Description::<Fr>{ terms: vec![term0, term1, term2] }
+        Description::<Fr>{ terms: vec![term0, term1, term2], constant: Fr::from(15 as u64) }
     }
 
     // As the verifier, evaluate a virtual oracle
@@ -289,7 +286,7 @@ mod new_tests {
     #[test]
     fn prover_evaluate_case_0() {
         // Let the virtual oracle be:
-        // F(x) = [a(X) + 5] + [b(X) ⋅ c(X) + 10] + d(2X)
+        // F(x) = [a(X)] + [b(X) ⋅ c(X)] + d(X) + 15
         //
         // Let the concrete oracles be:
         // a(X) = x
@@ -297,8 +294,10 @@ mod new_tests {
         // c(X) = x^3
         // d(X) = x^4
         //
+        // The constant is 15.
+        //
         // The virtual oracle as a polynomial should be:
-        // F(x) = [x + 5] + [x^5 + 10] + [x^4]
+        // F(x) = [x] + [x^5] + [x^4] + 15
         let ax = DensePolynomial::<Fr>::from_coefficients_slice(&[
            Fr::from(0 as u64),
            Fr::from(1 as u64),
@@ -330,12 +329,12 @@ mod new_tests {
 
         let concrete_oracles = vec![ax, bx, cx, dx];
 
-        // Evaluate the polynomial at the point 1:
-        // F(1) = [1 + 5] + [1 + 10] + [1] = 6 + 11 + 1 = 18
-        let point = Fr::from(1 as u64);
+        // Evaluate the polynomial at the point 2:
+        // F(1) = [2] + [2^5] + [2^4] + 15 = 65
+        let point = Fr::from(2 as u64);
         let eval = concrete_oracles.evaluate(&vo, point);
 
-        assert_eq!(eval.unwrap().into_repr(), Fr::from(18 as u64).into_repr());
+        assert_eq!(eval.unwrap().into_repr(), Fr::from(65 as u64).into_repr());
     }
 }
 

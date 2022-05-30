@@ -12,6 +12,7 @@ use ark_poly::{
 };
 use ark_std::rand::Rng;
 
+// TODO: change to use the new VirtualOracle implementation
 pub struct ProverState<'a, F: PrimeField, VO: VirtualOracle<F>> {
     all_concrete_oracles: &'a [LabeledPolynomial<F>],
 

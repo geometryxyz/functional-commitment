@@ -48,6 +48,7 @@ mod test {
         ];
         let b_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&b_evals));
 
+        // TODO: change to use the new VirtualOracle implementation
         let test_virtual_oracle = TestVirtualOracle {
             oracles: [a_poly.clone(), b_poly.clone()].to_vec(),
             alphas: alphas.to_vec(),
