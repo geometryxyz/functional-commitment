@@ -1,8 +1,5 @@
-use crate::commitment::HomomorphicPolynomialCommitment;
-use crate::error::{to_pc_error, Error};
-use ark_ff::{Field, PrimeField};
+use ark_ff::Field;
 use ark_poly::{univariate::DensePolynomial, UVPolynomial};
-use rand::RngCore;
 
 #[inline]
 pub fn powers_of<F>(scalar: F) -> impl Iterator<Item = F>

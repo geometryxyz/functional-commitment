@@ -1,14 +1,9 @@
 //! Useful commitment stuff
-use crate::{error::Error, to_poly};
-use ark_ec::{msm::VariableBaseMSM, AffineCurve, PairingEngine};
-use ark_ff::{Field, PrimeField, Zero};
-use ark_poly::{univariate::DensePolynomial, UVPolynomial};
-use ark_poly_commit::{
-    sonic_pc::SonicKZG10, Evaluations, LabeledCommitment, LabeledPolynomial, PolynomialCommitment,
-};
-use ark_poly_commit::{PCRandomness, QuerySet};
-use rand::Rng;
-use std::collections::HashMap;
+use ark_ec::{msm::VariableBaseMSM, PairingEngine};
+use ark_ff::PrimeField;
+use ark_poly::univariate::DensePolynomial;
+use ark_poly_commit::PCRandomness;
+use ark_poly_commit::{sonic_pc::SonicKZG10, LabeledCommitment, PolynomialCommitment};
 
 /// A homomorphic polynomial commitment
 pub trait HomomorphicPolynomialCommitment<F>: PolynomialCommitment<F, DensePolynomial<F>>

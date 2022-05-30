@@ -110,7 +110,7 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
 
         // compute the blinded virtual oracle F'[X]
         let f_prime = VO::instantiate(&h_primes, &alphas);
-        let (q_1, r) = DenseOrSparsePolynomial::from(&f_prime)
+        let (q_1, _) = DenseOrSparsePolynomial::from(&f_prime)
             .divide_with_q_and_r(&DenseOrSparsePolynomial::from(
                 &domain.vanishing_polynomial(),
             ))

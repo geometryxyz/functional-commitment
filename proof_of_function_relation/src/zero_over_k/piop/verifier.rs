@@ -1,6 +1,6 @@
 use super::PIOPforZeroOverK;
 use crate::error::Error;
-use crate::zero_over_k::{piop::LabeledPolynomial, VirtualOracle};
+use crate::zero_over_k::VirtualOracle;
 use ark_ff::PrimeField;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::QuerySet;

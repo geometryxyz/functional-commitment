@@ -7,19 +7,13 @@ use crate::zero_over_k::proof::Proof;
 use ark_ff::to_bytes;
 use ark_ff::PrimeField;
 use ark_marlin::rng::FiatShamirRng;
-use ark_poly::{
-    univariate::{DenseOrSparsePolynomial, DensePolynomial},
-    EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial,
-};
+use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::Evaluations;
-use ark_poly_commit::{
-    evaluate_query_set, LabeledCommitment, LabeledPolynomial, PCRandomness, QuerySet,
-};
-use ark_std::{marker::PhantomData, UniformRand};
+use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PCRandomness};
+use ark_std::marker::PhantomData;
 use digest::Digest;
 use rand::Rng;
 use rand_core::OsRng;
-use std::collections::HashMap;
 use std::iter;
 
 mod piop;

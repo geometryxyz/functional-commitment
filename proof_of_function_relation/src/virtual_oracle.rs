@@ -1,12 +1,9 @@
 use crate::to_poly;
 use crate::util::shift_dense_poly;
-use ark_bn254::Fr;
-use ark_ff::ToBytes;
-use ark_ff::{Field, One};
-use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
+use ark_ff::Field;
+use ark_poly::{univariate::DensePolynomial, UVPolynomial};
 use ark_poly_commit::LabeledPolynomial;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Read, SerializationError, Write};
-use ark_std::{test_rng, UniformRand};
+use ark_serialize::{CanonicalSerialize, SerializationError, Write};
 
 /// Encode a virtual oracle. `alphas` allow to keep track of the shift applied to the input point for each concrete oracle.
 /// The `evaluate` function encodes the function `G` defined in the paper.
@@ -65,11 +62,9 @@ impl<F: Field> VirtualOracle<F> for TestVirtualOracle<F> {
 mod tests {
 
     use super::{TestVirtualOracle, VirtualOracle};
-    use crate::to_poly;
-    use crate::util::shift_dense_poly;
     use ark_bn254::Fr;
-    use ark_ff::{Field, One};
-    use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
+    use ark_ff::One;
+    use ark_poly::{univariate::DensePolynomial, UVPolynomial};
     use ark_poly_commit::LabeledPolynomial;
     use ark_std::{test_rng, UniformRand};
 
