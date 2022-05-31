@@ -3,7 +3,7 @@ mod test {
     use crate::{
         commitment::KZG10,
         virtual_oracle::{TestVirtualOracle, VirtualOracle},
-        zero_over_k::ZeroOverK,
+        zero_over_k::ZeroOverK, error::Error
     };
     use ark_bn254::{Bn254, Fr};
     use ark_ff::{One, Zero};
@@ -60,7 +60,7 @@ mod test {
         let eval = instantiated_virtual_oracle.evaluate(&domain.element(1));
         assert_eq!(eval, F::zero());
 
-        let maximum_degree: usize = 16;
+        let maximum_degree: usize = 30;
 
         let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
         let (ck, vk) = PC::trim(&pp, maximum_degree, 0, None).unwrap();
@@ -76,7 +76,6 @@ mod test {
             domain,
             &ck,
             &mut OsRng,
-            &vk, //remove this after test
         )
         .unwrap();
 
@@ -94,7 +93,7 @@ mod test {
     }
 
     #[test]
-    fn test_failure() {
+    fn test_failure_on_malicious_virtual_oracle() {
         let n = 4;
         let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();
 
@@ -139,6 +138,8 @@ mod test {
         let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
         let (ck, vk) = PC::trim(&pp, maximum_degree, 0, None).unwrap();
 
+        // println!("vk: {}", vk);
+
         let (concrete_oracles_commitments, concrete_oracle_rands) =
             PC::commit(&ck, &concrete_oracles, None).unwrap();
 
@@ -150,20 +151,20 @@ mod test {
             domain,
             &ck,
             &mut OsRng,
-            &vk, //remove this after test
         )
         .unwrap();
 
+        let verification_result = ZeroOverK::<F, KZG10<Bn254>, Blake2s>::verify(
+            proof,
+            &concrete_oracles_commitments,
+            &test_virtual_oracle,
+            domain,
+            &vk,
+        );
+
         assert_eq!(
-            false,
-            ZeroOverK::<F, KZG10<Bn254>, Blake2s>::verify(
-                proof,
-                &concrete_oracles_commitments,
-                &test_virtual_oracle,
-                domain,
-                &vk,
-            )
-            .is_ok()
+            Err(Error::Check2Failed),
+            verification_result
         );
     }
 }
