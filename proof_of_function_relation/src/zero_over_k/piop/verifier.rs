@@ -1,6 +1,6 @@
 use super::PIOPforZeroOverK;
 use crate::error::Error;
-use crate::zero_over_k::{piop::LabeledPolynomial, VirtualOracle};
+use crate::zero_over_k::VirtualOracle;
 use ark_ff::PrimeField;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::QuerySet;
@@ -16,9 +16,9 @@ pub struct VerifierState<'a, F: PrimeField, VO: VirtualOracle<F>> {
 
     verifier_first_message: Option<VerifierFirstMsg<F>>,
 
-    beta_1: Option<F>,
+    pub beta_1: Option<F>,
 
-    beta_2: Option<F>,
+    pub beta_2: Option<F>,
 }
 
 /// Verifier message
@@ -26,11 +26,6 @@ pub struct VerifierState<'a, F: PrimeField, VO: VirtualOracle<F>> {
 pub struct VerifierFirstMsg<F: PrimeField> {
     /// Linearisation challenge for the maskings
     pub c: F,
-}
-
-pub struct VerifierQuerySet<F: PrimeField> {
-    pub beta_1: F,
-    pub beta_2: F,
 }
 
 impl<F: PrimeField> PIOPforZeroOverK<F> {
@@ -65,25 +60,6 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
     }
 
     pub fn verifier_query_set<VO: VirtualOracle<F>>(
-        state: &VerifierState<F, VO>,
-    ) -> Result<VerifierQuerySet<F>, Error> {
-        ///map for alpha_value => point_label
-        let mut evaluation_points = HashMap::new();
-
-        evaluation_points.insert(F::one(), "My favorite book.".to_string());
-
-        let beta_1 = state
-            .beta_1
-            .expect("Verifier should have computed beta 1 at this stage");
-        let beta_2 = state
-            .beta_2
-            .expect("Verifier should have computed beta 2 at this stage");
-
-        Ok(VerifierQuerySet { beta_1, beta_2 })
-    }
-
-    // TODO: change to use the new VirtualOracle implementation
-    pub fn verifier_query_set_new<VO: VirtualOracle<F>>(
         state: &VerifierState<F, VO>,
     ) -> Result<QuerySet<F>, Error> {
         let alphas = state.virtual_oracle.alphas();
@@ -130,12 +106,6 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
         query_set.insert((String::from("q_1"), (String::from("beta_1"), beta_1)));
         query_set.insert((String::from("q_2"), (String::from("beta_2"), beta_2)));
 
-        // for (poly_label, (point_label, point)) in &query_set {
-        //     println!(
-        //         "evaluate poly: {}, in point: {} with value {}",
-        //         poly_label, point_label, point
-        //     );
-        // }
         Ok(query_set)
     }
 

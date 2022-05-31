@@ -3,14 +3,14 @@ use crate::error::Error;
 use crate::util::*;
 use crate::zero_over_k::piop::{verifier::VerifierFirstMsg, LabeledPolynomial};
 use crate::zero_over_k::VirtualOracle;
-use crate::{label_polynomial, label_polynomial_with_bound};
 use ark_ff::{PrimeField, Zero};
 use ark_marlin::ahp::prover::ProverMsg;
 use ark_poly::{
     univariate::{DenseOrSparsePolynomial, DensePolynomial},
-    EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial,
+    EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };
 use ark_std::rand::Rng;
+use std::iter;
 
 // TODO: change to use the new VirtualOracle implementation
 pub struct ProverState<'a, F: PrimeField, VO: VirtualOracle<F>> {
@@ -25,7 +25,8 @@ pub struct ProverState<'a, F: PrimeField, VO: VirtualOracle<F>> {
 
     random_polynomials: Option<Vec<LabeledPolynomial<F>>>,
 
-    masked_oracles: Option<Vec<LabeledPolynomial<F>>>,
+    // this variable is made public to avoid recomputing the masked oracles at the PIOP to SNARK compiler stage
+    pub masked_oracles: Option<Vec<LabeledPolynomial<F>>>,
 
     q_1: Option<LabeledPolynomial<F>>,
 
@@ -43,9 +44,24 @@ pub struct ProverFirstOracles<F: PrimeField> {
     pub q_1: LabeledPolynomial<F>,
 }
 
+impl<F: PrimeField> ProverFirstOracles<F> {
+    pub fn iter(&self) -> impl Iterator<Item = &LabeledPolynomial<F>> {
+        self.masking_polynomials
+            .iter()
+            .chain(self.random_polynomials.iter())
+            .chain(iter::once(&self.q_1))
+    }
+}
+
 /// The second set of prover oracles
 pub struct ProverSecondOracles<F: PrimeField> {
     pub q_2: LabeledPolynomial<F>,
+}
+
+impl<F: PrimeField> ProverSecondOracles<F> {
+    pub fn iter(&self) -> impl Iterator<Item = &LabeledPolynomial<F>> {
+        iter::once(&self.q_2)
+    }
 }
 
 impl<F: PrimeField> PIOPforZeroOverK<F> {
@@ -82,26 +98,31 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
             .all_concrete_oracles
             .iter()
             .zip(masking_polynomials.iter())
-            .map(|(oracle, masking_poly)| oracle.polynomial() + masking_poly.polynomial())
+            .enumerate()
+            .map(|(i, (oracle, masking_poly))| {
+                LabeledPolynomial::new(
+                    format!("h_prime_{}", i),
+                    oracle.polynomial() + masking_poly.polynomial(),
+                    None,
+                    None,
+                )
+            })
             .collect::<Vec<_>>();
 
         // compute the blinded virtual oracle F'[X]
-        let f_prime = VO::instantiate(h_primes.as_slice().try_into().unwrap(), &alphas);
-        let (q_1, r) = DenseOrSparsePolynomial::from(&f_prime)
+        let f_prime = VO::instantiate(&h_primes, &alphas);
+        let (q_1, _) = DenseOrSparsePolynomial::from(&f_prime)
             .divide_with_q_and_r(&DenseOrSparsePolynomial::from(
                 &domain.vanishing_polynomial(),
             ))
             .unwrap();
+
+        // // sanity check
         // assert_eq!(r, DensePolynomial::<F>::zero());
 
         let msg = ProverMsg::EmptyMessage;
 
-        let q_1 = label_polynomial!(q_1);
-
-        let h_primes = h_primes
-            .iter()
-            .map(|h_prime| label_polynomial!(h_prime))
-            .collect::<Vec<_>>();
+        let q_1 = LabeledPolynomial::new(String::from("q_1"), q_1, None, None);
 
         let oracles = ProverFirstOracles {
             masking_polynomials: masking_polynomials.clone(),
@@ -109,6 +130,7 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
             q_1: q_1.clone(),
         };
 
+        state.q_1 = Some(q_1);
         state.masking_polynomials = Some(masking_polynomials);
         state.random_polynomials = Some(random_polynomials);
         state.masked_oracles = Some(h_primes);
@@ -131,7 +153,7 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
                 acc_poly + (r.polynomial() * c_power)
             });
 
-        let q_2 = label_polynomial!(q_2);
+        let q_2 = LabeledPolynomial::new(String::from("q_2"), q_2, None, None);
 
         let msg = ProverMsg::EmptyMessage;
 
@@ -164,8 +186,13 @@ fn compute_maskings<R: Rng, F: PrimeField>(
         let vanishing_shifted =
             shift_dense_poly(&domain.vanishing_polynomial().into(), &shifting_factor);
 
-        random_polynomials.push(label_polynomial!(r.clone()));
-        masking_polynomials.push(label_polynomial!((&r_shifted * &vanishing_shifted)));
+        random_polynomials.push(LabeledPolynomial::new(format!("r_{}", i), r, None, None));
+        masking_polynomials.push(LabeledPolynomial::new(
+            format!("m_{}", i),
+            &r_shifted * &vanishing_shifted,
+            None,
+            None,
+        ));
     }
 
     (random_polynomials, masking_polynomials)

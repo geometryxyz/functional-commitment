@@ -13,9 +13,6 @@ pub struct Proof<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> {
     pub h_prime_evals: Vec<F>,
     pub m_evals: Vec<F>,
 
-    // opening
-    pub q1_opening: PC::Proof,
-    pub q2_opening: PC::Proof,
-    pub m_openings: Vec<PC::Proof>,
-    pub h_prime_openings: Vec<PC::Proof>,
+    // opening proof
+    pub opening_proof: PC::BatchProof,
 }
