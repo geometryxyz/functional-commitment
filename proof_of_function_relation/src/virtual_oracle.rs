@@ -41,6 +41,7 @@ use ark_serialize::{CanonicalSerialize, SerializationError, Write};
 ///   Functions (as impl):
 ///     - new(Description) -> VirtualOracle
 ///       - returns a new VirtualOracle object
+///     - TODO: instantiate() which returns a polynomial?
 ///     - alphas() -> Scalar[]
 ///       - returns a list of alpha coefficients, sorted by term
 ///
@@ -100,7 +101,6 @@ use ark_serialize::{CanonicalSerialize, SerializationError, Write};
 /// (DNF).
 #[derive(Debug)]
 pub struct Term {
-    // TODO: check if usize is acceptable for this attribute
     num_concrete_oracles: usize,
 }
 
