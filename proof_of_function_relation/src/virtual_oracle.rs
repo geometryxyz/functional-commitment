@@ -42,7 +42,9 @@ use ark_serialize::{CanonicalSerialize, SerializationError, Write};
 ///   Functions (as impl):
 ///     - new(Description) -> VirtualOracle
 ///       - returns a new VirtualOracle object
-///     - TODO: instantiate() which returns a polynomial?
+///     - instantiate(concrete_oracles: Polynomial[]) -> Polynomial
+///       - Constructs a polynomial which represents the virtual oracle. This polynomial is
+///         composed of the given concrete oracles.
 ///     - alphas() -> Scalar[]
 ///       - returns a list of alpha coefficients, sorted by term
 ///
@@ -102,14 +104,14 @@ use ark_serialize::{CanonicalSerialize, SerializationError, Write};
 /// (DNF).
 #[derive(Debug)]
 pub struct Term {
-    num_concrete_oracles: usize,
+    pub num_concrete_oracles: usize,
 }
 
 /// A Description is just a Vector of Terms
 #[derive(Debug)]
 pub struct Description<F: Field> {
-    terms: Vec<Term>,
-    constant: F
+    pub terms: Vec<Term>,
+    pub constant: F
 }
 
 impl<F: Field> Description<F> {
@@ -129,19 +131,58 @@ pub trait EvaluationsProvider<F: Field> {
 }
 
 #[derive(Debug)]
+pub struct InvalidDescriptionError;
+
+#[derive(Debug)]
 pub struct EvaluationError;
 
+#[derive(Debug)]
+pub struct InstantiationError;
+
 impl<F: Field> VirtualOracle2<F> {
-    fn new(description: Description<F>) -> Self {
-        return Self{
-            description: description
-        };
+    pub fn new(description: Description<F>) -> Result<Self, InvalidDescriptionError> {
+        // Ensure that each term contains at least 1 concrete oracle
+        for term in description.terms.iter() {
+            if term.num_concrete_oracles == 0 {
+                return Err(InvalidDescriptionError);
+            }
+        }
+
+        Ok(Self{ description: description })
+    }
+
+    pub fn instantiate(
+        &self,
+        concrete_oracles: &Vec<DensePolynomial<F>>,
+    ) -> Result<DensePolynomial<F>, InstantiationError> {
+        if self.description.count_concrete_oracles() != concrete_oracles.len() {
+            return Err(InstantiationError);
+        }
+
+        let mut poly = DensePolynomial::<F>::default();
+
+        let mut i = 0 as usize;
+        // For each term
+        for term in self.description.terms.iter() {
+            let mut term_product = concrete_oracles[i].clone();
+            i += 1;
+
+            // Calculate the product of all concrete oracles in the term
+            for _ in 1..term.num_concrete_oracles {
+                term_product = term_product.naive_mul(&concrete_oracles[i]);
+                i += 1;
+            }
+
+            poly = poly + term_product;
+        }
+
+        Ok(poly + DensePolynomial::<F>::from_coefficients_slice(&[self.description.constant]))
     }
 }
 
 impl<F: Field> EvaluationsProvider<F> for Vec::<DensePolynomial<F>> {
-    /// Construct the polynomial which represents the virtual oracle. Returns an error if the
-    /// length of concrete_oracles differs from the number of concrete oracles in the Description.
+    /// Instantiate and evaluate the virtual oracle. Returns an error if the length of
+    /// concrete_oracles differs from the number of concrete oracles in the Description.
     fn evaluate(&self, virtual_oracle: &VirtualOracle2<F>, point: F) -> Result<F, EvaluationError> {
         let expected_num_concrete_oracles = virtual_oracle.description.count_concrete_oracles();
 
@@ -149,35 +190,8 @@ impl<F: Field> EvaluationsProvider<F> for Vec::<DensePolynomial<F>> {
             return Err(EvaluationError);
         }
 
-        // the polynomial to construct and return
-        let mut poly = DensePolynomial::<F>::default();
-
-        // index to keep track of concrete_oracles
-        let mut i = 0 as usize;
-
-        // For each term
-        for term in virtual_oracle.description.terms.iter() {
-            // term_product is the 1-degree polynomial: f(X) = (constant_sum ⋅ x^0)
-            let mut term_product: DensePolynomial<F>;
-
-            if term.num_concrete_oracles == 0 {
-                // An empty polynomial
-                term_product = DensePolynomial::<F>::default();
-            } else {
-                // Calculate the product of all concrete oracles in the term
-                term_product = self[i].clone();
-                i += 1;
-
-                for _i in 1..term.num_concrete_oracles {
-                    term_product = term_product.naive_mul(&self[i]);
-                    i += 1;
-                }
-            }
-
-            poly = poly + term_product;
-        }
-
-        Ok(poly.evaluate(&point) + virtual_oracle.description.constant)
+        let poly = virtual_oracle.instantiate(&self).unwrap();
+        return Ok(poly.evaluate(&point));
     }
 }
 
@@ -267,7 +281,7 @@ mod new_tests {
             Fr::from(3 as u64),
         ];
 
-        let vo = VirtualOracle2::new(description);
+        let vo = VirtualOracle2::new(description).unwrap();
         let result = evaluations.evaluate(&vo, Fr::default());
         assert!(result.is_ok());
 
@@ -326,7 +340,7 @@ mod new_tests {
         ]);
 
         let description = description_case_0();
-        let vo = VirtualOracle2::new(description);
+        let vo = VirtualOracle2::new(description).unwrap();
 
         let concrete_oracles = vec![ax, bx, cx, dx];
 
