@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test {
     use crate::{
-        commitment::KZG10,
+        commitment::{KZG10, HomomorphicPolynomialCommitment},
         virtual_oracle::{TestVirtualOracle, VirtualOracle},
         zero_over_k::ZeroOverK, error::Error
     };
@@ -11,9 +11,12 @@ mod test {
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
         UVPolynomial,
     };
-    use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
+    use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment, LabeledCommitment, PCRandomness};
     use blake2::Blake2s;
     use rand_core::OsRng;
+    use ark_std::UniformRand;
+    use rand::thread_rng;
+    use std::iter;
 
     type F = Fr;
     type PC = KZG10<Bn254>;
@@ -63,7 +66,7 @@ mod test {
         let maximum_degree: usize = 30;
 
         let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
-        let (ck, vk) = PC::trim(&pp, maximum_degree, 0, None).unwrap();
+        let (ck, vk) = PC::trim(&pp, maximum_degree, 0, Some(&[2, 5])).unwrap();
 
         let (concrete_oracles_commitments, concrete_oracle_rands) =
             PC::commit(&ck, &concrete_oracles, None).unwrap();
@@ -166,5 +169,87 @@ mod test {
             Err(Error::Check2Failed),
             verification_result
         );
+    }
+
+    #[test]
+    fn test_commit_with_bounds() {
+        let n = 4;
+        let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();
+        let rng = &mut thread_rng();
+
+        //test oracle to be zero at roots of unity
+        let a_evals = vec![
+            F::from(2u64),
+            F::from(4 as u64),
+            F::from(6 as u64),
+            F::from(8 as u64),
+        ];
+        let a_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&a_evals));
+        let a_poly = LabeledPolynomial::new(String::from("a"), a_poly, Some(4), None);
+
+        let b_evals = vec![
+            F::from(2u64),
+            F::from(4 as u64),
+            F::from(6 as u64),
+            F::from(8 as u64),
+        ];
+        let b_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&b_evals));
+        let b_poly = LabeledPolynomial::new(String::from("b"), b_poly, Some(4), None);
+
+        let a_plus_b_poly = a_poly.polynomial() + b_poly.polynomial(); 
+        let a_plus_b_poly = LabeledPolynomial::new(String::from("a_plus_b"), a_plus_b_poly, Some(4), None);
+
+        let point = Fr::from(10u64);
+        let eval = a_plus_b_poly.evaluate(&point);
+
+        let maximum_degree: usize = 16;
+
+        let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
+        let (ck, vk) = PC::trim(&pp, maximum_degree, 0, Some(&[4])).unwrap();
+
+        let (commitments, rands) = PC::commit(&ck, &[a_poly, b_poly], None).unwrap();
+        let a_commit = commitments[0].clone();
+        let a_rand = rands[0].clone();
+
+        let b_commit = commitments[1].clone();
+        let b_rand = rands[1].clone();
+
+        let one = Fr::one();
+        let a_plus_b_commit = PC::multi_scalar_mul(&[a_commit, b_commit], &[one, one]);
+        let a_plus_b_commit = LabeledCommitment::new(String::from("a_plus_b"), a_plus_b_commit, Some(4));
+
+        let challenge = Fr::from(1u64);
+
+        let homomorphic_randomness = ark_poly_commit::kzg10::Randomness::<Fr, DensePolynomial<Fr>>::empty();
+
+        let opening = PC::open(
+            &ck, 
+            &[a_plus_b_poly.clone()],
+            &[a_plus_b_commit.clone()],
+            &point,
+            challenge,
+            &[homomorphic_randomness],
+            None
+        ).unwrap();
+
+
+        let res = PC::check(
+            &vk,
+            &[a_plus_b_commit],
+            &point,
+            iter::once(eval),
+            &opening,
+            challenge,
+            None
+        );
+
+        println!("{:?}", res);
+
+        // let (commitments, randoms) = PC::commit(&ck, &[a_poly_no_bound, a_poly_with_bound], None).unwrap();
+
+        // for c in commitments {
+        //     println!("{:?}", c.commitment());
+        // }
+      
     }
 }
