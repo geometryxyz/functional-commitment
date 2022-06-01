@@ -192,8 +192,13 @@ impl<F: Field> VirtualOracle2<F> {
                 // shift_dense_poly is needed to apply the alpha coefficient to each concrete
                 // oracle, since resulting polynomial only has one "input" (F(X) rather than
                 // the expanded form f(a_1 * X) + g(a_2 * X)
-                let alpha_coeff = alpha_coeffs[i];
-                term_poly = term_poly.naive_mul(&shift_dense_poly(&concrete_oracles[*co_index], &alpha_coeff));
+                let alpha_coeff_index = term.alpha_coeff_indices[i];
+                term_poly = term_poly.naive_mul(
+                    &shift_dense_poly(
+                        &concrete_oracles[*co_index],
+                        &alpha_coeffs[alpha_coeff_index]
+                    )
+                );
             }
             poly = poly + term_poly;
         }

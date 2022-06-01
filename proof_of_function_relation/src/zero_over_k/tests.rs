@@ -2,7 +2,7 @@
 mod test {
     use crate::{
         commitment::KZG10,
-        virtual_oracle::{TestVirtualOracle, VirtualOracle},
+        virtual_oracle::{TestVirtualOracle, VirtualOracle, VirtualOracle2, Description, Term, EvaluationsProvider},
         zero_over_k::ZeroOverK,
     };
     use ark_bn254::{Bn254, Fr};
@@ -50,7 +50,37 @@ mod test {
 
         let concrete_oracles = [a_poly.clone(), b_poly.clone()];
 
-        // TODO: change to use the new VirtualOracle implementation
+        ///////////////////////////////////////////////////////////
+        // Using the new VirtualOracle2 implementation
+        // concrete_oracles = [f, g]
+        // alpha_coeffs = [alpha_1, alpha_2]
+        let term0 = Term { 
+            concrete_oracle_indices: vec![0],
+            alpha_coeff_indices: vec![0],
+            constant: Fr::from(1 as u64)
+        };
+        let term1 = Term {
+            concrete_oracle_indices: vec![1],
+            alpha_coeff_indices: vec![1],
+            constant: Fr::from(2 as u64)
+        };
+
+        let description = Description::<Fr>{
+            terms: vec![term0, term1],
+            constant: -F::from(2u64)
+        };
+        let vo2 = VirtualOracle2::new(description).unwrap();
+
+        let concrete_oracles2 = [a_poly.polynomial().clone(), b_poly.polynomial().clone()].to_vec();
+
+        let eval2 = concrete_oracles2.evaluate(
+            &vo2,
+            domain.element(1),
+            &alphas.to_vec(),
+        ).unwrap();
+        assert_eq!(eval2, F::zero());
+        ///////////////////////////////////////////////////////////
+
         let test_virtual_oracle = TestVirtualOracle {
             oracles: [a_poly.clone(), b_poly.clone()].to_vec(),
             alphas: alphas.to_vec(),
