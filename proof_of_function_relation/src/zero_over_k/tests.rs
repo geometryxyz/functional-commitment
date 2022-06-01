@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod test {
     use crate::{
-        commitment::{KZG10, HomomorphicPolynomialCommitment},
-        virtual_oracle::{TestVirtualOracle, VirtualOracle, VirtualOracle2, Description, Term, EvaluationsProvider},
+        commitment::{HomomorphicPolynomialCommitment, KZG10},
+        error::Error,
+        virtual_oracle::{Description, EvaluationsProvider, Term, VirtualOracle},
         zero_over_k::ZeroOverK,
-        error::Error
     };
     use ark_bn254::{Bn254, Fr};
     use ark_ff::{One, Zero};
@@ -12,11 +12,13 @@ mod test {
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
         UVPolynomial,
     };
-    use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment, LabeledCommitment, PCRandomness};
-    use blake2::Blake2s;
-    use rand_core::OsRng;
+    use ark_poly_commit::{
+        LabeledCommitment, LabeledPolynomial, PCRandomness, PolynomialCommitment,
+    };
     use ark_std::UniformRand;
+    use blake2::Blake2s;
     use rand::thread_rng;
+    use rand_core::OsRng;
     use std::iter;
 
     type F = Fr;
@@ -41,7 +43,7 @@ mod test {
             F::from(8 as u64),
         ];
         let a_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&a_evals));
-        let a_poly = LabeledPolynomial::new(String::from("b"), a_poly, None, None);
+        let a_poly = LabeledPolynomial::new(String::from("a"), a_poly, None, None);
 
         let b_evals = vec![
             -F::from(1u64),
@@ -58,43 +60,36 @@ mod test {
         // Using the new VirtualOracle2 implementation
         // concrete_oracles = [f, g]
         // alpha_coeffs = [alpha_1, alpha_2]
-        let term0 = Term { 
+        //1*f(alpha_1X) + 2*g(alpha_2X) - 2
+        let term0 = Term {
             concrete_oracle_indices: vec![0],
             alpha_coeff_indices: vec![0],
-            constant: Fr::from(1 as u64)
+            constant: Fr::from(1 as u64),
         };
         let term1 = Term {
             concrete_oracle_indices: vec![1],
             alpha_coeff_indices: vec![1],
-            constant: Fr::from(2 as u64)
+            constant: Fr::from(2 as u64),
         };
 
-        let description = Description::<Fr>{
-            terms: vec![term0, term1],
-            constant: -F::from(2u64)
+        let term2 = Term {
+            concrete_oracle_indices: vec![],
+            alpha_coeff_indices: vec![],
+            constant: -F::from(2u64),
         };
-        let vo2 = VirtualOracle2::new(description).unwrap();
 
-        let concrete_oracles2 = [a_poly.polynomial().clone(), b_poly.polynomial().clone()].to_vec();
+        let description = Description::<Fr> {
+            terms: vec![term0, term1, term2],
+        };
+        let vo2 = VirtualOracle::new(description).unwrap();
 
-        let eval2 = concrete_oracles2.evaluate(
-            &vo2,
-            domain.element(1),
-            &alphas.to_vec(),
-        ).unwrap();
+        let concrete_oracles2 = [a_poly.clone(), b_poly.clone()].to_vec();
+
+        let eval2 = concrete_oracles2
+            .evaluate(&vo2, domain.element(1), &alphas.to_vec())
+            .unwrap();
         assert_eq!(eval2, F::zero());
         ///////////////////////////////////////////////////////////
-
-        // Create a virtual oracle and test that it evaluates to 0 at domain.element(1)
-        let test_virtual_oracle = TestVirtualOracle {
-            oracles: [a_poly.clone(), b_poly.clone()].to_vec(),
-            alphas: alphas.to_vec(),
-        };
-        let instantiated_virtual_oracle =
-            TestVirtualOracle::instantiate(&concrete_oracles, &alphas);
-
-        let eval = instantiated_virtual_oracle.evaluate(&domain.element(1));
-        assert_eq!(eval, F::zero());
 
         // The proof of zero over K
         let maximum_degree: usize = 30;
@@ -109,9 +104,8 @@ mod test {
             &concrete_oracles,
             &concrete_oracles_commitments,
             &concrete_oracle_rands,
-            &test_virtual_oracle,
             &vo2,
-            &alphas,
+            &alphas.to_vec(),
             domain,
             &ck,
             &mut OsRng,
@@ -123,7 +117,6 @@ mod test {
             ZeroOverK::<F, KZG10<Bn254>, Blake2s>::verify(
                 proof,
                 &concrete_oracles_commitments,
-                &test_virtual_oracle,
                 &vo2,
                 domain,
                 &alphas,
@@ -165,10 +158,6 @@ mod test {
 
         let concrete_oracles = [a_poly.clone(), b_poly.clone()];
 
-        let test_virtual_oracle = TestVirtualOracle {
-            oracles: [a_poly.clone(), b_poly.clone()].to_vec(),
-            alphas: alphas.to_vec(),
-        };
         // let instantiated_virtual_oracle =
         //     TestVirtualOracle::instantiate(&concrete_oracles, &alphas);
 
@@ -178,22 +167,27 @@ mod test {
         // Using the new VirtualOracle2 implementation
         // concrete_oracles = [f, g]
         // alpha_coeffs = [alpha_1, alpha_2]
-        let term0 = Term { 
+        let term0 = Term {
             concrete_oracle_indices: vec![0],
             alpha_coeff_indices: vec![0],
-            constant: Fr::from(1 as u64)
+            constant: Fr::from(1 as u64),
         };
         let term1 = Term {
             concrete_oracle_indices: vec![1],
             alpha_coeff_indices: vec![1],
-            constant: Fr::from(2 as u64)
+            constant: Fr::from(2 as u64),
         };
 
-        let description = Description::<Fr>{
-            terms: vec![term0, term1],
-            constant: -F::from(2u64)
+        let term2 = Term {
+            concrete_oracle_indices: vec![],
+            alpha_coeff_indices: vec![],
+            constant: -F::from(2u64),
         };
-        let vo2 = VirtualOracle2::new(description).unwrap();
+
+        let description = Description::<Fr> {
+            terms: vec![term0, term1, term2],
+        };
+        let vo2 = VirtualOracle::new(description).unwrap();
         ///////////////////////////////////////////////////////////
 
         let maximum_degree: usize = 16;
@@ -210,9 +204,8 @@ mod test {
             &concrete_oracles,
             &concrete_oracles_commitments,
             &concrete_oracle_rands,
-            &test_virtual_oracle,
             &vo2,
-            &alphas,
+            &alphas.to_vec(),
             domain,
             &ck,
             &mut OsRng,
@@ -222,17 +215,13 @@ mod test {
         let verification_result = ZeroOverK::<F, KZG10<Bn254>, Blake2s>::verify(
             proof,
             &concrete_oracles_commitments,
-            &test_virtual_oracle,
             &vo2,
             domain,
             &alphas,
             &vk,
         );
 
-        assert_eq!(
-            Err(Error::Check2Failed),
-            verification_result
-        );
+        assert_eq!(Err(Error::Check2Failed), verification_result);
     }
 
     #[test]
@@ -260,8 +249,9 @@ mod test {
         let b_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&b_evals));
         let b_poly = LabeledPolynomial::new(String::from("b"), b_poly, Some(4), None);
 
-        let a_plus_b_poly = a_poly.polynomial() + b_poly.polynomial(); 
-        let a_plus_b_poly = LabeledPolynomial::new(String::from("a_plus_b"), a_plus_b_poly, Some(4), None);
+        let a_plus_b_poly = a_poly.polynomial() + b_poly.polynomial();
+        let a_plus_b_poly =
+            LabeledPolynomial::new(String::from("a_plus_b"), a_plus_b_poly, Some(4), None);
 
         let point = Fr::from(10u64);
         let eval = a_plus_b_poly.evaluate(&point);
@@ -280,22 +270,24 @@ mod test {
 
         let one = Fr::one();
         let a_plus_b_commit = PC::multi_scalar_mul(&[a_commit, b_commit], &[one, one]);
-        let a_plus_b_commit = LabeledCommitment::new(String::from("a_plus_b"), a_plus_b_commit, Some(4));
+        let a_plus_b_commit =
+            LabeledCommitment::new(String::from("a_plus_b"), a_plus_b_commit, Some(4));
 
         let challenge = Fr::from(1u64);
 
-        let homomorphic_randomness = ark_poly_commit::kzg10::Randomness::<Fr, DensePolynomial<Fr>>::empty();
+        let homomorphic_randomness =
+            ark_poly_commit::kzg10::Randomness::<Fr, DensePolynomial<Fr>>::empty();
 
         let opening = PC::open(
-            &ck, 
+            &ck,
             &[a_plus_b_poly.clone()],
             &[a_plus_b_commit.clone()],
             &point,
             challenge,
             &[homomorphic_randomness],
-            None
-        ).unwrap();
-
+            None,
+        )
+        .unwrap();
 
         let res = PC::check(
             &vk,
@@ -304,7 +296,7 @@ mod test {
             iter::once(eval),
             &opening,
             challenge,
-            None
+            None,
         );
 
         println!("{:?}", res);
@@ -314,6 +306,5 @@ mod test {
         // for c in commitments {
         //     println!("{:?}", c.commitment());
         // }
-      
     }
 }

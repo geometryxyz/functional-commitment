@@ -1,6 +1,5 @@
 use super::PIOPforZeroOverK;
 use crate::error::Error;
-use crate::zero_over_k::VirtualOracle;
 use ark_ff::PrimeField;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::QuerySet;
@@ -8,9 +7,7 @@ use rand::Rng;
 use std::collections::HashMap;
 
 #[derive(Copy, Clone)]
-pub struct VerifierState<'a, F: PrimeField, VO: VirtualOracle<F>> {
-    virtual_oracle: &'a VO,
-
+pub struct VerifierState<F: PrimeField> {
     /// domain K over which a virtual oracle should be equal to 0
     domain_k: GeneralEvaluationDomain<F>,
 
@@ -30,12 +27,10 @@ pub struct VerifierFirstMsg<F: PrimeField> {
 
 impl<F: PrimeField> PIOPforZeroOverK<F> {
     /// Return the initial verifier state
-    pub fn verifier_init<'a, VO: VirtualOracle<F>>(
+    pub fn verifier_init<'a>(
         domain_k: GeneralEvaluationDomain<F>,
-        virtual_oracle: &'a VO,
-    ) -> Result<VerifierState<'a, F, VO>, Error> {
+    ) -> Result<VerifierState<F>, Error> {
         Ok(VerifierState {
-            virtual_oracle,
             domain_k,
             verifier_first_message: None,
             beta_1: None,
@@ -43,10 +38,10 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
         })
     }
 
-    pub fn verifier_first_round<'a, R: Rng, VO: VirtualOracle<F>>(
-        mut state: VerifierState<'a, F, VO>,
+    pub fn verifier_first_round<R: Rng>(
+        mut state: VerifierState<F>,
         rng: &mut R,
-    ) -> Result<(VerifierFirstMsg<F>, VerifierState<'a, F, VO>), Error> {
+    ) -> Result<(VerifierFirstMsg<F>, VerifierState<F>), Error> {
         let beta_1 = state.domain_k.sample_element_outside_domain(rng);
         let beta_2 = state.domain_k.sample_element_outside_domain(rng);
         let c = state.domain_k.sample_element_outside_domain(rng);
@@ -60,8 +55,8 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
         Ok((msg, state))
     }
 
-    pub fn verifier_query_set<VO: VirtualOracle<F>>(
-        state: &VerifierState<F, VO>,
+    pub fn verifier_query_set(
+        state: &VerifierState<F>,
         alphas: &[F],
     ) -> Result<QuerySet<F>, Error> {
         let beta_1 = state

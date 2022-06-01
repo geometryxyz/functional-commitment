@@ -1,13 +1,15 @@
 use crate::commitment::HomomorphicPolynomialCommitment;
 use crate::error::{to_pc_error, Error};
 use crate::util::powers_of;
-use crate::virtual_oracle::{VirtualOracle, VirtualOracle2, EvaluationsProvider};
+use crate::virtual_oracle::{EvaluationsProvider, VirtualOracle};
 use crate::zero_over_k::piop::PIOPforZeroOverK;
 use crate::zero_over_k::proof::Proof;
 use ark_ff::to_bytes;
 use ark_ff::PrimeField;
 use ark_marlin::rng::FiatShamirRng;
-use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
+use ark_poly::{
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
+};
 use ark_poly_commit::Evaluations;
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PCRandomness};
 use ark_std::marker::PhantomData;
@@ -29,28 +31,22 @@ pub struct ZeroOverK<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: D
 impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK<F, PC, D> {
     pub const PROTOCOL_NAME: &'static [u8] = b"Zero Over K";
 
-    pub fn prove<VO: VirtualOracle<F>, R: Rng>(
+    pub fn prove<R: Rng>(
         concrete_oracles: &[LabeledPolynomial<F, DensePolynomial<F>>],
         concrete_oracle_commitments: &[LabeledCommitment<PC::Commitment>],
         concrete_oracle_commit_rands: &[PC::Randomness],
-        virtual_oracle: &VO,
-        virtual_oracle2: &VirtualOracle2::<F>,
-        alphas: &[F],
+        virtual_oracle: &VirtualOracle<F>,
+        alphas: &Vec<F>,
         domain: GeneralEvaluationDomain<F>,
         ck: &PC::CommitterKey,
         rng: &mut R,
     ) -> Result<Proof<F, PC>, Error> {
         let prover_initial_state =
-            PIOPforZeroOverK::prover_init(domain, concrete_oracles, virtual_oracle, virtual_oracle2)?;
-        let verifier_initial_state = PIOPforZeroOverK::verifier_init(domain, virtual_oracle)?;
+            PIOPforZeroOverK::prover_init(domain, concrete_oracles, virtual_oracle, &alphas)?;
+        let verifier_initial_state = PIOPforZeroOverK::verifier_init(domain)?;
 
         let mut fs_rng = FiatShamirRng::<D>::from_seed(
-            &to_bytes![
-                &Self::PROTOCOL_NAME,
-                concrete_oracle_commitments,
-                alphas
-            ]
-            .unwrap(),
+            &to_bytes![&Self::PROTOCOL_NAME, concrete_oracle_commitments, alphas].unwrap(),
         );
 
         //------------------------------------------------------------------
@@ -133,6 +129,13 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         let q2_eval = q2_eval.expect("q_2 was not evaluated");
         assert_eq!(h_prime_evals.len(), m_evals.len());
 
+        // // let check_vo = prover_state.virtual_oracle;
+        // let instantiated = virtual_oracle.instantiate(&h_primes.to_vec(), &alphas.to_vec()).unwrap();
+        // println!("Prover side virtual oracle: {:?}", instantiated);
+
+        // let sanity = instantiated.evaluate(&verifier_state.beta_1.expect(""));
+        // println!("Prover side virtual oracle at beta_1: {}", sanity);
+
         fs_rng.absorb(&to_bytes![h_prime_evals, m_evals, q1_eval, q2_eval].unwrap());
 
         let q2_commit = PC::multi_scalar_mul(
@@ -206,24 +209,18 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         Ok(proof)
     }
 
-    pub fn verify<VO: VirtualOracle<F>>(
+    pub fn verify(
         proof: Proof<F, PC>,
         concrete_oracle_commitments: &[LabeledCommitment<PC::Commitment>],
-        virtual_oracle: &VO,
-        virtual_oracle2: &VirtualOracle2<F>,
+        virtual_oracle: &VirtualOracle<F>,
         domain: GeneralEvaluationDomain<F>,
         alphas: &[F],
         vk: &PC::VerifierKey,
     ) -> Result<(), Error> {
-        let verifier_initial_state = PIOPforZeroOverK::verifier_init(domain, virtual_oracle)?;
+        let verifier_initial_state = PIOPforZeroOverK::verifier_init(domain)?;
 
         let mut fs_rng = FiatShamirRng::<D>::from_seed(
-            &to_bytes![
-                &Self::PROTOCOL_NAME,
-                concrete_oracle_commitments,
-                alphas
-            ]
-            .unwrap(),
+            &to_bytes![&Self::PROTOCOL_NAME, concrete_oracle_commitments, alphas].unwrap(),
         );
 
         //------------------------------------------------------------------
@@ -347,18 +344,17 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             .fold(F::zero(), |acc, (&m_eval, c_power)| {
                 acc + (m_eval * c_power)
             });
-        
+
         // evaluate z_k(beta_1), z_k(beta_2)
         let z_k_at_beta_1 = domain.evaluate_vanishing_polynomial(beta_1);
         let z_k_at_beta_2 = domain.evaluate_vanishing_polynomial(beta_2);
 
         // compute F_prime(beta_1)
         //let f_prime_eval = VO::query(&proof.h_prime_evals);
-        let f_prime_eval = &proof.h_prime_evals.evaluate(
-            virtual_oracle2,
-            F::from(0u64),
-            &Vec::<F>::default()
-        ).unwrap();
+        let f_prime_eval = &proof
+            .h_prime_evals
+            .evaluate(virtual_oracle, F::from(0u64), &Vec::<F>::default())
+            .unwrap();
 
         // check that M(beta_2) - q2(beta_2)*zK(beta_2) = 0
         let check_1 = *big_m_at_beta_2 - proof.q2_eval * z_k_at_beta_2;
