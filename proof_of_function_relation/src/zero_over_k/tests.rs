@@ -111,6 +111,7 @@ mod test {
             &concrete_oracle_rands,
             &test_virtual_oracle,
             &vo2,
+            &alphas,
             domain,
             &ck,
             &mut OsRng,
@@ -123,7 +124,9 @@ mod test {
                 proof,
                 &concrete_oracles_commitments,
                 &test_virtual_oracle,
+                &vo2,
                 domain,
+                &alphas,
                 &vk,
             )
             .is_ok()
@@ -209,6 +212,7 @@ mod test {
             &concrete_oracle_rands,
             &test_virtual_oracle,
             &vo2,
+            &alphas,
             domain,
             &ck,
             &mut OsRng,
@@ -219,7 +223,9 @@ mod test {
             proof,
             &concrete_oracles_commitments,
             &test_virtual_oracle,
+            &vo2,
             domain,
+            &alphas,
             &vk,
         );
 

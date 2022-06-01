@@ -62,8 +62,8 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
 
     pub fn verifier_query_set<VO: VirtualOracle<F>>(
         state: &VerifierState<F, VO>,
+        alphas: &[F],
     ) -> Result<QuerySet<F>, Error> {
-        let alphas = state.virtual_oracle.alphas();
         let beta_1 = state
             .beta_1
             .expect("Verifier should have computed beta 1 at this stage");
