@@ -81,6 +81,7 @@ mod test {
         assert_eq!(eval2, F::zero());
         ///////////////////////////////////////////////////////////
 
+        // Create a virtual oracle and test that it evaluates to 0 at domain.element(1)
         let test_virtual_oracle = TestVirtualOracle {
             oracles: [a_poly.clone(), b_poly.clone()].to_vec(),
             alphas: alphas.to_vec(),
@@ -91,6 +92,7 @@ mod test {
         let eval = instantiated_virtual_oracle.evaluate(&domain.element(1));
         assert_eq!(eval, F::zero());
 
+        // The proof of zero over K
         let maximum_degree: usize = 16;
 
         let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
@@ -104,6 +106,7 @@ mod test {
             &concrete_oracles_commitments,
             &concrete_oracle_rands,
             &test_virtual_oracle,
+            &vo2,
             domain,
             &ck,
             &mut OsRng,
@@ -164,6 +167,28 @@ mod test {
         //     TestVirtualOracle::instantiate(&concrete_oracles, &alphas);
 
         // let _ = instantiated_virtual_oracle.evaluate(&domain.element(1));
+        //
+        ///////////////////////////////////////////////////////////
+        // Using the new VirtualOracle2 implementation
+        // concrete_oracles = [f, g]
+        // alpha_coeffs = [alpha_1, alpha_2]
+        let term0 = Term { 
+            concrete_oracle_indices: vec![0],
+            alpha_coeff_indices: vec![0],
+            constant: Fr::from(1 as u64)
+        };
+        let term1 = Term {
+            concrete_oracle_indices: vec![1],
+            alpha_coeff_indices: vec![1],
+            constant: Fr::from(2 as u64)
+        };
+
+        let description = Description::<Fr>{
+            terms: vec![term0, term1],
+            constant: -F::from(2u64)
+        };
+        let vo2 = VirtualOracle2::new(description).unwrap();
+        ///////////////////////////////////////////////////////////
 
         let maximum_degree: usize = 16;
 
@@ -178,6 +203,7 @@ mod test {
             &concrete_oracles_commitments,
             &concrete_oracle_rands,
             &test_virtual_oracle,
+            &vo2,
             domain,
             &ck,
             &mut OsRng,

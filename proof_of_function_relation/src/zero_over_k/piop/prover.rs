@@ -2,7 +2,7 @@ use super::PIOPforZeroOverK;
 use crate::error::Error;
 use crate::util::*;
 use crate::zero_over_k::piop::{verifier::VerifierFirstMsg, LabeledPolynomial};
-use crate::zero_over_k::VirtualOracle;
+use crate::zero_over_k::{VirtualOracle, VirtualOracle2};
 use ark_ff::{PrimeField, Zero};
 use ark_marlin::ahp::prover::ProverMsg;
 use ark_poly::{
@@ -17,6 +17,8 @@ pub struct ProverState<'a, F: PrimeField, VO: VirtualOracle<F>> {
     all_concrete_oracles: &'a [LabeledPolynomial<F>],
 
     virtual_oracle: &'a VO,
+
+    virtual_oracle2: &'a VirtualOracle2<F>,
 
     /// domain K over which a virtual oracle should be equal to 0
     domain_k: GeneralEvaluationDomain<F>,
@@ -65,14 +67,17 @@ impl<F: PrimeField> ProverSecondOracles<F> {
 }
 
 impl<F: PrimeField> PIOPforZeroOverK<F> {
+    /// Return the initial prover state
     pub fn prover_init<'a, VO: VirtualOracle<F>>(
         domain: GeneralEvaluationDomain<F>,
         all_concrete_oracles: &'a [LabeledPolynomial<F>],
         virtual_oracle: &'a VO,
+        virtual_oracle2: &'a VirtualOracle2<F>,
     ) -> Result<ProverState<'a, F, VO>, Error> {
         Ok(ProverState {
             all_concrete_oracles,
             virtual_oracle,
+            virtual_oracle2,
             domain_k: domain,
             masking_polynomials: None,
             random_polynomials: None,
@@ -117,12 +122,24 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
             ))
             .unwrap();
 
+        // TODO: clean this up
+        // New impl:
+        let h_primes2 = h_primes.iter().map(|x| x.polynomial().clone()).collect::<Vec<_>>();
+        let f_prime2 = state.virtual_oracle2.instantiate(&h_primes2, &alphas).unwrap();
+
+        let (q_1_new, _) = DenseOrSparsePolynomial::from(&f_prime2)
+            .divide_with_q_and_r(&DenseOrSparsePolynomial::from(
+                &domain.vanishing_polynomial(),
+            ))
+            .unwrap();
+        ///////////////////////////////////////////////////////////
+
         // // sanity check
         // assert_eq!(r, DensePolynomial::<F>::zero());
 
         let msg = ProverMsg::EmptyMessage;
 
-        let q_1 = LabeledPolynomial::new(String::from("q_1"), q_1, None, None);
+        let q_1 = LabeledPolynomial::new(String::from("q_1"), q_1_new, None, None);
 
         let oracles = ProverFirstOracles {
             masking_polynomials: masking_polynomials.clone(),

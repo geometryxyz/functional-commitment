@@ -53,6 +53,8 @@ use ark_serialize::{CanonicalSerialize, SerializationError, Write};
 ///
 /// Doing the above makes it easy to reuse the lists of alpha coefficients and concrete oracles, as
 /// well as to determine the degree of the virtual oracle.
+///
+/// TODO: have constant bounds instead of arbitrary vectors, to reduce overhead
 #[derive(Debug)]
 pub struct Term<F> {
     pub concrete_oracle_indices: Vec<usize>,
@@ -109,6 +111,7 @@ pub trait EvaluationsProvider<F: Field> {
     fn evaluate(&self, virtual_oracle: &VirtualOracle2<F>, point: F, alpha_coeffs: &Vec<F>)  -> Result<F, EvaluationError>;
 }
 
+// TODO: define errors in errors.rs
 #[derive(Debug)]
 pub struct InvalidDescriptionError;
 
@@ -140,6 +143,8 @@ impl<F: Field> VirtualOracle2<F> {
     /// description.
     /// @param concrete_oracles A vector of concrete oracles whose order follows that of the
     ///                         concrete_oracle_indices in the Terms in the description
+    /// TODO: instead of concrete_oracles and alpha_coeffs as vector, expect slices of a specific
+    /// size
     pub fn instantiate(
         &self,
         concrete_oracles: &Vec<DensePolynomial<F>>,

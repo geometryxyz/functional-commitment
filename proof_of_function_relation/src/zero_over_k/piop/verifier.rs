@@ -29,6 +29,7 @@ pub struct VerifierFirstMsg<F: PrimeField> {
 }
 
 impl<F: PrimeField> PIOPforZeroOverK<F> {
+    /// Return the initial verifier state
     pub fn verifier_init<'a, VO: VirtualOracle<F>>(
         domain_k: GeneralEvaluationDomain<F>,
         virtual_oracle: &'a VO,

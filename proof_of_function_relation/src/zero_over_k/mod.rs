@@ -1,7 +1,7 @@
 use crate::commitment::HomomorphicPolynomialCommitment;
 use crate::error::{to_pc_error, Error};
 use crate::util::powers_of;
-use crate::virtual_oracle::VirtualOracle;
+use crate::virtual_oracle::{VirtualOracle, VirtualOracle2};
 use crate::zero_over_k::piop::PIOPforZeroOverK;
 use crate::zero_over_k::proof::Proof;
 use ark_ff::to_bytes;
@@ -34,13 +34,14 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         concrete_oracle_commitments: &[LabeledCommitment<PC::Commitment>],
         concrete_oracle_commit_rands: &[PC::Randomness],
         virtual_oracle: &VO,
+        virtual_oracle2: &VirtualOracle2::<F>,
         domain: GeneralEvaluationDomain<F>,
         ck: &PC::CommitterKey,
         rng: &mut R,
         vk: &PC::VerifierKey,
     ) -> Result<Proof<F, PC>, Error> {
         let prover_initial_state =
-            PIOPforZeroOverK::prover_init(domain, concrete_oracles, virtual_oracle)?;
+            PIOPforZeroOverK::prover_init(domain, concrete_oracles, virtual_oracle, virtual_oracle2)?;
         let verifier_initial_state = PIOPforZeroOverK::verifier_init(domain, virtual_oracle)?;
 
         // TODO: FiatShamir more stuff!
