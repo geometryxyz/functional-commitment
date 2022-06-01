@@ -7,7 +7,7 @@ use ark_ff::{PrimeField, Zero};
 use ark_marlin::ahp::prover::ProverMsg;
 use ark_poly::{
     univariate::{DenseOrSparsePolynomial, DensePolynomial},
-    EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
+    EvaluationDomain, GeneralEvaluationDomain, UVPolynomial, Polynomial
 };
 use ark_std::rand::Rng;
 use std::iter;
@@ -203,6 +203,7 @@ fn compute_maskings<R: Rng, F: PrimeField>(
         let vanishing_shifted =
             shift_dense_poly(&domain.vanishing_polynomial().into(), &shifting_factor);
 
+        // random_polynomials.push(LabeledPolynomial::new(format!("r_{}", i), r, Some(2), None));
         random_polynomials.push(LabeledPolynomial::new(format!("r_{}", i), r, None, None));
         masking_polynomials.push(LabeledPolynomial::new(
             format!("m_{}", i),
