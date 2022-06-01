@@ -5,6 +5,7 @@ use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
 use ark_poly_commit::LabeledPolynomial;
 use ark_serialize::{CanonicalSerialize, SerializationError, Write};
 
+/// TODO: rewrite these comments
 /// A abstraction which represents the description of a virtual oracle. A virtual oracle is
 /// composed of an indexed list of concrete oracles, the description of a virtual oracle which
 /// specifies how said concrete oracles must be composed to form the virtual oracle, as well as the
@@ -31,93 +32,71 @@ use ark_serialize::{CanonicalSerialize, SerializationError, Write};
 /// If the verifier knows the evaluations of each concrete oracle at X, as well as the description,
 /// they can compute the evaluation of the virtual oracle at X, without needing to know the
 /// definition of any of the concrete oracles.
-///
-/// ## Next steps
-///
-/// The following is an UML-esque design for the structs/traits:
-///
-/// VirtualOracle2 (struct) TODO: rename this to VirtualOracle
-///   Attributes:
-///     - description: Description
-///   Functions (as impl):
-///     - new(Description) -> VirtualOracle
-///       - returns a new VirtualOracle object
-///     - instantiate(concrete_oracles: Polynomial[]) -> Polynomial
-///       - Constructs a polynomial which represents the virtual oracle. This polynomial is
-///         composed of the given concrete oracles.
-///     - alphas() -> Scalar[]
-///       - returns a list of alpha coefficients, sorted by term
-///
-/// EvaluationsProvider (trait)
-///   - A common interface for the prover and verifier to either:
-///     - evaluate a list of concrete oracles given a virtual oracle description and a point, so as
-///       to evaluate the virtual oracle at said point;
-///     - or to compute the the evaluation of the virtual oracle given a list of evaluations of
-///       each concrete oracle.
-///   Functions:
-///     - evaluate(virtual_oracle: VirtualOracle2, point: Scalar) -> Scalar
-///    
-///
-/// Description (struct)
-///   Attributes:
-///     - terms: Term[]
-///
-///   Functions:
-///     - group_concrete_oracles_by_alphas: Dict{F -> integer[]} (TBD?)
-///       - Returns an associative array where the index of the concrete oracles are grouped by
-///         alpha coefficients. Useful for batch polynomial commitments?
-///
-///  Term (struct)
-///   Attributes:
-///     - alpha_coeffs: Scalar[]
-///     - constants: Scalar[]
-///
-///   Functions:
-///     - evaluate_as_prover(inputs: Scalar[], concrete_oracles: Polynomial[]) -> Scalar (or Error)
-///
-///   Notes:
-///     - the length of alpha_coeffs must be exactly the number of concrete oracles in this term
-///
-/// ## Important notes
-///
-/// The order of concrete oracles passsed to instantiate() is critical. Take for example the
-/// following virtual oracle:
-/// h(X) = f(αX) ⋅ g(X) + β0 + a(X) ⋅ b(X) ⋅ c(X) + β1
-///
-/// h(X) contains two terms:
-///   - Term 0:
-///     - 2 concrete oracles (f and g)
-///     - 1 constant (β0)
-///   - Term 1:
-///     - 3 concrete oracles (a, b, and c)
-///     - 1 constant (β1)
-///
-/// The order of concrete oracles passed to instantiate() should therefore be [f, g, a, b c]
 
-/// A term is part of a virtual oracle. It is composed of the product of one or more concrete
-/// oracle, plus the sum of some constants. e.g. if a virtual oracle is defined as:
-///   F(X) = a(X) + [b(X) ⋅ c(X)] + d(X)
-/// then there are 3 terms: a, [b ⋅ c], and d.
-/// A term does not contain any constants, as we want to be able to linearise the virtual oracle
-/// and commit to each term, and later use homomorphic addition to add the commitments, which is
-/// efficient. Note that this means that the virtual oracle is defined in disjunctive normal form
-/// (DNF).
+/// A Term is part of a Description. It is composed of the product of one or more concrete
+/// oracle, as well as a constant. e.g. if a virtual oracle is defined as:
+///   F(X) = b(a_1X) + [2 ⋅ b(a_2X) ⋅ c(a_3X)] + d(a_4X)
+/// then there are 3 terms: b, [2 ⋅ b ⋅ c], and d.
+/// The constants are [1, 2, 1].
+/// Given a list of concrete oracles [b, c, d], the concrete oracle indices for each term are: 
+/// - [0]
+/// - [0, 1]
+/// - [2]
+///
+/// Given a list of alpha coefficients [a_1, a_2, a_3, a_4], the alpha coefficient indices for each
+/// term are:
+/// - [0]
+/// - [1, 2]
+/// - [3]
+/// 
+/// Note that this means that the virtual oracle is defined in disjunctive normal form (DNF).
+///
+/// Doing the above makes it easy to reuse the lists of alpha coefficients and concrete oracles, as
+/// well as to determine the degree of the virtual oracle.
 #[derive(Debug)]
-pub struct Term {
-    pub num_concrete_oracles: usize,
-}
-
-/// A Description is just a Vector of Terms
-#[derive(Debug)]
-pub struct Description<F: Field> {
-    pub terms: Vec<Term>,
+pub struct Term<F> {
+    pub concrete_oracle_indices: Vec<usize>,
+    pub alpha_coeff_indices: Vec<usize>,
     pub constant: F
 }
 
+impl<F: Field> Term<F> {
+    fn count_concrete_oracles(&self) -> usize {
+        let mut indices = HashMap::<usize, bool>::new();
+        for index in self.concrete_oracle_indices.iter(){
+            if !indices.contains_key(index) {
+                indices.insert(*index, true);
+            }
+        }
+        indices.len()
+    }
+}
+
+/// A Description is just a Vector of Terms, and a constant that is added to the end
+#[derive(Debug)]
+pub struct Description<F: Field> {
+    pub terms: Vec<Term<F>>,
+    pub constant: F
+}
+
+use std::collections::HashMap;
 impl<F: Field> Description<F> {
     /// Returns the total number of concrete oracles across all Terms in a Description.
+    /// If a Description contains the following Terms:
+    /// - { concrete_oracle_indices: [0, 1] }
+    /// - { concrete_oracle_indices: [1, 2] }
+    /// Then the number of concrete oracles should be 3.
     fn count_concrete_oracles(&self) -> usize {
-        self.terms.iter().fold(0 as usize, |sum, t| sum + t.num_concrete_oracles)
+        let mut indices = HashMap::<usize, bool>::new();
+        for term in self.terms.iter() {
+            for index in term.concrete_oracle_indices.iter(){
+                if !indices.contains_key(index) {
+                    indices.insert(*index, true);
+                }
+            }
+        }
+
+        indices.len()
     }
 }
 
@@ -127,7 +106,7 @@ pub struct VirtualOracle2<F: Field> {
 }
 
 pub trait EvaluationsProvider<F: Field> {
-    fn evaluate(&self, virtual_oracle: &VirtualOracle2<F>, point: F)  -> Result<F, EvaluationError>;
+    fn evaluate(&self, virtual_oracle: &VirtualOracle2<F>, point: F, alpha_coeffs: &Vec<F>)  -> Result<F, EvaluationError>;
 }
 
 #[derive(Debug)]
@@ -141,9 +120,13 @@ pub struct InstantiationError;
 
 impl<F: Field> VirtualOracle2<F> {
     pub fn new(description: Description<F>) -> Result<Self, InvalidDescriptionError> {
-        // Ensure that each term contains at least 1 concrete oracle
+        if description.terms.len() == 0 {
+            return Err(InvalidDescriptionError);
+        }
+
+        // Ensure that the lengths of the lists of indices are the same
         for term in description.terms.iter() {
-            if term.num_concrete_oracles == 0 {
+            if term.concrete_oracle_indices.len() != term.alpha_coeff_indices.len() {
                 return Err(InvalidDescriptionError);
             }
         }
@@ -151,29 +134,68 @@ impl<F: Field> VirtualOracle2<F> {
         Ok(Self{ description: description })
     }
 
+    /// Output a polynomial which represents the virtual oracle according to the description, the
+    /// alpha coefficients, and the given concrete oracles. The alpha coefficients and concrete
+    /// oracles should be arranged according to their respective lists of indices in the
+    /// description.
+    /// @param concrete_oracles A vector of concrete oracles whose order follows that of the
+    ///                         concrete_oracle_indices in the Terms in the description
     pub fn instantiate(
         &self,
         concrete_oracles: &Vec<DensePolynomial<F>>,
+        alpha_coeffs: &Vec<F>
     ) -> Result<DensePolynomial<F>, InstantiationError> {
-        if self.description.count_concrete_oracles() != concrete_oracles.len() {
+        // Ensure that there are enough concrete oracles and alpha coefficients to fit the
+        // description
+        let num_cos = self.description.count_concrete_oracles();
+        if num_cos < concrete_oracles.len() || num_cos < alpha_coeffs.len() {
+            return Err(InstantiationError);
+        }
+
+        // get the max index from the flattened list of concrete oracle indices
+        let max_co_index = self.description.terms.iter()
+            .map(
+                |term| term.concrete_oracle_indices.iter().max()
+            )
+            .max()
+            .unwrap()
+            .unwrap();
+
+        // the given vector of concrete oracles must be large enough
+        if max_co_index >= &concrete_oracles.len() {
+            return Err(InstantiationError);
+        }
+
+        // get the max index from the flattened list of alpha coefficient indices
+        let max_alpha_index = self.description.terms.iter()
+            .map(
+                |term| term.alpha_coeff_indices.iter().max()
+            )
+            .max()
+            .unwrap()  // assume that the number of terms is > 0 
+            .unwrap(); // and the number of alpha coefficients is > 0
+
+        // the given vector of concrete oracles must be large enough
+        if max_alpha_index >= &concrete_oracles.len() {
             return Err(InstantiationError);
         }
 
         let mut poly = DensePolynomial::<F>::default();
 
-        let mut i = 0 as usize;
-        // For each term
+        // loop through each term
         for term in self.description.terms.iter() {
-            let mut term_product = concrete_oracles[i].clone();
-            i += 1;
-
-            // Calculate the product of all concrete oracles in the term
-            for _ in 1..term.num_concrete_oracles {
-                term_product = term_product.naive_mul(&concrete_oracles[i]);
-                i += 1;
+            // term_poly is the polynomial which represents the current term. its initial value is
+            // the term constant which will be chained with the other concrete oracles in the term
+            // via multiplication
+            let mut term_poly = DensePolynomial::<F>::from_coefficients_slice(&[term.constant]);
+            for (i, co_index) in term.concrete_oracle_indices.iter().enumerate() {
+                // shift_dense_poly is needed to apply the alpha coefficient to each concrete
+                // oracle, since resulting polynomial only has one "input" (F(X) rather than
+                // the expanded form f(a_1 * X) + g(a_2 * X)
+                let alpha_coeff = alpha_coeffs[i];
+                term_poly = term_poly.naive_mul(&shift_dense_poly(&concrete_oracles[*co_index], &alpha_coeff));
             }
-
-            poly = poly + term_product;
+            poly = poly + term_poly;
         }
 
         Ok(poly + DensePolynomial::<F>::from_coefficients_slice(&[self.description.constant]))
@@ -183,14 +205,19 @@ impl<F: Field> VirtualOracle2<F> {
 impl<F: Field> EvaluationsProvider<F> for Vec::<DensePolynomial<F>> {
     /// Instantiate and evaluate the virtual oracle. Returns an error if the length of
     /// concrete_oracles differs from the number of concrete oracles in the Description.
-    fn evaluate(&self, virtual_oracle: &VirtualOracle2<F>, point: F) -> Result<F, EvaluationError> {
+    fn evaluate(
+        &self,
+        virtual_oracle: &VirtualOracle2<F>,
+        point: F,
+        alpha_coeffs: &Vec<F>
+    ) -> Result<F, EvaluationError> {
         let expected_num_concrete_oracles = virtual_oracle.description.count_concrete_oracles();
 
         if self.len() != expected_num_concrete_oracles {
             return Err(EvaluationError);
         }
 
-        let poly = virtual_oracle.instantiate(&self).unwrap();
+        let poly = virtual_oracle.instantiate(&self, alpha_coeffs).unwrap();
         return Ok(poly.evaluate(&point));
     }
 }
@@ -199,7 +226,7 @@ impl<F: Field> EvaluationsProvider<F> for Vec::<F> {
     /// Return the evaluation of the virtual oracle given a list of evaluations of each concrete
     /// oracle. The length of the input vector of evaluations must equal to the number of concrete
     /// oracles in the Description.
-    fn evaluate(&self, virtual_oracle: &VirtualOracle2<F>, _point: F) -> Result<F, EvaluationError> {
+    fn evaluate(&self, virtual_oracle: &VirtualOracle2<F>, _: F, _: &Vec<F>) -> Result<F, EvaluationError> {
         let expected_num_concrete_oracles = virtual_oracle.description.count_concrete_oracles();
 
         if self.len() != expected_num_concrete_oracles {
@@ -216,7 +243,7 @@ impl<F: Field> EvaluationsProvider<F> for Vec::<F> {
             let mut product_of_concrete_oracles = F::from(1 as u64);
 
             // Calculate the evaluation of the term
-            for _i in 0..term.num_concrete_oracles {
+            for _ in 0..term.count_concrete_oracles() {
                 product_of_concrete_oracles *= &self[i];
                 i += 1;
             }
@@ -235,6 +262,15 @@ mod new_tests {
     use ark_bn254::Fr;
     use ark_ff::PrimeField;
 
+    fn term() {
+        let term = Term {
+            concrete_oracle_indices: vec![0, 1],
+            alpha_coeff_indices: vec![1, 2],
+            constant: Fr::from(1 as u64)
+        };
+        assert_eq!(term.count_concrete_oracles(), 2);
+    }
+
     fn description_case_0() -> Description<Fr> {
         // Let the virtual oracle be:
         // F(X) = [a(X)] + [b(X) ⋅ c(X)] + d(X) + 15
@@ -250,28 +286,36 @@ mod new_tests {
 
         // a(X) + 5
         let term0 = Term{
-            num_concrete_oracles: 1
+            concrete_oracle_indices: vec![0],
+            alpha_coeff_indices: vec![0],
+            constant: Fr::from(1u64),
         };
 
         // b(X) ⋅ c(X) + 10
         let term1 = Term{
-            num_concrete_oracles: 2
+            concrete_oracle_indices: vec![1, 2],
+            alpha_coeff_indices: vec![1, 2],
+            constant: Fr::from(1u64),
         };
 
         // d(X)
         let term2 = Term{
-            num_concrete_oracles: 1
+            concrete_oracle_indices: vec![3],
+            alpha_coeff_indices: vec![3],
+            constant: Fr::from(1u64),
         };
 
-        Description::<Fr>{ terms: vec![term0, term1, term2], constant: Fr::from(15 as u64) }
+        let desc = Description::<Fr>{ terms: vec![term0, term1, term2], constant: Fr::from(15 as u64) };
+
+        assert_eq!(desc.count_concrete_oracles(), 4 as usize);
+
+        desc
     }
 
     // As the verifier, evaluate a virtual oracle
     #[test]
     fn verifier_evaluate_case_0() {
         let description = description_case_0();
-
-        assert!(description.count_concrete_oracles() == 4 as usize);
 
         // Query the description
         let evaluations = vec![
@@ -282,7 +326,7 @@ mod new_tests {
         ];
 
         let vo = VirtualOracle2::new(description).unwrap();
-        let result = evaluations.evaluate(&vo, Fr::default());
+        let result = evaluations.evaluate(&vo, Fr::default(), &Vec::<Fr>::default());
         assert!(result.is_ok());
 
         assert!(result.unwrap() == Fr::from(20 as u64));
@@ -293,7 +337,7 @@ mod new_tests {
             Fr::from(2 as u64),
             Fr::from(3 as u64),
         ];
-        let result = bad_evaluations.evaluate(&vo, Fr::default());
+        let result = bad_evaluations.evaluate(&vo, Fr::default(), &Vec::<Fr>::default());
         assert!(result.is_err());
     }
 
@@ -343,11 +387,19 @@ mod new_tests {
         let vo = VirtualOracle2::new(description).unwrap();
 
         let concrete_oracles = vec![ax, bx, cx, dx];
+        let alpha_coeffs = vec![
+            Fr::from(1u64),
+            Fr::from(1u64),
+            Fr::from(1u64),
+            Fr::from(1u64),
+        ];
 
-        // Evaluate the polynomial at the point 2:
+        let p = vo.instantiate(&concrete_oracles, &alpha_coeffs);
+
         // F(1) = [2] + [2^5] + [2^4] + 15 = 65
+        // Evaluate the polynomial at the point 2:
         let point = Fr::from(2 as u64);
-        let eval = concrete_oracles.evaluate(&vo, point);
+        let eval = concrete_oracles.evaluate(&vo, point, &alpha_coeffs);
 
         assert_eq!(eval.unwrap().into_repr(), Fr::from(65 as u64).into_repr());
     }
