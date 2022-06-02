@@ -1,4 +1,5 @@
 use crate::to_poly;
+use crate::error::Error;
 use crate::util::shift_dense_poly;
 use ark_ff::{PrimeField, Zero};
 use ark_poly::{
@@ -175,13 +176,22 @@ impl<F: PrimeField> VirtualOracleTrait<F> for GeoSequenceVO<F> {
 ///
 /// TODO: have constant bounds instead of arbitrary vectors, to reduce overhead
 #[derive(Debug)]
-pub struct Term<F: PrimeField> {
+pub struct Term<
+    F: PrimeField,
+    //const NUM_CONCRETE_ORACLES: usize
+> {
+    //pub concrete_oracle_indices: [usize; NUM_CONCRETE_ORACLES],
+    //pub alpha_coeff_indices: [usize; NUM_CONCRETE_ORACLES],
     pub concrete_oracle_indices: Vec<usize>,
     pub alpha_coeff_indices: Vec<usize>,
     pub constant: F,
 }
 
-impl<F: PrimeField> Term<F> {
+//impl<F: PrimeField> Term<F, const NUM_CONCRETE_ORACLES: usize> {
+impl<F: PrimeField> Term<
+    F,
+    //const NUM_CONCRETE_ORACLES: usize
+    > {
     fn count_concrete_oracles(&self) -> usize {
         let mut indices = HashMap::<usize, bool>::new();
         for index in self.concrete_oracle_indices.iter() {
@@ -230,29 +240,23 @@ pub trait EvaluationsProvider<F: PrimeField> {
         virtual_oracle: &VirtualOracle<F>,
         point: F,
         alpha_coeffs: &Vec<F>,
-    ) -> Result<F, EvaluationError>;
+    ) -> Result<F, Error>;
 }
 
 // TODO: define errors in errors.rs
 #[derive(Debug)]
-pub struct InvalidDescriptionError;
-
-#[derive(Debug)]
-pub struct EvaluationError;
-
-#[derive(Debug)]
 pub struct InstantiationError;
 
 impl<F: PrimeField> VirtualOracle<F> {
-    pub fn new(description: Description<F>) -> Result<Self, InvalidDescriptionError> {
+    pub fn new(description: Description<F>) -> Result<Self, Error> {
         if description.terms.len() == 0 {
-            return Err(InvalidDescriptionError);
+            return Err(Error::InvalidDescriptionError);
         }
 
         // Ensure that the lengths of the lists of indices are the same
         for term in description.terms.iter() {
             if term.concrete_oracle_indices.len() != term.alpha_coeff_indices.len() {
-                return Err(InvalidDescriptionError);
+                return Err(Error::InvalidDescriptionError);
             }
         }
 
@@ -273,41 +277,41 @@ impl<F: PrimeField> VirtualOracle<F> {
         &self,
         concrete_oracles: &Vec<LabeledPolynomial<F, DensePolynomial<F>>>,
         alphas: &Vec<F>,
-    ) -> Result<DensePolynomial<F>, InstantiationError> {
+    ) -> Result<DensePolynomial<F>, Error> {
         // Ensure that there are enough concrete oracles and alpha coefficients to fit the
         // description
-        // let num_cos = self.description.count_concrete_oracles();
-        // if num_cos < concrete_oracles.len() || num_cos < alphas.len() {
-        //     return Err(InstantiationError);
-        // }
+         let num_cos = self.description.count_concrete_oracles();
+         if num_cos < concrete_oracles.len() || num_cos < alphas.len() {
+             return Err(Error::InstantiationError);
+         }
 
         // get the max index from the flattened list of concrete oracle indices
-        // let max_co_index = self.description.terms.iter()
-        //     .map(
-        //         |term| term.concrete_oracle_indices.iter().max()
-        //     )
-        //     .max()
-        //     .unwrap()
-        //     .unwrap();
+         let max_co_index = self.description.terms.iter()
+             .map(
+                 |term| term.concrete_oracle_indices.iter().max()
+             )
+             .max()
+             .unwrap()
+             .unwrap();
 
         // // the given vector of concrete oracles must be large enough
-        // if max_co_index >= &concrete_oracles.len() {
-        //     return Err(InstantiationError);
-        // }
+         if max_co_index >= &concrete_oracles.len() {
+             return Err(Error::InstantiationError);
+         }
 
         // get the max index from the flattened list of alpha coefficient indices
-        // let max_alpha_index = self.description.terms.iter()
-        //     .map(
-        //         |term| term.alpha_coeff_indices.iter().max()
-        //     )
-        //     .max()
-        //     .unwrap()  // assume that the number of terms is > 0
-        //     .unwrap(); // and the number of alpha coefficients is > 0
+         let max_alpha_index = self.description.terms.iter()
+             .map(
+                 |term| term.alpha_coeff_indices.iter().max()
+             )
+             .max()
+             .unwrap()  // assume that the number of terms is > 0
+             .unwrap(); // and the number of alpha coefficients is > 0
 
-        // // the given vector of concrete oracles must be large enough
-        // if max_alpha_index >= &concrete_oracles.len() {
-        //     return Err(InstantiationError);
-        // }
+         // the given vector of concrete oracles must be large enough
+         if max_alpha_index >= &concrete_oracles.len() {
+             return Err(Error::InstantiationError);
+         }
 
         let mut poly = DensePolynomial::<F>::zero();
 
@@ -341,11 +345,11 @@ impl<F: PrimeField> EvaluationsProvider<F> for Vec<LabeledPolynomial<F, DensePol
         virtual_oracle: &VirtualOracle<F>,
         point: F,
         alpha_coeffs: &Vec<F>,
-    ) -> Result<F, EvaluationError> {
+    ) -> Result<F, Error> {
         let expected_num_concrete_oracles = virtual_oracle.description.count_concrete_oracles();
 
         if self.len() != expected_num_concrete_oracles {
-            return Err(EvaluationError);
+            return Err(Error::EvaluationError);
         }
 
         let poly = virtual_oracle.instantiate(&self, alpha_coeffs).unwrap();
@@ -362,11 +366,11 @@ impl<F: PrimeField> EvaluationsProvider<F> for Vec<F> {
         virtual_oracle: &VirtualOracle<F>,
         _: F,
         _: &Vec<F>,
-    ) -> Result<F, EvaluationError> {
+    ) -> Result<F, Error> {
         let expected_num_concrete_oracles = virtual_oracle.description.count_concrete_oracles();
 
         if self.len() != expected_num_concrete_oracles {
-            return Err(EvaluationError);
+            return Err(Error::EvaluationError);
         }
 
         let mut total_eval = F::zero();

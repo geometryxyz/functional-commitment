@@ -5,6 +5,9 @@ pub enum Error {
     Check1Failed,
     Check2Failed,
     ProofVerificationError,
+    InvalidDescriptionError,
+    EvaluationError,
+    InstantiationError,
 }
 
 /// Convert an ark_poly_commit error
