@@ -56,8 +56,6 @@ mod test {
 
         let concrete_oracles = [a_poly.clone(), b_poly.clone()];
 
-        ///////////////////////////////////////////////////////////
-        // Using the new VirtualOracle2 implementation
         // concrete_oracles = [f, g]
         // alpha_coeffs = [alpha_1, alpha_2]
         //1*f(alpha_1X) + 2*g(alpha_2X) - 2
@@ -81,15 +79,14 @@ mod test {
         let description = Description::<Fr> {
             terms: vec![term0, term1, term2],
         };
-        let vo2 = VirtualOracle::new(description).unwrap();
+        let vo = VirtualOracle::new(description).unwrap();
 
         let concrete_oracles2 = [a_poly.clone(), b_poly.clone()].to_vec();
 
         let eval2 = concrete_oracles2
-            .evaluate(&vo2, domain.element(1), &alphas.to_vec())
+            .evaluate(&vo, domain.element(1), &alphas.to_vec())
             .unwrap();
         assert_eq!(eval2, F::zero());
-        ///////////////////////////////////////////////////////////
 
         // The proof of zero over K
         let maximum_degree: usize = 30;
@@ -104,7 +101,7 @@ mod test {
             &concrete_oracles,
             &concrete_oracles_commitments,
             &concrete_oracle_rands,
-            &vo2,
+            &vo,
             &alphas.to_vec(),
             domain,
             &ck,
@@ -117,7 +114,7 @@ mod test {
             ZeroOverK::<F, KZG10<Bn254>, Blake2s>::verify(
                 proof,
                 &concrete_oracles_commitments,
-                &vo2,
+                &vo,
                 domain,
                 &alphas,
                 &vk,
@@ -163,8 +160,6 @@ mod test {
 
         // let _ = instantiated_virtual_oracle.evaluate(&domain.element(1));
         //
-        ///////////////////////////////////////////////////////////
-        // Using the new VirtualOracle2 implementation
         // concrete_oracles = [f, g]
         // alpha_coeffs = [alpha_1, alpha_2]
         let term0 = Term {
@@ -187,8 +182,7 @@ mod test {
         let description = Description::<Fr> {
             terms: vec![term0, term1, term2],
         };
-        let vo2 = VirtualOracle::new(description).unwrap();
-        ///////////////////////////////////////////////////////////
+        let vo = VirtualOracle::new(description).unwrap();
 
         let maximum_degree: usize = 16;
 
@@ -204,7 +198,7 @@ mod test {
             &concrete_oracles,
             &concrete_oracles_commitments,
             &concrete_oracle_rands,
-            &vo2,
+            &vo,
             &alphas.to_vec(),
             domain,
             &ck,
@@ -215,7 +209,7 @@ mod test {
         let verification_result = ZeroOverK::<F, KZG10<Bn254>, Blake2s>::verify(
             proof,
             &concrete_oracles_commitments,
-            &vo2,
+            &vo,
             domain,
             &alphas,
             &vk,

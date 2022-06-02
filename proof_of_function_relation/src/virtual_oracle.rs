@@ -3,11 +3,10 @@ use crate::error::Error;
 use crate::util::shift_dense_poly;
 use ark_ff::{PrimeField, Zero};
 use ark_poly::{
-    univariate::{DenseOrSparsePolynomial, DensePolynomial},
+    univariate::{DensePolynomial},
     Polynomial, UVPolynomial,
 };
 use ark_poly_commit::{LabeledPolynomial, QuerySet};
-use ark_serialize::{CanonicalSerialize, SerializationError, Write};
 use std::collections::HashMap;
 
 pub trait VirtualOracleTrait<F: PrimeField> {
@@ -234,10 +233,6 @@ pub trait EvaluationsProvider<F: PrimeField> {
     ) -> Result<F, Error>;
 }
 
-// TODO: define errors in errors.rs
-#[derive(Debug)]
-pub struct InstantiationError;
-
 impl<F: PrimeField> VirtualOracle<F> {
     pub fn new(description: Description<F>) -> Result<Self, Error> {
         if description.terms.len() == 0 {
@@ -269,6 +264,9 @@ impl<F: PrimeField> VirtualOracle<F> {
         concrete_oracles: &Vec<LabeledPolynomial<F, DensePolynomial<F>>>,
         alphas: &Vec<F>,
     ) -> Result<DensePolynomial<F>, Error> {
+        // TODO: can there be a way to reduce the overhead of checking the indices?
+        //
+        //
         // Ensure that there are enough concrete oracles and alpha coefficients to fit the
         // description
          let num_cos = self.description.count_concrete_oracles();
@@ -285,7 +283,7 @@ impl<F: PrimeField> VirtualOracle<F> {
              .unwrap()
              .unwrap();
 
-        // // the given vector of concrete oracles must be large enough
+         // the given vector of concrete oracles must be large enough
          if max_co_index >= &concrete_oracles.len() {
              return Err(Error::InstantiationError);
          }
@@ -299,7 +297,7 @@ impl<F: PrimeField> VirtualOracle<F> {
              .unwrap()  // assume that the number of terms is > 0
              .unwrap(); // and the number of alpha coefficients is > 0
 
-        // // the given vector of concrete oracles must be large enough
+        // the given vector of concrete oracles must be large enough
          if max_alpha_index >= &concrete_oracles.len() {
              return Err(Error::InstantiationError);
          }
@@ -554,11 +552,14 @@ mod new_tests {
         ];
         let alpha_coeffs = vec![Fr::from(1u64)];
 
+        let point = Fr::from(2 as u64);
+
+        // Test the instantiated polynomial by evaluating it at the point
         let p = vo.instantiate(&concrete_oracles, &alpha_coeffs);
+        assert_eq!(p.unwrap().evaluate(&point).into_repr(), Fr::from(65 as u64).into_repr());
 
         // F(2) = [2] + [2^5] + [2^4] + 15 = 65
-        // Evaluate the polynomial at the point 2:
-        let point = Fr::from(2 as u64);
+        // Evaluate the polynomial at the point:
         let eval = concrete_oracles.evaluate(&vo, point, &alpha_coeffs);
 
         assert_eq!(eval.unwrap().into_repr(), Fr::from(65 as u64).into_repr());
