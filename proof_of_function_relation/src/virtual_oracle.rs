@@ -176,22 +176,13 @@ impl<F: PrimeField> VirtualOracleTrait<F> for GeoSequenceVO<F> {
 ///
 /// TODO: have constant bounds instead of arbitrary vectors, to reduce overhead
 #[derive(Debug)]
-pub struct Term<
-    F: PrimeField,
-    //const NUM_CONCRETE_ORACLES: usize
-> {
-    //pub concrete_oracle_indices: [usize; NUM_CONCRETE_ORACLES],
-    //pub alpha_coeff_indices: [usize; NUM_CONCRETE_ORACLES],
+pub struct Term<F: PrimeField> {
     pub concrete_oracle_indices: Vec<usize>,
     pub alpha_coeff_indices: Vec<usize>,
     pub constant: F,
 }
 
-//impl<F: PrimeField> Term<F, const NUM_CONCRETE_ORACLES: usize> {
-impl<F: PrimeField> Term<
-    F,
-    //const NUM_CONCRETE_ORACLES: usize
-    > {
+impl<F: PrimeField> Term<F> {
     fn count_concrete_oracles(&self) -> usize {
         let mut indices = HashMap::<usize, bool>::new();
         for index in self.concrete_oracle_indices.iter() {
@@ -308,7 +299,7 @@ impl<F: PrimeField> VirtualOracle<F> {
              .unwrap()  // assume that the number of terms is > 0
              .unwrap(); // and the number of alpha coefficients is > 0
 
-         // the given vector of concrete oracles must be large enough
+        // // the given vector of concrete oracles must be large enough
          if max_alpha_index >= &concrete_oracles.len() {
              return Err(Error::InstantiationError);
          }
