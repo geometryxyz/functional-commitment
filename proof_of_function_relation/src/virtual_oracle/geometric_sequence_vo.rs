@@ -86,8 +86,8 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
         };
 
         query_set.insert((labels[0].clone(), (label, gamma_x))); // h_prime_0 is evaluated at (alpha_0_beta1 with value gamma * beta_1)
-
-        QuerySet::new()
+        
+        query_set
     }
 
     fn num_of_oracles(&self) -> usize {
@@ -115,7 +115,7 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
 mod test {
 
     use super::{GeoSequenceVO, VirtualOracle};
-    use crate::label_polynomial;
+    use crate::{label_polynomial, util::generate_sequence};
     use ark_bn254::Fr;
     use ark_ff::PrimeField;
     use ark_poly::{
@@ -124,24 +124,6 @@ mod test {
     };
 
     /// @param a_s The initial value of each sequence
-    fn generate_sequence<F: PrimeField>(r: F, a_s: &[F], c_s: &[usize]) -> Vec<F> {
-        assert_eq!(c_s.len(), a_s.len());
-        let mut concatenation = Vec::<F>::default();
-
-        for (i, a) in a_s.iter().enumerate() {
-            for j in 0..c_s[i] {
-                // r ** j (is there a pow() library function in Fp256?)
-                let mut r_pow = F::from(1 as u64);
-                for _ in 0..j {
-                    r_pow = r_pow * r;
-                }
-                let val = *a * r_pow;
-                concatenation.push(val);
-            }
-        }
-
-        concatenation
-    }
 
     #[test]
     fn test_geo_seq_instantiation() {
