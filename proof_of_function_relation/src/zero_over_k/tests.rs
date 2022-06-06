@@ -4,7 +4,8 @@ mod test {
         commitment::{HomomorphicPolynomialCommitment, KZG10},
         error::Error,
         virtual_oracle::{
-            Description, EvaluationsProvider, NormalizedVirtualOracle, Term, VirtualOracle,
+            normalized_vo::{Description, NormalizedVirtualOracle, Term},
+            EvaluationsProvider, VirtualOracle,
         },
         zero_over_k::ZeroOverK,
     };
