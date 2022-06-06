@@ -8,6 +8,7 @@ pub enum Error {
     InvalidDescriptionError,
     EvaluationError,
     InstantiationError,
+    InvalidGeoSeq,
 }
 
 /// Convert an ark_poly_commit error
