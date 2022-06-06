@@ -96,7 +96,8 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
         let alphas = state.alphas;
 
         // generate the masking polynomials and keep a record of the random polynomials that were used
-        let (random_polynomials, masking_polynomials) = compute_maskings(&domain, &alphas, rng);
+        let (random_polynomials, masking_polynomials) =
+            compute_maskings(state.virtual_oracle, &domain, &alphas, rng);
 
         // compute the masked oracles
         let h_primes = state
@@ -125,7 +126,7 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
         ///////////////////////////////////////////////////////////
 
         // // sanity check
-        // assert_eq!(r, DensePolynomial::<F>::zero());
+        // assert_eq!(_r, DensePolynomial::<F>::zero());
 
         let msg = ProverMsg::EmptyMessage;
 
@@ -174,12 +175,13 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
 }
 
 /// computes array of m_i = ri(alpha_i^-1) * zk(alpha_i^-1)
-fn compute_maskings<R: Rng, F: PrimeField>(
+fn compute_maskings<R: Rng, F: PrimeField, VO: VirtualOracle<F>>(
+    virtual_oracle: &VO,
     domain: &GeneralEvaluationDomain<F>,
     alphas: &[F],
     rng: &mut R,
 ) -> (Vec<LabeledPolynomial<F>>, Vec<LabeledPolynomial<F>>) {
-    let num_of_concrete_oracles = alphas.len();
+    let num_of_concrete_oracles = virtual_oracle.num_of_oracles();
     //r is defined as polynomial degree < 2
     let degree = 1;
 

@@ -1,4 +1,4 @@
-use ark_ff::Field;
+use ark_ff::{Field, PrimeField};
 use ark_poly::{univariate::DensePolynomial, UVPolynomial};
 
 #[inline]
@@ -41,4 +41,23 @@ pub fn shift_dense_poly<F: Field>(
     }
 
     DensePolynomial::from_coefficients_vec(coeffs)
+}
+
+pub fn generate_sequence<F: PrimeField>(r: F, a_s: &[F], c_s: &[usize]) -> Vec<F> {
+    assert_eq!(c_s.len(), a_s.len());
+    let mut concatenation = Vec::<F>::default();
+
+    for (i, a) in a_s.iter().enumerate() {
+        for j in 0..c_s[i] {
+            // r ** j (is there a pow() library function in Fp256?)
+            let mut r_pow = F::from(1 as u64);
+            for _ in 0..j {
+                r_pow = r_pow * r;
+            }
+            let val = *a * r_pow;
+            concatenation.push(val);
+        }
+    }
+
+    concatenation
 }

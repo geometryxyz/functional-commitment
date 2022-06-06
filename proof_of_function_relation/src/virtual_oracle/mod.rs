@@ -68,10 +68,6 @@ impl<F: PrimeField> EvaluationsProvider<F> for Vec<F> {
         point: F,
         _: &Vec<F>,
     ) -> Result<F, Error> {
-        if self.len() != virtual_oracle.num_of_oracles() {
-            return Err(Error::EvaluationError);
-        }
-
         virtual_oracle.query(&self, point)
     }
 }

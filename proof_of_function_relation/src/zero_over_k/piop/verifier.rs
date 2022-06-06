@@ -8,7 +8,9 @@ use rand::Rng;
 use std::collections::HashMap;
 
 #[derive(Copy, Clone)]
-pub struct VerifierState<F: PrimeField> {
+pub struct VerifierState<'a, F: PrimeField, VO: VirtualOracle<F>> {
+    virtual_oracle: &'a VO,
+
     /// domain K over which a virtual oracle should be equal to 0
     domain_k: GeneralEvaluationDomain<F>,
 
@@ -29,9 +31,11 @@ pub struct VerifierFirstMsg<F: PrimeField> {
 impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
     /// Return the initial verifier state
     pub fn verifier_init<'a>(
+        virtual_oracle: &'a VO,
         domain_k: GeneralEvaluationDomain<F>,
-    ) -> Result<VerifierState<F>, Error> {
+    ) -> Result<VerifierState<F, VO>, Error> {
         Ok(VerifierState {
+            virtual_oracle,
             domain_k,
             verifier_first_message: None,
             beta_1: None,
@@ -39,10 +43,10 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
         })
     }
 
-    pub fn verifier_first_round<R: Rng>(
-        mut state: VerifierState<F>,
+    pub fn verifier_first_round<'a, R: Rng>(
+        mut state: VerifierState<'a, F, VO>,
         rng: &mut R,
-    ) -> Result<(VerifierFirstMsg<F>, VerifierState<F>), Error> {
+    ) -> Result<(VerifierFirstMsg<F>, VerifierState<'a, F, VO>), Error> {
         let beta_1 = state.domain_k.sample_element_outside_domain(rng);
         let beta_2 = state.domain_k.sample_element_outside_domain(rng);
         let c = state.domain_k.sample_element_outside_domain(rng);
@@ -57,7 +61,7 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
     }
 
     pub fn verifier_query_set(
-        state: &VerifierState<F>,
+        state: &VerifierState<F, VO>,
         alphas: &[F],
     ) -> Result<QuerySet<F>, Error> {
         let beta_1 = state
@@ -67,47 +71,50 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
             .beta_2
             .expect("Verifier should have computed beta 2 at this stage");
 
-        let mut query_set = QuerySet::<F>::new();
-        let mut point_evaluations: HashMap<F, String> = HashMap::new();
+        let num_of_oracles = state.virtual_oracle.num_of_oracles();
 
-        point_evaluations.insert(beta_1, String::from("beta_1"));
-        point_evaluations.insert(beta_2, String::from("beta_2"));
+        let mut h_prime_labels = Vec::with_capacity(num_of_oracles);
+        let mut m_labels = Vec::with_capacity(num_of_oracles);
 
-        // call once for h_primes qs_1 = vo.get_query_set(h_primes_labels, [domain.element(1)], (beta_1, beta_1_value))
-        // call once for ms qs_2 = vo.get_query_set(m_lables, [domain.element(1)], (beta_2, beta_2_value))
-        // query_set.insert((String::from("q_1"), (String::from("beta_1"), beta_1))); (1)
-        // query_set.insert((String::from("q_2"), (String::from("beta_2"), beta_2))); (2)
-        // merge q1 and q2 and insert (1)&(2)
-
-        for (i, alpha) in alphas.iter().enumerate() {
-            let test_point = *alpha * beta_1;
-            let label = match point_evaluations.get(&test_point) {
-                Some(label) => label.clone(),
-                None => {
-                    let label = format!("alpha_{}_beta_1", i);
-                    point_evaluations.insert(test_point, label.clone());
-
-                    label
-                }
-            };
-            query_set.insert((format!("h_prime_{}", i), (label, *alpha * beta_1)));
-
-            let test_point = *alpha * beta_2;
-            let label = match point_evaluations.get(&test_point) {
-                Some(label) => label.clone(),
-                None => {
-                    let label = format!("alpha_{}_beta_2", i);
-                    point_evaluations.insert(test_point, label.clone());
-
-                    label
-                }
-            };
-
-            query_set.insert((format!("m_{}", i), (label, *alpha * beta_2)));
+        for i in 0..num_of_oracles {
+            h_prime_labels.push(format!("h_prime_{}", i));
+            m_labels.push(format!("m_{}", i));
         }
 
+        let alphas_labeled = alphas
+            .iter()
+            .enumerate()
+            .map(|(i, alpha)| (format!("alpha_{}", i), *alpha))
+            .collect::<Vec<_>>();
+
+        let mut query_set = QuerySet::new();
+        let h_primes_set = state.virtual_oracle.get_query_set(
+            &h_prime_labels,
+            &alphas_labeled.to_vec(),
+            &(String::from("beta_1"), beta_1),
+        );
+        let m_query_set = state.virtual_oracle.get_query_set(
+            &m_labels,
+            &alphas_labeled.to_vec(),
+            &(String::from("beta_2"), beta_2),
+        );
+
+        query_set.extend(h_primes_set);
+        query_set.extend(m_query_set);
         query_set.insert((String::from("q_1"), (String::from("beta_1"), beta_1)));
         query_set.insert((String::from("q_2"), (String::from("beta_2"), beta_2)));
+        /*
+         * What do we get with geo seq virtual oracle
+         * we have h_primes_0 and m_primes_0
+         * h_prime_0 in point alpha_0_beta_1
+         * h_prime_0 in point beta_1
+         *
+         * m_0 in point alpha_0_beta_2
+         * m_0 in point beta_2
+         *
+         * q_1, in point: beta_1
+         * q_2, in point: beta_2
+         */
 
         Ok(query_set)
     }
