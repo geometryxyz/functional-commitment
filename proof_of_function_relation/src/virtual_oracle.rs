@@ -1,38 +1,50 @@
-use crate::to_poly;
 use crate::error::Error;
+use crate::to_poly;
 use crate::util::shift_dense_poly;
 use ark_ff::{PrimeField, Zero};
-use ark_poly::{
-    univariate::{DensePolynomial},
-    Polynomial, UVPolynomial,
-};
+use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
 use ark_poly_commit::{LabeledPolynomial, QuerySet};
 use std::collections::HashMap;
+use std::iter;
 
-pub trait VirtualOracleTrait<F: PrimeField> {
+pub trait VirtualOracle<F: PrimeField> {
     /// abstract function which will return instantiation of virtual oracle from concrete oracles and shifting factors
     fn instantiate(
         &self,
-        concrete_oracles: &[DensePolynomial<F>],
+        concrete_oracles: &[LabeledPolynomial<F, DensePolynomial<F>>],
         alphas: &[F],
-    ) -> DensePolynomial<F>;
+    ) -> Result<DensePolynomial<F>, Error>;
 
     /// from description of self get which concrete oracles should be queried and at which points
     /// points with same value should always have same label, for example alpha*beta = beta when alpha = 1
     /// that's why we gradually build point_values_to_labels from which we construct query set
-    fn get_query_set(&self, labels: &Vec<String>, alphas: &Vec<(String, F)>, x: &(String, F)) -> QuerySet<F>;
+    fn get_query_set(
+        &self,
+        labels: &Vec<String>,
+        alphas: &Vec<(String, F)>,
+        x: &(String, F),
+    ) -> QuerySet<F>;
+
+    fn num_of_oracles(&self) -> usize;
+
+    fn query(&self, evals: &[F], point: F) -> Result<F, Error>;
 }
 
 pub struct GeoSequenceVO<F: PrimeField> {
-    pi_s: Vec<u64>,
-    ci_s: Vec<u64>,
+    pi_s: Vec<usize>,
+    ci_s: Vec<usize>,
     gamma: F,
     r: F,
 }
 
 impl<F: PrimeField> GeoSequenceVO<F> {
-    pub fn new(pi_s: &Vec<u64>, ci_s: &Vec<u64>, gamma: F, r: F) -> Self {
-        assert_eq!(pi_s.len(), ci_s.len());
+    pub fn new(ci_s: &Vec<usize>, gamma: F, r: F) -> Self {
+        let pi_s = iter::once(0)
+            .chain(ci_s.iter().scan(0, |st, elem| {
+                *st += elem;
+                Some(*st)
+            }))
+            .collect::<Vec<_>>();
 
         Self {
             pi_s: pi_s.clone(),
@@ -43,18 +55,19 @@ impl<F: PrimeField> GeoSequenceVO<F> {
     }
 }
 
-impl<F: PrimeField> VirtualOracleTrait<F> for GeoSequenceVO<F> {
+impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
     fn instantiate(
         &self,
-        concrete_oracles: &[DensePolynomial<F>],
+        concrete_oracles: &[LabeledPolynomial<F, DensePolynomial<F>>],
         alphas: &[F],
-    ) -> DensePolynomial<F> {
-        assert_eq!(concrete_oracles.len(), 1);
-        assert_eq!(alphas.len(), 1);
+    ) -> Result<DensePolynomial<F>, Error> {
+        if concrete_oracles.len() != 1 || alphas.len() != 1 {
+            return Err(Error::InstantiationError);
+        }
 
         // construct (f(gamma * x) - r * f(x))
-        let mut instantiation_poly =
-            shift_dense_poly(&concrete_oracles[0], &alphas[0]) + (&concrete_oracles[0] * -self.r);
+        let mut instantiation_poly = shift_dense_poly(&concrete_oracles[0], &alphas[0])
+            + (concrete_oracles[0].polynomial() * -self.r);
 
         let x_poly = DensePolynomial::<F>::from_coefficients_slice(&[F::zero(), F::one()]);
         for (&pi, &ci) in self.pi_s.iter().zip(self.ci_s.iter()) {
@@ -63,11 +76,15 @@ impl<F: PrimeField> VirtualOracleTrait<F> for GeoSequenceVO<F> {
             instantiation_poly = &instantiation_poly * &stitch_i;
         }
 
-        instantiation_poly
+        Ok(instantiation_poly)
     }
 
-    fn get_query_set(&self, labels: &Vec<String>, alphas: &Vec<(String, F)>, x: &(String, F)) -> QuerySet<F> {
-
+    fn get_query_set(
+        &self,
+        labels: &Vec<String>,
+        alphas: &Vec<(String, F)>,
+        x: &(String, F),
+    ) -> QuerySet<F> {
         assert_eq!(labels.len(), 1);
         assert_eq!(alphas.len(), 1);
         assert_eq!(alphas[0].1, self.gamma);
@@ -78,7 +95,7 @@ impl<F: PrimeField> VirtualOracleTrait<F> for GeoSequenceVO<F> {
         let mut query_set = QuerySet::<F>::new();
 
         query_set.insert((labels[0].clone(), (x.0.clone(), x.1))); // h_prime_0 is evaluated at (beta_1 with value beta_1)
-        
+
         let gamma_x = alphas[0].1 * x.1;
         let label = match point_values_to_point_labels.get(&gamma_x) {
             Some(label) => label.clone(),
@@ -93,6 +110,26 @@ impl<F: PrimeField> VirtualOracleTrait<F> for GeoSequenceVO<F> {
         query_set.insert((labels[0].clone(), (label, gamma_x))); // h_prime_0 is evaluated at (alpha_0_beta1 with value gamma * beta_1)
 
         QuerySet::new()
+    }
+
+    fn num_of_oracles(&self) -> usize {
+        return 1;
+    }
+
+    fn query(&self, evals: &[F], point: F) -> Result<F, Error> {
+        if evals.len() != 2 {
+            return Err(Error::EvaluationError);
+        }
+
+        // evals = [shifted_f, f]
+        let mut eval = evals[1] - self.r * evals[0];
+        for (&pi, &ci) in self.pi_s.iter().zip(self.ci_s.iter()) {
+            // construct x - y^(pi + ci - 1)
+            let stitch_i = point - self.gamma.pow([(pi + ci - 1) as u64]);
+            eval += stitch_i;
+        }
+
+        Ok(eval)
     }
 }
 // for (i, alpha) in alphas.iter().enumerate() {
@@ -220,20 +257,21 @@ impl<F: PrimeField> Description<F> {
 }
 
 #[derive(Debug)]
-pub struct VirtualOracle<F: PrimeField> {
+pub struct NormalizedVirtualOracle<F: PrimeField> {
     description: Description<F>,
 }
 
 pub trait EvaluationsProvider<F: PrimeField> {
-    fn evaluate(
+    fn evaluate<VO: VirtualOracle<F>>(
         &self,
-        virtual_oracle: &VirtualOracle<F>,
+        virtual_oracle: &VO,
         point: F,
         alpha_coeffs: &Vec<F>,
     ) -> Result<F, Error>;
 }
 
-impl<F: PrimeField> VirtualOracle<F> {
+impl<F: PrimeField> NormalizedVirtualOracle<F> {
+    // impl<F: PrimeField> NormalizedVirtualOracle<F> {
     pub fn new(description: Description<F>) -> Result<Self, Error> {
         if description.terms.len() == 0 {
             return Err(Error::InvalidDescriptionError);
@@ -251,6 +289,21 @@ impl<F: PrimeField> VirtualOracle<F> {
         })
     }
 
+    /// Return the number of concrete oracles in this virtual oracle
+    pub fn num_of_oracles(&self) -> usize {
+        let mut indices = HashMap::<usize, bool>::new();
+        for term in self.description.terms.iter() {
+            for index in term.concrete_oracle_indices.iter() {
+                if !indices.contains_key(index) {
+                    indices.insert(*index, true);
+                }
+            }
+        }
+        indices.len()
+    }
+}
+
+impl<F: PrimeField> VirtualOracle<F> for NormalizedVirtualOracle<F> {
     /// Output a polynomial which represents the virtual oracle according to the description, the
     /// alpha coefficients, and the given concrete oracles. The alpha coefficients and concrete
     /// oracles should be arranged according to their respective lists of indices in the
@@ -259,48 +312,50 @@ impl<F: PrimeField> VirtualOracle<F> {
     ///                         concrete_oracle_indices in the Terms in the description
     /// TODO: instead of concrete_oracles and alpha_coeffs as vector, expect slices of a specific
     /// size
-    pub fn instantiate(
+    fn instantiate(
         &self,
-        concrete_oracles: &Vec<LabeledPolynomial<F, DensePolynomial<F>>>,
-        alphas: &Vec<F>,
+        concrete_oracles: &[LabeledPolynomial<F, DensePolynomial<F>>],
+        alphas: &[F],
     ) -> Result<DensePolynomial<F>, Error> {
         // TODO: can there be a way to reduce the overhead of checking the indices?
         //
         //
         // Ensure that there are enough concrete oracles and alpha coefficients to fit the
         // description
-         let num_cos = self.description.count_concrete_oracles();
-         if num_cos < concrete_oracles.len() || num_cos < alphas.len() {
-             return Err(Error::InstantiationError);
-         }
+        let num_cos = self.description.count_concrete_oracles();
+        if num_cos < concrete_oracles.len() || num_cos < alphas.len() {
+            return Err(Error::InstantiationError);
+        }
 
         // get the max index from the flattened list of concrete oracle indices
-         let max_co_index = self.description.terms.iter()
-             .map(
-                 |term| term.concrete_oracle_indices.iter().max()
-             )
-             .max()
-             .unwrap()
-             .unwrap();
-
-         // the given vector of concrete oracles must be large enough
-         if max_co_index >= &concrete_oracles.len() {
-             return Err(Error::InstantiationError);
-         }
-
-        // get the max index from the flattened list of alpha coefficient indices
-         let max_alpha_index = self.description.terms.iter()
-             .map(
-                 |term| term.alpha_coeff_indices.iter().max()
-             )
-             .max()
-             .unwrap()  // assume that the number of terms is > 0
-             .unwrap(); // and the number of alpha coefficients is > 0
+        let max_co_index = self
+            .description
+            .terms
+            .iter()
+            .map(|term| term.concrete_oracle_indices.iter().max())
+            .max()
+            .unwrap()
+            .unwrap();
 
         // the given vector of concrete oracles must be large enough
-         if max_alpha_index >= &concrete_oracles.len() {
-             return Err(Error::InstantiationError);
-         }
+        if max_co_index >= &concrete_oracles.len() {
+            return Err(Error::InstantiationError);
+        }
+
+        // get the max index from the flattened list of alpha coefficient indices
+        let max_alpha_index = self
+            .description
+            .terms
+            .iter()
+            .map(|term| term.alpha_coeff_indices.iter().max())
+            .max()
+            .unwrap() // assume that the number of terms is > 0
+            .unwrap(); // and the number of alpha coefficients is > 0
+
+        // the given vector of concrete oracles must be large enough
+        if max_alpha_index >= &concrete_oracles.len() {
+            return Err(Error::InstantiationError);
+        }
 
         let mut poly = DensePolynomial::<F>::zero();
 
@@ -324,20 +379,50 @@ impl<F: PrimeField> VirtualOracle<F> {
 
         Ok(poly)
     }
+
+    fn get_query_set(
+        &self,
+        labels: &Vec<String>,
+        alphas: &Vec<(String, F)>,
+        x: &(String, F),
+    ) -> QuerySet<F> {
+        QuerySet::new()
+    }
+
+    fn query(&self, evals: &[F], point: F) -> Result<F, Error> {
+        // let mut total_eval = F::zero();
+
+        // // For each term in the virtual oracle
+        // for term in virtual_oracle.description.terms.iter() {
+        //     let mut term_eval = term.constant;
+
+        //     // for each concrete oracle in the term
+        //     for &co_index in term.concrete_oracle_indices.iter() {
+        //         term_eval *= self[co_index];
+        //     }
+
+        //     total_eval += term_eval;
+        // }
+
+        // Ok(total_eval)
+        Ok(F::default())
+    }
+
+    fn num_of_oracles(&self) -> usize {
+        self.num_of_oracles()
+    }
 }
 
 impl<F: PrimeField> EvaluationsProvider<F> for Vec<LabeledPolynomial<F, DensePolynomial<F>>> {
     /// Instantiate and evaluate the virtual oracle. Returns an error if the length of
     /// concrete_oracles differs from the number of concrete oracles in the Description.
-    fn evaluate(
+    fn evaluate<VO: VirtualOracle<F>>(
         &self,
-        virtual_oracle: &VirtualOracle<F>,
+        virtual_oracle: &VO,
         point: F,
         alpha_coeffs: &Vec<F>,
     ) -> Result<F, Error> {
-        let expected_num_concrete_oracles = virtual_oracle.description.count_concrete_oracles();
-
-        if self.len() != expected_num_concrete_oracles {
+        if self.len() != virtual_oracle.num_of_oracles() {
             return Err(Error::EvaluationError);
         }
 
@@ -346,37 +431,23 @@ impl<F: PrimeField> EvaluationsProvider<F> for Vec<LabeledPolynomial<F, DensePol
     }
 }
 
+//1. add query funct to oracle vec<f>.evaluate => vo.query(vec<f>)
+//2. return function from oracle and then return func(self) of vec<f>
 impl<F: PrimeField> EvaluationsProvider<F> for Vec<F> {
     /// Return the evaluation of the virtual oracle given a list of evaluations of each concrete
     /// oracle. The length of the input vector of evaluations must equal to the number of concrete
     /// oracles in the Description.
-    fn evaluate(
+    fn evaluate<VO: VirtualOracle<F>>(
         &self,
-        virtual_oracle: &VirtualOracle<F>,
-        _: F,
+        virtual_oracle: &VO,
+        point: F,
         _: &Vec<F>,
     ) -> Result<F, Error> {
-        let expected_num_concrete_oracles = virtual_oracle.description.count_concrete_oracles();
-
-        if self.len() != expected_num_concrete_oracles {
+        if self.len() != virtual_oracle.num_of_oracles() {
             return Err(Error::EvaluationError);
         }
 
-        let mut total_eval = F::zero();
-
-        // For each term in the virtual oracle
-        for term in virtual_oracle.description.terms.iter() {
-            let mut term_eval = term.constant;
-
-            // for each concrete oracle in the term
-            for &co_index in term.concrete_oracle_indices.iter() {
-                term_eval *= self[co_index];
-            }
-
-            total_eval += term_eval;
-        }
-
-        Ok(total_eval)
+        virtual_oracle.query(&self, point)
     }
 }
 
@@ -408,11 +479,77 @@ impl<F: PrimeField> EvaluationsProvider<F> for Vec<F> {
 
 #[cfg(test)]
 mod new_tests {
-    use super::{Description, EvaluationsProvider, Term, VirtualOracle};
+    use super::{
+        Description, EvaluationsProvider, GeoSequenceVO, NormalizedVirtualOracle, Term,
+        VirtualOracle,
+    };
     use crate::label_polynomial;
     use ark_bn254::Fr;
     use ark_ff::PrimeField;
-    use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
+    use ark_poly::{
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
+        UVPolynomial,
+    };
+
+    /// @param a_s The initial value of each sequence
+    fn generate_sequence<F: PrimeField>(r: F, a_s: &[F], c_s: &[usize]) -> Vec<F> {
+        assert_eq!(c_s.len(), a_s.len());
+        let mut concatenation = Vec::<F>::default();
+
+        for (i, a) in a_s.iter().enumerate() {
+            for j in 0..c_s[i] {
+                // r ** j (is there a pow() library function in Fp256?)
+                let mut r_pow = F::from(1 as u64);
+                for _ in 0..j {
+                    r_pow = r_pow * r;
+                }
+                let val = *a * r_pow;
+                concatenation.push(val);
+            }
+        }
+
+        concatenation
+    }
+
+    #[test]
+    fn test_geo_seq_instantiation() {
+        let r = Fr::from(2u64);
+        let mut a_s = vec![
+            Fr::from(2u64),
+            Fr::from(5u64),
+            Fr::from(7u64),
+            Fr::from(11u64),
+        ];
+        let mut c_s = vec![5, 3, 10, 30];
+
+        let m = c_s.iter().sum();
+
+        // domain is a subset of the scalar field F.
+        // it's significant because domain.element(1) = gamma, domain.element(2) = gamma^2, etc
+        // m is also called the order of some subgroup (TBD)
+        // m is the length that we want (it must be a power of 2 if you want to ffts and iffts; otherwise
+        // you don't need it to be so).
+        let domain = GeneralEvaluationDomain::<Fr>::new(m).unwrap();
+
+        let to_pad = domain.size() - m;
+        if to_pad > 0 {
+            a_s.push(Fr::from(0u64));
+            c_s.push(to_pad);
+        }
+
+        let seq = generate_sequence::<Fr>(r, &a_s.as_slice(), &c_s.as_slice());
+        let f = DensePolynomial::<Fr>::from_coefficients_slice(&domain.ifft(&seq));
+
+        let geo_seq_vo = GeoSequenceVO::new(&c_s, domain.element(1), r);
+        let instantiatied_geo_seq_vo = geo_seq_vo
+            .instantiate(&[label_polynomial!(f)], &[domain.element(1)])
+            .unwrap();
+
+        for root_of_unity in domain.elements() {
+            let eval = instantiatied_geo_seq_vo.evaluate(&root_of_unity);
+            assert_eq!(eval, Fr::from(0u64));
+        }
+    }
 
     #[test]
     fn term() {
@@ -475,7 +612,6 @@ mod new_tests {
     }
 
     // As the verifier, evaluate a virtual oracle
-    #[test]
     fn verifier_evaluate_case_0() {
         let description = description_case_0();
 
@@ -487,7 +623,7 @@ mod new_tests {
             Fr::from(3 as u64),
         ];
 
-        let vo = VirtualOracle::new(description).unwrap();
+        let vo = NormalizedVirtualOracle::new(description).unwrap();
         let result = evaluations.evaluate(&vo, Fr::default(), &Vec::<Fr>::default());
         assert!(result.is_ok());
 
@@ -542,7 +678,7 @@ mod new_tests {
         ]);
 
         let description = description_case_0();
-        let vo = VirtualOracle::new(description).unwrap();
+        let vo = NormalizedVirtualOracle::new(description).unwrap();
 
         let concrete_oracles = vec![
             label_polynomial!(ax),
@@ -555,8 +691,11 @@ mod new_tests {
         let point = Fr::from(2 as u64);
 
         // Test the instantiated polynomial by evaluating it at the point
-        let p = vo.instantiate(&concrete_oracles, &alpha_coeffs);
-        assert_eq!(p.unwrap().evaluate(&point).into_repr(), Fr::from(65 as u64).into_repr());
+        let p = vo.instantiate(&concrete_oracles, &alpha_coeffs).unwrap();
+        assert_eq!(
+            p.evaluate(&point).into_repr(),
+            Fr::from(65 as u64).into_repr()
+        );
 
         // F(2) = [2] + [2^5] + [2^4] + 15 = 65
         // Evaluate the polynomial at the point:

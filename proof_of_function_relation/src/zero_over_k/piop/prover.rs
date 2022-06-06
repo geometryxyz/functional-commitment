@@ -13,12 +13,12 @@ use ark_std::rand::Rng;
 use std::iter;
 
 // TODO: change to use the new VirtualOracle implementation
-pub struct ProverState<'a, F: PrimeField> {
+pub struct ProverState<'a, F: PrimeField, VO: VirtualOracle<F>> {
     all_concrete_oracles: &'a [LabeledPolynomial<F>],
 
     alphas: &'a Vec<F>,
 
-    pub virtual_oracle: &'a VirtualOracle<F>, // TODO: made public for debugging. Private later
+    pub virtual_oracle: &'a VO, // TODO: made public for debugging. Private later
 
     /// domain K over which a virtual oracle should be equal to 0
     domain_k: GeneralEvaluationDomain<F>,
@@ -66,14 +66,14 @@ impl<F: PrimeField> ProverSecondOracles<F> {
     }
 }
 
-impl<F: PrimeField> PIOPforZeroOverK<F> {
+impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
     /// Return the initial prover state
     pub fn prover_init<'a>(
         domain: GeneralEvaluationDomain<F>,
         all_concrete_oracles: &'a [LabeledPolynomial<F>],
-        virtual_oracle: &'a VirtualOracle<F>,
+        virtual_oracle: &'a VO,
         alphas: &'a Vec<F>,
-    ) -> Result<ProverState<'a, F>, Error> {
+    ) -> Result<ProverState<'a, F, VO>, Error> {
         Ok(ProverState {
             all_concrete_oracles,
             alphas,
@@ -89,9 +89,9 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
     }
 
     pub fn prover_first_round<'a, R: Rng>(
-        mut state: ProverState<'a, F>,
+        mut state: ProverState<'a, F, VO>,
         rng: &mut R,
-    ) -> Result<(ProverMsg<F>, ProverFirstOracles<F>, ProverState<'a, F>), Error> {
+    ) -> Result<(ProverMsg<F>, ProverFirstOracles<F>, ProverState<'a, F, VO>), Error> {
         let domain = state.domain_k;
         let alphas = state.alphas;
 
@@ -116,8 +116,7 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
 
         let f_prime = state
             .virtual_oracle
-            .instantiate(&h_primes, &alphas)
-            .unwrap();
+            .instantiate(h_primes.as_slice(), &alphas)?;
         let (q_1, _r) = DenseOrSparsePolynomial::from(&f_prime)
             .divide_with_q_and_r(&DenseOrSparsePolynomial::from(
                 &domain.vanishing_polynomial(),
@@ -148,9 +147,9 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
 
     pub fn prover_second_round<'a, R: Rng>(
         ver_message: &VerifierFirstMsg<F>,
-        mut state: ProverState<'a, F>,
+        mut state: ProverState<'a, F, VO>,
         _r: &mut R,
-    ) -> (ProverMsg<F>, ProverSecondOracles<F>, ProverState<'a, F>) {
+    ) -> (ProverMsg<F>, ProverSecondOracles<F>, ProverState<'a, F, VO>) {
         let random_polynomials = state.random_polynomials.clone().expect("ProverState should include the random polynomials that were used to create the maskings in round 1");
 
         // q_2 is defined as r1 + c*r2 + c^2r3 + ...

@@ -3,14 +3,15 @@ mod test {
     use crate::{
         commitment::{HomomorphicPolynomialCommitment, KZG10},
         error::Error,
-        virtual_oracle::{Description, EvaluationsProvider, Term, VirtualOracle},
+        virtual_oracle::{
+            Description, EvaluationsProvider, NormalizedVirtualOracle, Term, VirtualOracle,
+        },
         zero_over_k::ZeroOverK,
     };
     use ark_bn254::{Bn254, Fr};
     use ark_ff::{One, Zero};
     use ark_poly::{
-        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-        UVPolynomial,
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
     };
     use ark_poly_commit::{
         LabeledCommitment, LabeledPolynomial, PCRandomness, PolynomialCommitment,
@@ -24,8 +25,7 @@ mod test {
     type F = Fr;
     type PC = KZG10<Bn254>;
 
-    #[test]
-    fn test_zero_over_k() {
+    fn test_zero_over_k_normalized_oracle() {
         let n = 4;
         let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();
 
@@ -79,7 +79,7 @@ mod test {
         let description = Description::<Fr> {
             terms: vec![term0, term1, term2],
         };
-        let vo = VirtualOracle::new(description).unwrap();
+        let vo = NormalizedVirtualOracle::new(description).unwrap();
 
         let concrete_oracles2 = [a_poly.clone(), b_poly.clone()].to_vec();
 
@@ -124,7 +124,7 @@ mod test {
     }
 
     #[test]
-    fn test_failure_on_malicious_virtual_oracle() {
+    fn test_failure_on_malicious_normalized_virtual_oracle() {
         let n = 4;
         let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();
 
@@ -182,7 +182,7 @@ mod test {
         let description = Description::<Fr> {
             terms: vec![term0, term1, term2],
         };
-        let vo = VirtualOracle::new(description).unwrap();
+        let vo = NormalizedVirtualOracle::new(description).unwrap();
 
         let maximum_degree: usize = 16;
 

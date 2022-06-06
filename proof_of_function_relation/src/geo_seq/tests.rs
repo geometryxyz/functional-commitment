@@ -1,9 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::{
-        geo_seq::GeoSeqTest,
-        commitment::{KZG10},
-    };
+    use crate::{commitment::KZG10, geo_seq::GeoSeqTest};
     use ark_bn254::{Bn254, Fr};
     use blake2::Blake2s;
 
@@ -13,11 +10,7 @@ mod tests {
     /// @param r The multiplicative factor
     /// @param c_s The size of each sequence
     /// @param a_s The initial value of each sequence
-    fn generate_sequence(
-        r: F,
-        a_s: &[F],
-        c_s: &[usize],
-    ) -> Vec::<F> {
+    fn generate_sequence(r: F, a_s: &[F], c_s: &[usize]) -> Vec<F> {
         assert_eq!(c_s.len(), a_s.len());
         let mut concatenation = Vec::<F>::default();
 
@@ -44,12 +37,7 @@ mod tests {
 
         let seq = generate_sequence(r, a_s, c_s);
 
-        let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(
-            seq,
-            r,
-            a_s,
-            c_s,
-        );
+        let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(seq, r, a_s, c_s);
     }
 
     /// Test that geometric_sequence() works correctly
@@ -60,28 +48,37 @@ mod tests {
         let c_s = &[3, 3];
         let seq = generate_sequence(r, a_s, c_s);
 
-        let expected = [1, 2, 4, 2, 4, 8].iter().map(|x| F::from(*x as u64)).collect::<Vec::<F>>();
+        let expected = [1, 2, 4, 2, 4, 8]
+            .iter()
+            .map(|x| F::from(*x as u64))
+            .collect::<Vec<F>>();
         assert_eq!(expected.len(), seq.len());
         for (i, s) in seq.iter().enumerate() {
             assert_eq!(&expected[i], s);
         }
 
-        assert!(GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::naive_verify(seq, r, a_s, c_s));
+        assert!(GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::naive_verify(
+            seq, r, a_s, c_s
+        ));
     }
 
     #[test]
     fn test_generate_sequence_1() {
-
         let r = F::from(1u64);
         let a_s = &[F::from(1u64), F::from(1u64)];
         let c_s = &[1, 1];
 
         let seq = generate_sequence(r, a_s, c_s);
-        let expected = [0, 1].iter().map(|x| F::from(*x as u64)).collect::<Vec::<F>>();
+        let expected = [1, 1]
+            .iter()
+            .map(|x| F::from(*x as u64))
+            .collect::<Vec<F>>();
         assert_eq!(expected.len(), seq.len());
         for (i, s) in seq.iter().enumerate() {
             assert_eq!(&expected[i], s);
         }
-        assert!(GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::naive_verify(seq, r, a_s, c_s));
+        assert!(GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::naive_verify(
+            seq, r, a_s, c_s
+        ));
     }
 }
