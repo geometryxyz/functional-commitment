@@ -8,7 +8,7 @@ use ark_ff::to_bytes;
 use ark_ff::PrimeField;
 use ark_marlin::rng::FiatShamirRng;
 use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
 };
 use ark_poly_commit::Evaluations;
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PCRandomness};
@@ -63,11 +63,11 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             PC::commit(ck, random_polynomials.iter(), None).map_err(to_pc_error::<F, PC>)?;
 
         // commit to the masking polynomials
-        let (m_commitments, m_rands) =
+        let (m_commitments, _m_rands) =
             PC::commit(ck, masking_polynomials.iter(), None).map_err(to_pc_error::<F, PC>)?;
 
         // commit to q_1
-        let (q1_commit, q1_rand) =
+        let (q1_commit, _q1_rand) =
             PC::commit(ck, &[q_1.clone()], None).map_err(to_pc_error::<F, PC>)?;
 
         fs_rng.absorb(&to_bytes![r_commitments, m_commitments, q1_commit].unwrap());
@@ -79,7 +79,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         //------------------------------------------------------------------
         // Second Round
 
-        let (prover_second_msg, prover_second_oracles, prover_state) =
+        let (_prover_second_msg, prover_second_oracles, prover_state) =
             PIOPforZeroOverK::prover_second_round(&verifier_first_msg, prover_state, rng);
 
         let query_set = PIOPforZeroOverK::verifier_query_set(&verifier_state, alphas)?;

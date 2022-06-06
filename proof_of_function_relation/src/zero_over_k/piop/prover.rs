@@ -7,7 +7,7 @@ use ark_ff::{PrimeField, Zero};
 use ark_marlin::ahp::prover::ProverMsg;
 use ark_poly::{
     univariate::{DenseOrSparsePolynomial, DensePolynomial},
-    EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial,
+    EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };
 use ark_std::rand::Rng;
 use std::iter;
@@ -118,7 +118,7 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
             .virtual_oracle
             .instantiate(&h_primes, &alphas)
             .unwrap();
-        let (q_1, r) = DenseOrSparsePolynomial::from(&f_prime)
+        let (q_1, _r) = DenseOrSparsePolynomial::from(&f_prime)
             .divide_with_q_and_r(&DenseOrSparsePolynomial::from(
                 &domain.vanishing_polynomial(),
             ))

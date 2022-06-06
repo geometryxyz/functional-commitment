@@ -9,15 +9,15 @@ mod test {
     use ark_bn254::{Bn254, Fr};
     use ark_ff::{One, Zero};
     use ark_poly::{
-        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
         UVPolynomial,
     };
     use ark_poly_commit::{
         LabeledCommitment, LabeledPolynomial, PCRandomness, PolynomialCommitment,
     };
-    use ark_std::UniformRand;
+    //use ark_std::UniformRand;
     use blake2::Blake2s;
-    use rand::thread_rng;
+    //use rand::thread_rng;
     use rand_core::OsRng;
     use std::iter;
 
@@ -222,7 +222,7 @@ mod test {
     fn test_commit_with_bounds() {
         let n = 4;
         let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();
-        let rng = &mut thread_rng();
+        //let rng = &mut thread_rng();
 
         //test oracle to be zero at roots of unity
         let a_evals = vec![
@@ -255,12 +255,12 @@ mod test {
         let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
         let (ck, vk) = PC::trim(&pp, maximum_degree, 0, Some(&[4])).unwrap();
 
-        let (commitments, rands) = PC::commit(&ck, &[a_poly, b_poly], None).unwrap();
+        let (commitments, _rands) = PC::commit(&ck, &[a_poly, b_poly], None).unwrap();
         let a_commit = commitments[0].clone();
-        let a_rand = rands[0].clone();
+        //let a_rand = rands[0].clone();
 
         let b_commit = commitments[1].clone();
-        let b_rand = rands[1].clone();
+        // let b_rand = rands[1].clone();
 
         let one = Fr::one();
         let a_plus_b_commit = PC::multi_scalar_mul(&[a_commit, b_commit], &[one, one]);
