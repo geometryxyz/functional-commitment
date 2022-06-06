@@ -16,6 +16,19 @@ macro_rules! to_poly {
     };
 }
 
+/// Lazy labelling of polynomials for testing.
+#[macro_export]
+macro_rules! label_polynomial {
+    ($poly:expr) => {
+        ark_poly_commit::LabeledPolynomial::new(
+            stringify!($poly).to_owned(),
+            $poly.clone(),
+            None,
+            None,
+        )
+    };
+}
+
 pub fn shift_dense_poly<F: Field>(
     p: &DensePolynomial<F>,
     shifting_factor: &F,

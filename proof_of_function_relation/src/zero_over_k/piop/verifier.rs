@@ -1,6 +1,6 @@
 use super::PIOPforZeroOverK;
 use crate::error::Error;
-use crate::zero_over_k::VirtualOracle;
+use crate::virtual_oracle::VirtualOracle;
 use ark_ff::PrimeField;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::QuerySet;
@@ -8,9 +8,7 @@ use rand::Rng;
 use std::collections::HashMap;
 
 #[derive(Copy, Clone)]
-pub struct VerifierState<'a, F: PrimeField, VO: VirtualOracle<F>> {
-    virtual_oracle: &'a VO,
-
+pub struct VerifierState<F: PrimeField> {
     /// domain K over which a virtual oracle should be equal to 0
     domain_k: GeneralEvaluationDomain<F>,
 
@@ -28,13 +26,12 @@ pub struct VerifierFirstMsg<F: PrimeField> {
     pub c: F,
 }
 
-impl<F: PrimeField> PIOPforZeroOverK<F> {
-    pub fn verifier_init<'a, VO: VirtualOracle<F>>(
+impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
+    /// Return the initial verifier state
+    pub fn verifier_init<'a>(
         domain_k: GeneralEvaluationDomain<F>,
-        virtual_oracle: &'a VO,
-    ) -> Result<VerifierState<'a, F, VO>, Error> {
+    ) -> Result<VerifierState<F>, Error> {
         Ok(VerifierState {
-            virtual_oracle,
             domain_k,
             verifier_first_message: None,
             beta_1: None,
@@ -42,10 +39,10 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
         })
     }
 
-    pub fn verifier_first_round<'a, R: Rng, VO: VirtualOracle<F>>(
-        mut state: VerifierState<'a, F, VO>,
+    pub fn verifier_first_round<R: Rng>(
+        mut state: VerifierState<F>,
         rng: &mut R,
-    ) -> Result<(VerifierFirstMsg<F>, VerifierState<'a, F, VO>), Error> {
+    ) -> Result<(VerifierFirstMsg<F>, VerifierState<F>), Error> {
         let beta_1 = state.domain_k.sample_element_outside_domain(rng);
         let beta_2 = state.domain_k.sample_element_outside_domain(rng);
         let c = state.domain_k.sample_element_outside_domain(rng);
@@ -59,10 +56,10 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
         Ok((msg, state))
     }
 
-    pub fn verifier_query_set<VO: VirtualOracle<F>>(
-        state: &VerifierState<F, VO>,
+    pub fn verifier_query_set(
+        state: &VerifierState<F>,
+        alphas: &[F],
     ) -> Result<QuerySet<F>, Error> {
-        let alphas = state.virtual_oracle.alphas();
         let beta_1 = state
             .beta_1
             .expect("Verifier should have computed beta 1 at this stage");
@@ -75,6 +72,12 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
 
         point_evaluations.insert(beta_1, String::from("beta_1"));
         point_evaluations.insert(beta_2, String::from("beta_2"));
+
+        // call once for h_primes qs_1 = vo.get_query_set(h_primes_labels, [domain.element(1)], (beta_1, beta_1_value))
+        // call once for ms qs_2 = vo.get_query_set(m_lables, [domain.element(1)], (beta_2, beta_2_value))
+        // query_set.insert((String::from("q_1"), (String::from("beta_1"), beta_1))); (1)
+        // query_set.insert((String::from("q_2"), (String::from("beta_2"), beta_2))); (2)
+        // merge q1 and q2 and insert (1)&(2)
 
         for (i, alpha) in alphas.iter().enumerate() {
             let test_point = *alpha * beta_1;

@@ -1,21 +1,24 @@
 use super::PIOPforZeroOverK;
 use crate::error::Error;
 use crate::util::*;
+use crate::virtual_oracle::VirtualOracle;
 use crate::zero_over_k::piop::{verifier::VerifierFirstMsg, LabeledPolynomial};
-use crate::zero_over_k::VirtualOracle;
 use ark_ff::{PrimeField, Zero};
 use ark_marlin::ahp::prover::ProverMsg;
 use ark_poly::{
     univariate::{DenseOrSparsePolynomial, DensePolynomial},
-    EvaluationDomain, GeneralEvaluationDomain, UVPolynomial, Polynomial
+    EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };
 use ark_std::rand::Rng;
 use std::iter;
 
+// TODO: change to use the new VirtualOracle implementation
 pub struct ProverState<'a, F: PrimeField, VO: VirtualOracle<F>> {
     all_concrete_oracles: &'a [LabeledPolynomial<F>],
 
-    virtual_oracle: &'a VO,
+    alphas: &'a Vec<F>,
+
+    pub virtual_oracle: &'a VO, // TODO: made public for debugging. Private later
 
     /// domain K over which a virtual oracle should be equal to 0
     domain_k: GeneralEvaluationDomain<F>,
@@ -63,14 +66,17 @@ impl<F: PrimeField> ProverSecondOracles<F> {
     }
 }
 
-impl<F: PrimeField> PIOPforZeroOverK<F> {
-    pub fn prover_init<'a, VO: VirtualOracle<F>>(
+impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
+    /// Return the initial prover state
+    pub fn prover_init<'a>(
         domain: GeneralEvaluationDomain<F>,
         all_concrete_oracles: &'a [LabeledPolynomial<F>],
         virtual_oracle: &'a VO,
+        alphas: &'a Vec<F>,
     ) -> Result<ProverState<'a, F, VO>, Error> {
         Ok(ProverState {
             all_concrete_oracles,
+            alphas,
             virtual_oracle,
             domain_k: domain,
             masking_polynomials: None,
@@ -82,12 +88,12 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
         })
     }
 
-    pub fn prover_first_round<'a, VO: VirtualOracle<F>, R: Rng>(
+    pub fn prover_first_round<'a, R: Rng>(
         mut state: ProverState<'a, F, VO>,
         rng: &mut R,
     ) -> Result<(ProverMsg<F>, ProverFirstOracles<F>, ProverState<'a, F, VO>), Error> {
         let domain = state.domain_k;
-        let alphas = state.virtual_oracle.alphas();
+        let alphas = state.alphas;
 
         // generate the masking polynomials and keep a record of the random polynomials that were used
         let (random_polynomials, masking_polynomials) = compute_maskings(&domain, &alphas, rng);
@@ -108,13 +114,15 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
             })
             .collect::<Vec<_>>();
 
-        // compute the blinded virtual oracle F'[X]
-        let f_prime = VO::instantiate(&h_primes, &alphas);
-        let (q_1, _) = DenseOrSparsePolynomial::from(&f_prime)
+        let f_prime = state
+            .virtual_oracle
+            .instantiate(h_primes.as_slice(), &alphas)?;
+        let (q_1, _r) = DenseOrSparsePolynomial::from(&f_prime)
             .divide_with_q_and_r(&DenseOrSparsePolynomial::from(
                 &domain.vanishing_polynomial(),
             ))
             .unwrap();
+        ///////////////////////////////////////////////////////////
 
         // // sanity check
         // assert_eq!(r, DensePolynomial::<F>::zero());
@@ -137,7 +145,7 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
         Ok((msg, oracles, state))
     }
 
-    pub fn prover_second_round<'a, R: Rng, VO: VirtualOracle<F>>(
+    pub fn prover_second_round<'a, R: Rng>(
         ver_message: &VerifierFirstMsg<F>,
         mut state: ProverState<'a, F, VO>,
         _r: &mut R,
