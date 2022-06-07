@@ -75,7 +75,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
         let maximum_degree: usize = instantiatied_geo_seq_vo.coeffs.len();
         let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
 
-        // TODO: why [2, 5]?
+        // TODO: why [2, 5]? this is the degree bounds... needs to be implented correctly in ZOK
+        // upstream.
         let (ck, vk) = PC::trim(&pp, maximum_degree, 0, Some(&[2, 5])).unwrap();
 
         let (concrete_oracles_commitments, concrete_oracle_rands) =

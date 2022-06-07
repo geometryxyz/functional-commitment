@@ -1,5 +1,8 @@
 #[cfg(test)]
 mod tests {
+    // The protocol starts with the verifier receiving a commitment to f
+    // Then the prover computes f
+    //
     use crate::{commitment::KZG10, geo_seq::GeoSeqTest};
     use ark_bn254::{Bn254, Fr};
     use blake2::Blake2s;
@@ -36,6 +39,27 @@ mod tests {
         let c_s = &[3, 3];
 
         let seq = generate_sequence(r, a_s, c_s);
+        
+        // TODO: pull from dev!
+        // TODO: implement the following. need to refactor things
+        // Let's describe how to do a proper back and forth between the prover and verifier
+
+        // 1. We have a sequence defined by r, a_s, and c_s
+        // 2. Both the verifier and prover receive r, a_s, and c_s
+        // 3. Verifier has oracle access to the function f (i.e. verifier already hold a commitment)
+        //   - Test generates seq, interpolate the polynomial out of it to get f
+        // 4. Prover generates the VO. Next, the prover runs zero over k for
+        //    this VO. The prover sends the following to the verifier:
+        //    - zero over k proof
+        // 5. Verifier generates VO (note that it already knows f). Verifier
+        //    verifies the zero over k proof. It also checks that:
+        //    - for all i in n, check that f(gamma^p_i) = a_i
+
+        // Verifier emits a query set (for the f_gamma check)
+        // Prover will evaluate f at those points and return opening proof
+        // Prover runs zero over k prove
+        // Verifier runs zero over k verify
+
 
         let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(
             &seq,
