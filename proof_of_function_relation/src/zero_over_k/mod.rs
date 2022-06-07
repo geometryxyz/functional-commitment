@@ -7,7 +7,7 @@ use crate::zero_over_k::proof::Proof;
 use ark_ff::to_bytes;
 use ark_ff::PrimeField;
 use ark_marlin::rng::FiatShamirRng;
-use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
+use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial};
 use ark_poly_commit::Evaluations;
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PCRandomness};
 use ark_std::marker::PhantomData;
@@ -106,11 +106,11 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         let mut q2_eval: Option<F> = None;
 
         // Extract evaluations from the `evaluated_query_set`
-        for ((poly_label, point), &evaluation) in &evaluated_query_set {
+        for ((poly_label, _), &evaluation) in &evaluated_query_set {
             if poly_label.contains("h_prime_") {
-                h_prime_evals.push((poly_label, point, evaluation));
+                h_prime_evals.push((poly_label, evaluation));
             } else if poly_label.contains("m_") {
-                m_evals.push((poly_label, point, evaluation));
+                m_evals.push((poly_label, evaluation));
             } else if poly_label == "q_1" {
                 q1_eval = Some(evaluation);
             } else if poly_label == "q_2" {
@@ -119,12 +119,10 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         }
 
         // sort the evaluation by poly label name => h_prime_is, m_is, q_1, q_2
-        // h_prime_evals.sort_by(|a, b| a.0.cmp(&b.0));
-        h_prime_evals.sort_unstable_by_key(|item| (item.0, item.1));
-        let h_prime_evals = h_prime_evals.into_iter().map(|x| x.2).collect::<Vec<F>>();
-        // m_evals.sort_by(|a, b| a.0.cmp(&b.0));
-        m_evals.sort_unstable_by_key(|item| (item.0, item.1));
-        let m_evals = m_evals.into_iter().map(|x| x.2).collect::<Vec<F>>();
+        h_prime_evals.sort_by(|a, b| a.0.cmp(&b.0));
+        let h_prime_evals = h_prime_evals.into_iter().map(|x| x.1).collect::<Vec<F>>();
+        m_evals.sort_by(|a, b| a.0.cmp(&b.0));
+        let m_evals = m_evals.into_iter().map(|x| x.1).collect::<Vec<F>>();
 
         // sanity checks
         let q1_eval = q1_eval.expect("q_1 was not evaluated");
@@ -180,25 +178,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         )
         .map_err(to_pc_error::<F, PC>)?;
 
-
-        // let evaluations = ark_poly_commit::evaluate_query_set(polynomials, &query_set);
-        // for ((label, point), eval) in &evaluations {
-        //     println!("Prover side - poly: {} in point {} evaluates to {}", label, point, eval);
-        // }
-
-        // let res = match PC::batch_check(
-        //     vk,
-        //     commitments,
-        //     &query_set,
-        //     &ark_poly_commit::evaluate_query_set(polynomials, &query_set),
-        //     &batch_opening,
-        //     separation_challenge,
-        //     &mut OsRng,
-        // ) {
-        //     Ok(true) => Ok(()),
-        //     Ok(false) => Err(Error::ProofVerificationError),
-        //     Err(e) => panic!("{:?}", e),
-        // };
+        // let f_prime = virtual_oracle.instantiate(&h_primes, alphas).unwrap();
+        // println!("F PRIME EVAL ON PROVER SIDE: {}", f_prime.evaluate(&verifier_state.beta_1.expect("")));
 
         let proof = Proof {
             // commitments
@@ -325,16 +306,10 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         }
 
         // take advantage of the alphabetical order to re-label each evaluation
-        // evaluation_labels.sort_by(|a, b| a.0.cmp(&b.0));
-        evaluation_labels.sort_unstable_by_key(|item| (item.0.clone(), item.1));
-        
+        evaluation_labels.sort_by(|a, b| a.0.cmp(&b.0));        
         for (q, eval) in evaluation_labels.into_iter().zip(evals) {
             evaluations.insert(q, *eval);
         }
-
-        // for ((label, point), eval) in &evaluations {
-        //     println!("Verifier side - poly: {} in point {} evaluates to {}", label, point, eval);
-        // }
 
         let commitments = m_commitments
             .iter()
@@ -359,8 +334,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         }?;
 
         // compute M(beta_2)
-        let big_m_at_beta_2 = &proof
-            .m_evals
+        let big_m_at_beta_2 = &proof.m_evals
             .iter()
             .zip(powers_of(verifier_first_msg.c))
             .fold(F::zero(), |acc, (&m_eval, c_power)| {
@@ -372,24 +346,23 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         let z_k_at_beta_2 = domain.evaluate_vanishing_polynomial(beta_2);
 
         // compute F_prime(beta_1)
-        //let f_prime_eval = VO::query(&proof.h_prime_evals);
         let f_prime_eval = proof.h_prime_evals
             .evaluate(virtual_oracle, beta_1, &Vec::<F>::default())
             .unwrap();
 
         // check that M(beta_2) - q2(beta_2)*zK(beta_2) = 0
-        // let check_1 = *big_m_at_beta_2 - proof.q2_eval * z_k_at_beta_2;
-        // if check_1 != F::zero() {
-        //     return Err(Error::Check1Failed);
-        // }
-
-        println!("hereeee");
+        let check_1 = *big_m_at_beta_2 - proof.q2_eval * z_k_at_beta_2;
+        if check_1 != F::zero() {
+            return Err(Error::Check1Failed);
+        }
 
         // check that F_prime(beta_1) - q1(beta_1)*zK(beta_1) = 0
         let check_2 = f_prime_eval - proof.q1_eval * z_k_at_beta_1;
         if check_2 != F::zero() {
             return Err(Error::Check2Failed);
         }
+
+        println!("SURVIVED");
 
         Ok(())
     }

@@ -39,13 +39,13 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
         concrete_oracles: &[LabeledPolynomial<F, DensePolynomial<F>>],
         alphas: &[F],
     ) -> Result<DensePolynomial<F>, Error> {
-        if concrete_oracles.len() != 1 || alphas.len() != 1 {
+        if concrete_oracles.len() != 2 || alphas.len() != 2 {
             return Err(Error::InstantiationError);
         }
 
         // construct (f(gamma * x) - r * f(x))
-        let mut instantiation_poly = shift_dense_poly(&concrete_oracles[0], &alphas[0])
-            + (concrete_oracles[0].polynomial() * -self.r);
+        let mut instantiation_poly = shift_dense_poly(&concrete_oracles[1], &alphas[1])
+            + (&shift_dense_poly(&concrete_oracles[0], &alphas[0]) * -self.r);
 
         let x_poly = DensePolynomial::<F>::from_coefficients_slice(&[F::zero(), F::one()]);
         for (&pi, &ci) in self.pi_s.iter().zip(self.ci_s.iter()) {
@@ -91,7 +91,7 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
     }
 
     fn num_of_oracles(&self) -> usize {
-        return 1;
+        return 2;
     }
 
     fn query(&self, evals: &[F], point: F) -> Result<F, Error> {
@@ -104,7 +104,7 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
         for (&pi, &ci) in self.pi_s.iter().zip(self.ci_s.iter()) {
             // construct x - y^(pi + ci - 1)
             let stitch_i = point - self.gamma.pow([(pi + ci - 1) as u64]);
-            eval += stitch_i;
+            eval *= stitch_i;
         }
 
         Ok(eval)
@@ -156,7 +156,7 @@ mod test {
 
         let geo_seq_vo = GeoSequenceVO::new(&c_s, domain.element(1), r);
         let instantiatied_geo_seq_vo = geo_seq_vo
-            .instantiate(&[label_polynomial!(f)], &[domain.element(1)])
+            .instantiate(&[label_polynomial!(f), label_polynomial!(f)], &[Fr::from(1u64), domain.element(1)])
             .unwrap();
 
         for root_of_unity in domain.elements() {

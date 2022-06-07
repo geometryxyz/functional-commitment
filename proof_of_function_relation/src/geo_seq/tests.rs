@@ -98,8 +98,8 @@ mod tests {
 
         let geo_seq_vo = GeoSequenceVO::new(&c_s, domain.element(1), r);
 
-        let concrete_oracles = [label_polynomial!(f)];
-        let alphas = [domain.element(1)];
+        let concrete_oracles = [label_polynomial!(f), label_polynomial!(f)];
+        let alphas = [Fr::from(1u64), domain.element(1)];
 
         let maximum_degree: usize = 80;
 

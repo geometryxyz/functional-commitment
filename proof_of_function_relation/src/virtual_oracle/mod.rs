@@ -71,29 +71,3 @@ impl<F: PrimeField> EvaluationsProvider<F> for Vec<F> {
         virtual_oracle.query(&self, point)
     }
 }
-
-// co = vec![f(x), g(x)] labeled
-// alphas = vec![1, gamma]
-// 1) create the identity polynomial and insert it to co
-// co = vec![x, f(x), g(x)]
-// j = [1, 1] means h_0 = co[1] = f, h_1 = co[1] = f
-// f(gamma * x) - f(x)
-// VO = shift(co[j[1]], alpha)
-// V0 = shift(co[1], alpha)
-
-// term1 = co_indices = [1] alphas_indicies = [1] c = 1
-// term2 = co_indices = [1] alphas_indicies = [0] c = -1
-//
-// query set
-// h_prime_commitments = [h_prime_commitment_0] = (commitment_f + commiement_m0)
-//
-//
-//
-// if i want vo to give me query_set
-// co_0 shoud be evaluated at point alpha_1 * x
-// (H_PRIME_0, (alpha_{}_x_label_we_sent, alpha_1 * x))
-// alpha_3 * beta_1 == alpha_7 * beta_2
-// F
-
-// function that says :
-// co[j[]]
