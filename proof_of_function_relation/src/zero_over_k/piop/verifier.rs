@@ -1,5 +1,6 @@
 use super::PIOPforZeroOverK;
 use crate::error::Error;
+use crate::virtual_oracle::VirtualOracle;
 use ark_ff::PrimeField;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::QuerySet;
@@ -25,7 +26,7 @@ pub struct VerifierFirstMsg<F: PrimeField> {
     pub c: F,
 }
 
-impl<F: PrimeField> PIOPforZeroOverK<F> {
+impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
     /// Return the initial verifier state
     pub fn verifier_init<'a>(
         domain_k: GeneralEvaluationDomain<F>,
@@ -71,6 +72,12 @@ impl<F: PrimeField> PIOPforZeroOverK<F> {
 
         point_evaluations.insert(beta_1, String::from("beta_1"));
         point_evaluations.insert(beta_2, String::from("beta_2"));
+
+        // call once for h_primes qs_1 = vo.get_query_set(h_primes_labels, [domain.element(1)], (beta_1, beta_1_value))
+        // call once for ms qs_2 = vo.get_query_set(m_lables, [domain.element(1)], (beta_2, beta_2_value))
+        // query_set.insert((String::from("q_1"), (String::from("beta_1"), beta_1))); (1)
+        // query_set.insert((String::from("q_2"), (String::from("beta_2"), beta_2))); (2)
+        // merge q1 and q2 and insert (1)&(2)
 
         for (i, alpha) in alphas.iter().enumerate() {
             let test_point = *alpha * beta_1;

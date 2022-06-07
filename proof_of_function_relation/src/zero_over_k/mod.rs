@@ -7,9 +7,7 @@ use crate::zero_over_k::proof::Proof;
 use ark_ff::to_bytes;
 use ark_ff::PrimeField;
 use ark_marlin::rng::FiatShamirRng;
-use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-};
+use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::Evaluations;
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PCRandomness};
 use ark_std::marker::PhantomData;
@@ -31,11 +29,11 @@ pub struct ZeroOverK<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: D
 impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK<F, PC, D> {
     pub const PROTOCOL_NAME: &'static [u8] = b"Zero Over K";
 
-    pub fn prove<R: Rng>(
+    pub fn prove<R: Rng, VO: VirtualOracle<F>>(
         concrete_oracles: &[LabeledPolynomial<F, DensePolynomial<F>>],
         concrete_oracle_commitments: &[LabeledCommitment<PC::Commitment>],
         concrete_oracle_commit_rands: &[PC::Randomness],
-        virtual_oracle: &VirtualOracle<F>,
+        virtual_oracle: &VO,
         alphas: &Vec<F>,
         domain: GeneralEvaluationDomain<F>,
         ck: &PC::CommitterKey,
@@ -43,7 +41,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
     ) -> Result<Proof<F, PC>, Error> {
         let prover_initial_state =
             PIOPforZeroOverK::prover_init(domain, concrete_oracles, virtual_oracle, &alphas)?;
-        let verifier_initial_state = PIOPforZeroOverK::verifier_init(domain)?;
+        let verifier_initial_state = PIOPforZeroOverK::<F, VO>::verifier_init(domain)?;
 
         let mut fs_rng = FiatShamirRng::<D>::from_seed(
             &to_bytes![&Self::PROTOCOL_NAME, concrete_oracle_commitments, alphas].unwrap(),
@@ -73,7 +71,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         fs_rng.absorb(&to_bytes![r_commitments, m_commitments, q1_commit].unwrap());
 
         let (verifier_first_msg, verifier_state) =
-            PIOPforZeroOverK::verifier_first_round(verifier_initial_state, &mut fs_rng)?;
+            PIOPforZeroOverK::<F, VO>::verifier_first_round(verifier_initial_state, &mut fs_rng)?;
         //------------------------------------------------------------------
 
         //------------------------------------------------------------------
@@ -82,7 +80,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         let (_prover_second_msg, prover_second_oracles, prover_state) =
             PIOPforZeroOverK::prover_second_round(&verifier_first_msg, prover_state, rng);
 
-        let query_set = PIOPforZeroOverK::verifier_query_set(&verifier_state, alphas)?;
+        let query_set = PIOPforZeroOverK::<F, VO>::verifier_query_set(&verifier_state, alphas)?;
         //------------------------------------------------------------------
 
         let h_primes = prover_state
@@ -209,15 +207,15 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         Ok(proof)
     }
 
-    pub fn verify(
+    pub fn verify<VO: VirtualOracle<F>>(
         proof: Proof<F, PC>,
         concrete_oracle_commitments: &[LabeledCommitment<PC::Commitment>],
-        virtual_oracle: &VirtualOracle<F>,
+        virtual_oracle: &VO,
         domain: GeneralEvaluationDomain<F>,
         alphas: &[F],
         vk: &PC::VerifierKey,
     ) -> Result<(), Error> {
-        let verifier_initial_state = PIOPforZeroOverK::verifier_init(domain)?;
+        let verifier_initial_state = PIOPforZeroOverK::<F, VO>::verifier_init(domain)?;
 
         let mut fs_rng = FiatShamirRng::<D>::from_seed(
             &to_bytes![&Self::PROTOCOL_NAME, concrete_oracle_commitments, alphas].unwrap(),
@@ -229,7 +227,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             .absorb(&to_bytes![proof.r_commitments, proof.m_commitments, proof.q1_commit].unwrap());
 
         let (verifier_first_msg, verifier_state) =
-            PIOPforZeroOverK::verifier_first_round(verifier_initial_state, &mut fs_rng)?;
+            PIOPforZeroOverK::<F, VO>::verifier_first_round(verifier_initial_state, &mut fs_rng)?;
 
         //------------------------------------------------------------------
         // Second Round
@@ -243,7 +241,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             .unwrap(),
         );
 
-        let query_set = PIOPforZeroOverK::verifier_query_set(&verifier_state, alphas)?;
+        let query_set = PIOPforZeroOverK::<F, VO>::verifier_query_set(&verifier_state, alphas)?;
 
         let beta_1 = verifier_state
             .beta_1
