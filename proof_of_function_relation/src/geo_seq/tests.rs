@@ -45,11 +45,20 @@ mod tests {
         let seq = generate_sequence(r, a_s, c_s);
 
         let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(
-            seq,
+            &seq,
             r,
             a_s,
             c_s,
         );
+
+        let is_valid = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::verify(
+            proof.unwrap(),
+            &seq,
+            r,
+            a_s,
+            c_s,
+        );
+        assert!(is_valid);
     }
 
     /// Test that geometric_sequence() works correctly
@@ -66,7 +75,7 @@ mod tests {
             assert_eq!(&expected[i], s);
         }
 
-        assert!(GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::naive_verify(seq, r, a_s, c_s));
+        assert!(GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::naive_verify(&seq, r, a_s, c_s));
     }
 
     #[test]
@@ -77,11 +86,11 @@ mod tests {
         let c_s = &[1, 1];
 
         let seq = generate_sequence(r, a_s, c_s);
-        let expected = [0, 1].iter().map(|x| F::from(*x as u64)).collect::<Vec::<F>>();
+        let expected = [1, 1].iter().map(|x| F::from(*x as u64)).collect::<Vec::<F>>();
         assert_eq!(expected.len(), seq.len());
         for (i, s) in seq.iter().enumerate() {
             assert_eq!(&expected[i], s);
         }
-        assert!(GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::naive_verify(seq, r, a_s, c_s));
+        assert!(GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::naive_verify(&seq, r, a_s, c_s));
     }
 }

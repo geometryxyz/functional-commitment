@@ -13,15 +13,19 @@ pub struct GeoSeqTest <F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D:
 
 impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTest<F, PC, D> {
     pub fn prove(
-        seq: Vec::<F>,
+        seq: &Vec::<F>,
         r: F,
         a_s: &[F],
         c_s: &[usize],
     ) -> Result<Proof<F>, Error>{
-        // TODO: check that seq is valid; otherwise, return an error
-        if !GeoSeqTest::<F, PC, D>::naive_verify(seq, r, a_s, c_s) {
+        // Check that seq is valid; otherwise, return an error
+        if !GeoSeqTest::<F, PC, D>::naive_verify(&seq, r, a_s, c_s) {
             return Err(Error::InvalidGeoSeq);
         }
+
+        // TODO: generate f() such that f(w^n) = a_i*r^n 
+        //
+        // Generate the GeoSequenceVO virtual oracle using instantiate()
 
         // dummy value for now
         let proof = Proof::<F> {
@@ -32,7 +36,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
 
     pub fn verify(
         proof: Proof<F>,
-        seq: Vec::<F>,
+        seq: &Vec::<F>,
         r: F,
         a_s: &[F],
         c_s: &[usize],
@@ -43,7 +47,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
 
     /// Inefficiently verify that the sequence is valid
     pub fn naive_verify(
-        seq: Vec::<F>,
+        seq: &Vec::<F>,
         r: F,
         a_s: &[F],
         c_s: &[usize],
