@@ -2,10 +2,9 @@ use crate::error::Error;
 use crate::to_poly;
 use crate::util::shift_dense_poly;
 use crate::virtual_oracle::VirtualOracle;
-use ark_ff::{PrimeField, Zero};
-use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
-use ark_poly_commit::{LabeledPolynomial, QuerySet};
-use std::collections::HashMap;
+use ark_ff::PrimeField;
+use ark_poly::{univariate::DensePolynomial, UVPolynomial};
+use ark_poly_commit::LabeledPolynomial;
 use std::iter;
 
 pub struct GeoSequenceVO<F: PrimeField> {
@@ -57,39 +56,6 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
         Ok(instantiation_poly)
     }
 
-    fn get_query_set(
-        &self,
-        labels: &Vec<String>,
-        alphas: &Vec<(String, F)>,
-        x: &(String, F),
-    ) -> QuerySet<F> {
-        assert_eq!(labels.len(), 1);
-        assert_eq!(alphas.len(), 1);
-        assert_eq!(alphas[0].1, self.gamma);
-
-        let mut point_values_to_point_labels = HashMap::new();
-        point_values_to_point_labels.insert(x.1, x.0.clone());
-
-        let mut query_set = QuerySet::<F>::new();
-
-        query_set.insert((labels[0].clone(), (x.0.clone(), x.1))); // h_prime_0 is evaluated at (beta_1 with value beta_1)
-
-        let gamma_x = alphas[0].1 * x.1;
-        let label = match point_values_to_point_labels.get(&gamma_x) {
-            Some(label) => label.clone(),
-            None => {
-                let label = format!("{}_{}", alphas[0].0.clone(), x.0.clone());
-                point_values_to_point_labels.insert(gamma_x, label.clone());
-
-                label
-            }
-        };
-
-        query_set.insert((labels[0].clone(), (label, gamma_x))); // h_prime_0 is evaluated at (alpha_0_beta1 with value gamma * beta_1)
-        
-        query_set
-    }
-
     fn num_of_oracles(&self) -> usize {
         return 2;
     }
@@ -111,7 +77,7 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
     }
 
     /// this map encodes at which concrete oracle should h_i point
-    fn fs2hs(&self) -> Vec<usize> {
+    fn mapping_vector(&self) -> Vec<usize> {
         // in geo sequence test we have just one concrete oracle f0, hence
         // h0 = f0, h1 = f0
         Vec::from([0, 0])
@@ -124,7 +90,6 @@ mod test {
     use super::{GeoSequenceVO, VirtualOracle};
     use crate::{label_polynomial, util::generate_sequence};
     use ark_bn254::Fr;
-    use ark_ff::PrimeField;
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
         UVPolynomial,
@@ -163,7 +128,10 @@ mod test {
 
         let geo_seq_vo = GeoSequenceVO::new(&c_s, domain.element(1), r);
         let instantiatied_geo_seq_vo = geo_seq_vo
-            .instantiate(&[label_polynomial!(f), label_polynomial!(f)], &[Fr::from(1u64), domain.element(1)])
+            .instantiate(
+                &[label_polynomial!(f), label_polynomial!(f)],
+                &[Fr::from(1u64), domain.element(1)],
+            )
             .unwrap();
 
         for root_of_unity in domain.elements() {

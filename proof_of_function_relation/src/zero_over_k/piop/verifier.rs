@@ -12,7 +12,7 @@ pub struct VerifierState<'a, F: PrimeField, VO: VirtualOracle<F>> {
     virtual_oracle: &'a VO,
 
     /// domain K over which a virtual oracle should be equal to 0
-    domain_k: GeneralEvaluationDomain<F>,
+    domain_k: &'a GeneralEvaluationDomain<F>,
 
     verifier_first_message: Option<VerifierFirstMsg<F>>,
 
@@ -32,8 +32,8 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
     /// Return the initial verifier state
     pub fn verifier_init<'a>(
         virtual_oracle: &'a VO,
-        domain_k: GeneralEvaluationDomain<F>,
-    ) -> Result<VerifierState<F, VO>, Error> {
+        domain_k: &'a GeneralEvaluationDomain<F>,
+    ) -> Result<VerifierState<'a, F, VO>, Error> {
         Ok(VerifierState {
             virtual_oracle,
             domain_k,
@@ -138,7 +138,7 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
 
         query_set.insert((String::from("q_1"), (String::from("beta_1"), beta_1)));
         query_set.insert((String::from("q_2"), (String::from("beta_2"), beta_2)));
-        
+
         /*
          * What do we get with geo seq virtual oracle
          * we have h_primes_0 and m_primes_0

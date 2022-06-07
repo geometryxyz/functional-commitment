@@ -21,7 +21,7 @@ pub struct ProverState<'a, F: PrimeField, VO: VirtualOracle<F>> {
     pub virtual_oracle: &'a VO, // TODO: made public for debugging. Private later
 
     /// domain K over which a virtual oracle should be equal to 0
-    domain_k: GeneralEvaluationDomain<F>,
+    domain_k: &'a GeneralEvaluationDomain<F>,
 
     masking_polynomials: Option<Vec<LabeledPolynomial<F>>>,
 
@@ -69,7 +69,7 @@ impl<F: PrimeField> ProverSecondOracles<F> {
 impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
     /// Return the initial prover state
     pub fn prover_init<'a>(
-        domain: GeneralEvaluationDomain<F>,
+        domain: &'a GeneralEvaluationDomain<F>,
         all_concrete_oracles: &'a [LabeledPolynomial<F>],
         virtual_oracle: &'a VO,
         alphas: &'a Vec<F>,
@@ -99,9 +99,9 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
         let (random_polynomials, masking_polynomials) =
             compute_maskings(state.virtual_oracle, &domain, &alphas, rng);
 
-        let fs2hs = state.virtual_oracle.fs2hs();
+        let mapping_vector = state.virtual_oracle.mapping_vector();
         let mut hs = Vec::with_capacity(state.virtual_oracle.num_of_oracles());
-        for concrete_oracle_index in fs2hs {
+        for concrete_oracle_index in mapping_vector {
             hs.push(state.all_concrete_oracles[concrete_oracle_index].clone())
         }
 

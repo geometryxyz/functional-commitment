@@ -115,9 +115,8 @@ mod tests {
             &concrete_oracle_rands,
             &geo_seq_vo,
             &alphas.to_vec(),
-            domain,
+            &domain,
             &ck,
-            &vk,
             &mut OsRng,
         )
         .unwrap();
@@ -128,7 +127,7 @@ mod tests {
                 proof,
                 &concrete_oracles_commitments,
                 &geo_seq_vo,
-                domain,
+                &domain,
                 &alphas,
                 &vk,
             )

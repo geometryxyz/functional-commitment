@@ -1,5 +1,7 @@
 use ark_ff::{Field, PrimeField};
 use ark_poly::{univariate::DensePolynomial, UVPolynomial};
+use ark_std::UniformRand;
+use rand::Rng;
 
 #[inline]
 pub fn powers_of<F>(scalar: F) -> impl Iterator<Item = F>
@@ -60,4 +62,13 @@ pub fn generate_sequence<F: PrimeField>(r: F, a_s: &[F], c_s: &[usize]) -> Vec<F
     }
 
     concatenation
+}
+
+/// Sample a vector of random elements of type T
+pub fn sample_vector<T: UniformRand, R: Rng>(seed: &mut R, length: usize) -> Vec<T> {
+    (0..length)
+        .collect::<Vec<usize>>()
+        .iter()
+        .map(|_| T::rand(seed))
+        .collect::<Vec<_>>()
 }

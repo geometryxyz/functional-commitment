@@ -4,6 +4,7 @@ use ark_poly::{univariate::DensePolynomial, Polynomial};
 use ark_poly_commit::{LabeledPolynomial, QuerySet};
 
 pub mod geometric_sequence_vo;
+pub mod inverse_check_oracle;
 pub mod normalized_vo;
 
 pub trait VirtualOracle<F: PrimeField> {
@@ -14,21 +15,13 @@ pub trait VirtualOracle<F: PrimeField> {
         alphas: &[F],
     ) -> Result<DensePolynomial<F>, Error>;
 
-    /// from description of self get which concrete oracles should be queried and at which points
-    /// points with same value should always have same label, for example alpha*beta = beta when alpha = 1
-    /// that's why we gradually build point_values_to_labels from which we construct query set
-    fn get_query_set(
-        &self,
-        labels: &Vec<String>,
-        alphas: &Vec<(String, F)>,
-        x: &(String, F),
-    ) -> QuerySet<F>;
-
     fn num_of_oracles(&self) -> usize;
 
     fn query(&self, evals: &[F], point: F) -> Result<F, Error>;
 
-    fn fs2hs(&self) -> Vec<usize>;
+    /// each new (f, alpha) pair should be mapped to new h (new concrete oracle)
+    /// this function provides mapping from concrete oracle inidices to h indices
+    fn mapping_vector(&self) -> Vec<usize>;
 }
 
 pub trait EvaluationsProvider<F: PrimeField> {

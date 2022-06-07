@@ -4,7 +4,7 @@ use crate::util::shift_dense_poly;
 use crate::virtual_oracle::VirtualOracle;
 use ark_ff::{PrimeField, Zero};
 use ark_poly::{univariate::DensePolynomial, UVPolynomial};
-use ark_poly_commit::{LabeledPolynomial, QuerySet};
+use ark_poly_commit::LabeledPolynomial;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -167,15 +167,6 @@ impl<F: PrimeField> VirtualOracle<F> for NormalizedVirtualOracle<F> {
         Ok(poly)
     }
 
-    fn get_query_set(
-        &self,
-        labels: &Vec<String>,
-        alphas: &Vec<(String, F)>,
-        x: &(String, F),
-    ) -> QuerySet<F> {
-        QuerySet::new()
-    }
-
     fn query(&self, evals: &[F], point: F) -> Result<F, Error> {
         // let mut total_eval = F::zero();
 
@@ -199,7 +190,7 @@ impl<F: PrimeField> VirtualOracle<F> for NormalizedVirtualOracle<F> {
         self.num_of_oracles()
     }
 
-    fn fs2hs(&self) -> Vec<usize> {
+    fn mapping_vector(&self) -> Vec<usize> {
         Vec::new()
     }
 }

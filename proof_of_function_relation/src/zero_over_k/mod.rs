@@ -7,7 +7,9 @@ use crate::zero_over_k::proof::Proof;
 use ark_ff::to_bytes;
 use ark_ff::PrimeField;
 use ark_marlin::rng::FiatShamirRng;
-use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial};
+use ark_poly::{
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
+};
 use ark_poly_commit::Evaluations;
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PCRandomness};
 use ark_std::marker::PhantomData;
@@ -17,7 +19,7 @@ use rand_core::OsRng;
 use std::iter;
 
 mod piop;
-mod proof;
+pub mod proof;
 mod tests;
 
 pub struct ZeroOverK<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
@@ -35,9 +37,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         concrete_oracle_commit_rands: &[PC::Randomness],
         virtual_oracle: &VO,
         alphas: &Vec<F>,
-        domain: GeneralEvaluationDomain<F>,
+        domain: &GeneralEvaluationDomain<F>,
         ck: &PC::CommitterKey,
-        vk: &PC::VerifierKey, // TODO: remove
         rng: &mut R,
     ) -> Result<Proof<F, PC>, Error> {
         let prover_initial_state =
@@ -140,7 +141,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         );
         let q2_commit = LabeledCommitment::new(String::from("q_2"), q2_commit, None);
 
-        let fs2hs = virtual_oracle.fs2hs();
+        let fs2hs = virtual_oracle.mapping_vector();
         let mut h_commitments = Vec::with_capacity(virtual_oracle.num_of_oracles());
         for concrete_oracle_index in fs2hs {
             h_commitments.push(concrete_oracle_commitments[concrete_oracle_index].clone())
@@ -151,10 +152,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             .zip(m_commitments.iter())
             .enumerate()
             .map(|(i, (h_commitment, m))| {
-                let c = PC::multi_scalar_mul(
-                    &[h_commitment.clone(), m.clone()],
-                    &[F::one(), F::one()],
-                );
+                let c =
+                    PC::multi_scalar_mul(&[h_commitment.clone(), m.clone()], &[F::one(), F::one()]);
                 // In order to work with batched version of PC, commitment labels must be same as poly labels
                 LabeledCommitment::new(format!("h_prime_{}", i), c, None)
             })
@@ -215,12 +214,12 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         proof: Proof<F, PC>,
         concrete_oracle_commitments: &[LabeledCommitment<PC::Commitment>],
         virtual_oracle: &VO,
-        domain: GeneralEvaluationDomain<F>,
+        domain: &GeneralEvaluationDomain<F>,
         alphas: &[F],
         vk: &PC::VerifierKey,
     ) -> Result<(), Error> {
         let verifier_initial_state =
-            PIOPforZeroOverK::<F, VO>::verifier_init(virtual_oracle, domain)?;
+            PIOPforZeroOverK::<F, VO>::verifier_init(virtual_oracle, &domain)?;
 
         let mut fs_rng = FiatShamirRng::<D>::from_seed(
             &to_bytes![&Self::PROTOCOL_NAME, concrete_oracle_commitments, alphas].unwrap(),
@@ -268,7 +267,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             .map(|(i, c)| LabeledCommitment::new(format!("m_{}", i), c.clone(), None))
             .collect::<Vec<_>>();
 
-        let fs2hs = virtual_oracle.fs2hs();
+        let fs2hs = virtual_oracle.mapping_vector();
         let mut h_commitments = Vec::with_capacity(virtual_oracle.num_of_oracles());
         for concrete_oracle_index in fs2hs {
             h_commitments.push(concrete_oracle_commitments[concrete_oracle_index].clone())
@@ -318,7 +317,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         }
 
         // take advantage of the alphabetical order to re-label each evaluation
-        evaluation_labels.sort_by(|a, b| a.0.cmp(&b.0));        
+        evaluation_labels.sort_by(|a, b| a.0.cmp(&b.0));
         for (q, eval) in evaluation_labels.into_iter().zip(evals) {
             evaluations.insert(q, *eval);
         }
@@ -346,7 +345,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         }?;
 
         // compute M(beta_2)
-        let big_m_at_beta_2 = &proof.m_evals
+        let big_m_at_beta_2 = &proof
+            .m_evals
             .iter()
             .zip(powers_of(verifier_first_msg.c))
             .fold(F::zero(), |acc, (&m_eval, c_power)| {
@@ -358,7 +358,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         let z_k_at_beta_2 = domain.evaluate_vanishing_polynomial(beta_2);
 
         // compute F_prime(beta_1)
-        let f_prime_eval = proof.h_prime_evals
+        let f_prime_eval = proof
+            .h_prime_evals
             .evaluate(virtual_oracle, beta_1, &Vec::<F>::default())
             .unwrap();
 
@@ -373,8 +374,6 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         if check_2 != F::zero() {
             return Err(Error::Check2Failed);
         }
-
-        println!("SURVIVED");
 
         Ok(())
     }
