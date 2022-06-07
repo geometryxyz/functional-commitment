@@ -140,13 +140,19 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         );
         let q2_commit = LabeledCommitment::new(String::from("q_2"), q2_commit, None);
 
-        let h_prime_commitments = concrete_oracle_commitments
+        let fs2hs = virtual_oracle.fs2hs();
+        let mut h_commitments = Vec::with_capacity(virtual_oracle.num_of_oracles());
+        for concrete_oracle_index in fs2hs {
+            h_commitments.push(concrete_oracle_commitments[concrete_oracle_index].clone())
+        }
+
+        let h_prime_commitments = h_commitments
             .iter()
             .zip(m_commitments.iter())
             .enumerate()
-            .map(|(i, (oracle_commitment, m))| {
+            .map(|(i, (h_commitment, m))| {
                 let c = PC::multi_scalar_mul(
-                    &[oracle_commitment.clone(), m.clone()],
+                    &[h_commitment.clone(), m.clone()],
                     &[F::one(), F::one()],
                 );
                 // In order to work with batched version of PC, commitment labels must be same as poly labels
@@ -268,16 +274,14 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             h_commitments.push(concrete_oracle_commitments[concrete_oracle_index].clone())
         }
 
-        assert_eq!(h_commitments.len(), 2);
-
         // derive commitment to h_prime through additive homomorphism
         let h_prime_commitments = h_commitments
             .iter()
             .zip(m_commitments.iter())
             .enumerate()
-            .map(|(i, (oracle_commitment, m_commitment))| {
+            .map(|(i, (h_commitment, m_commitment))| {
                 let c = PC::multi_scalar_mul(
-                    &[oracle_commitment.clone(), m_commitment.clone()],
+                    &[h_commitment.clone(), m_commitment.clone()],
                     &[F::one(), F::one()],
                 );
                 LabeledCommitment::new(format!("h_prime_{}", i), c, None)
@@ -288,7 +292,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         let q2_commit = PC::multi_scalar_mul(
             &r_commitments,
             powers_of(verifier_first_msg.c)
-                .take(concrete_oracle_commitments.len())
+                .take(h_prime_commitments.len())
                 .collect::<Vec<_>>()
                 .as_slice(),
         );
