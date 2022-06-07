@@ -99,9 +99,14 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
         let (random_polynomials, masking_polynomials) =
             compute_maskings(state.virtual_oracle, &domain, &alphas, rng);
 
+        let fs2hs = state.virtual_oracle.fs2hs();
+        let mut hs = Vec::with_capacity(state.virtual_oracle.num_of_oracles());
+        for concrete_oracle_index in fs2hs {
+            hs.push(state.all_concrete_oracles[concrete_oracle_index].clone())
+        }
+
         // compute the masked oracles
-        let h_primes = state
-            .all_concrete_oracles
+        let h_primes = hs
             .iter()
             .zip(masking_polynomials.iter())
             .enumerate()

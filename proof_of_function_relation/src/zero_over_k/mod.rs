@@ -262,8 +262,16 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             .map(|(i, c)| LabeledCommitment::new(format!("m_{}", i), c.clone(), None))
             .collect::<Vec<_>>();
 
+        let fs2hs = virtual_oracle.fs2hs();
+        let mut h_commitments = Vec::with_capacity(virtual_oracle.num_of_oracles());
+        for concrete_oracle_index in fs2hs {
+            h_commitments.push(concrete_oracle_commitments[concrete_oracle_index].clone())
+        }
+
+        assert_eq!(h_commitments.len(), 2);
+
         // derive commitment to h_prime through additive homomorphism
-        let h_prime_commitments = concrete_oracle_commitments
+        let h_prime_commitments = h_commitments
             .iter()
             .zip(m_commitments.iter())
             .enumerate()

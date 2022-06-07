@@ -109,6 +109,13 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
 
         Ok(eval)
     }
+
+    /// this map encodes at which concrete oracle should h_i point
+    fn fs2hs(&self) -> Vec<usize> {
+        // in geo sequence test we have just one concrete oracle f0, hence
+        // h0 = f0, h1 = f0
+        Vec::from([0, 0])
+    }
 }
 
 #[cfg(test)]

@@ -27,6 +27,8 @@ pub trait VirtualOracle<F: PrimeField> {
     fn num_of_oracles(&self) -> usize;
 
     fn query(&self, evals: &[F], point: F) -> Result<F, Error>;
+
+    fn fs2hs(&self) -> Vec<usize>;
 }
 
 pub trait EvaluationsProvider<F: PrimeField> {

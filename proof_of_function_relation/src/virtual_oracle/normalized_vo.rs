@@ -198,6 +198,10 @@ impl<F: PrimeField> VirtualOracle<F> for NormalizedVirtualOracle<F> {
     fn num_of_oracles(&self) -> usize {
         self.num_of_oracles()
     }
+
+    fn fs2hs(&self) -> Vec<usize> {
+        Vec::new()
+    }
 }
 
 #[cfg(test)]
