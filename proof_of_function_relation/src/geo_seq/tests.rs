@@ -51,7 +51,6 @@ mod tests {
             a_s,
             c_s,
         );
-        assert!(is_valid);
     }
 
     /// Test that geometric_sequence() works correctly

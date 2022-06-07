@@ -532,6 +532,7 @@ mod new_tests {
         let domain = GeneralEvaluationDomain::<Fr>::new(m).unwrap();
 
         let to_pad = domain.size() - m;
+
         if to_pad > 0 {
             a_s.push(Fr::from(0u64));
             c_s.push(to_pad);

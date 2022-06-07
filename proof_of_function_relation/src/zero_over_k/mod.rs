@@ -17,7 +17,7 @@ use rand_core::OsRng;
 use std::iter;
 
 mod piop;
-mod proof;
+pub mod proof;
 mod tests;
 
 pub struct ZeroOverK<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
