@@ -136,6 +136,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
             &mut OsRng,
         );
 
+        // TODO: the verfier needs a copy of concrete_oracles_commitments!
         let proof = Proof::<F, PC> {
             z_proof: z_proof.unwrap(),
             seq: seq.clone(),
