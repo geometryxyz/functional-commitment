@@ -1,8 +1,5 @@
 #[cfg(test)]
 mod tests {
-    // The protocol starts with the verifier receiving a commitment to f
-    // Then the prover computes f
-    //
     use crate::{commitment::KZG10, geo_seq::GeoSeqTest};
     use ark_bn254::{Bn254, Fr};
     use blake2::Blake2s;
@@ -55,10 +52,32 @@ mod tests {
         //    verifies the zero over k proof. It also checks that:
         //    - for all i in n, check that f(gamma^p_i) = a_i
 
+        // TODO: implement this after the above! It's necessary to make the proof succinct.
         // Verifier emits a query set (for the f_gamma check)
         // Prover will evaluate f at those points and return opening proof
         // Prover runs zero over k prove
         // Verifier runs zero over k verify
+        // TODO: qn: can this be made noninteractive? I want the prover to be bound to the query
+        // set that the verifier will emit so that the verifier doesn't need to send anything
+        // before the prover. It should be as simple as "prover sends proof, verifier verifies
+        // proof" instead of "verifier emits query set, prover sends proof, verifier verifies
+        // proof"
+
+        //
+        // fn prove(r, a_s, c_s) {
+        //     generate virtual oracle
+        //     run zero over k
+        //     output proof
+        // }
+        //
+        // fn verify(proof, r, a_s, c_s) {
+        //     generate seq from r, a_s, c_s
+        //     derive f
+        //     for all i in n, check that f(gamma^p_i) = a_i
+        //     (todo: emit a query set)
+        //     generate virtual oracle
+        //     verify the zero over k proof
+        // }
 
 
         let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(
