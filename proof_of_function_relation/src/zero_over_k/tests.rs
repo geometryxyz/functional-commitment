@@ -4,7 +4,8 @@ mod test {
         commitment::{HomomorphicPolynomialCommitment, KZG10},
         error::Error,
         virtual_oracle::{
-            Description, EvaluationsProvider, NormalizedVirtualOracle, Term, VirtualOracle,
+            normalized_vo::{Description, NormalizedVirtualOracle, Term},
+            EvaluationsProvider, VirtualOracle,
         },
         zero_over_k::ZeroOverK,
     };
@@ -25,199 +26,198 @@ mod test {
     type F = Fr;
     type PC = KZG10<Bn254>;
 
-    fn test_zero_over_k_normalized_oracle() {
-        let n = 4;
-        let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();
+    // fn test_zero_over_k_normalized_oracle() {
+    //     let n = 4;
+    //     let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();
 
-        let alphas = [domain.element(1), F::one()];
-        // let alphas = [F::one(), F::one()];
+    //     let alphas = [domain.element(1), F::one()];
+    //     // let alphas = [F::one(), F::one()];
 
-        //a_evals (2, 4, 6, 8) -> f(w * x) = (4, 6, 8, 2)
-        //b_evals (-1, -2, -3, 0) -> 2 * g(x) = (-2, -4, -6, 0)
+    //     //a_evals (2, 4, 6, 8) -> f(w * x) = (4, 6, 8, 2)
+    //     //b_evals (-1, -2, -3, 0) -> 2 * g(x) = (-2, -4, -6, 0)
 
-        //test oracle to be zero at roots of unity
-        let a_evals = vec![
-            F::from(2u64),
-            F::from(4 as u64),
-            F::from(6 as u64),
-            F::from(8 as u64),
-        ];
-        let a_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&a_evals));
-        let a_poly = LabeledPolynomial::new(String::from("a"), a_poly, None, None);
+    //     //test oracle to be zero at roots of unity
+    //     let a_evals = vec![
+    //         F::from(2u64),
+    //         F::from(4 as u64),
+    //         F::from(6 as u64),
+    //         F::from(8 as u64),
+    //     ];
+    //     let a_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&a_evals));
+    //     let a_poly = LabeledPolynomial::new(String::from("a"), a_poly, None, None);
 
-        let b_evals = vec![
-            -F::from(1u64),
-            -F::from(2u64),
-            -F::from(3u64),
-            -F::from(0u64),
-        ];
-        let b_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&b_evals));
-        let b_poly = LabeledPolynomial::new(String::from("b"), b_poly, None, None);
+    //     let b_evals = vec![
+    //         -F::from(1u64),
+    //         -F::from(2u64),
+    //         -F::from(3u64),
+    //         -F::from(0u64),
+    //     ];
+    //     let b_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&b_evals));
+    //     let b_poly = LabeledPolynomial::new(String::from("b"), b_poly, None, None);
 
-        let concrete_oracles = [a_poly.clone(), b_poly.clone()];
+    //     let concrete_oracles = [a_poly.clone(), b_poly.clone()];
 
-        // concrete_oracles = [f, g]
-        // alpha_coeffs = [alpha_1, alpha_2]
-        //1*f(alpha_1X) + 2*g(alpha_2X) - 2
-        let term0 = Term {
-            concrete_oracle_indices: vec![0],
-            alpha_coeff_indices: vec![0],
-            constant: Fr::from(1 as u64),
-        };
-        let term1 = Term {
-            concrete_oracle_indices: vec![1],
-            alpha_coeff_indices: vec![1],
-            constant: Fr::from(2 as u64),
-        };
+    //     // concrete_oracles = [f, g]
+    //     // alpha_coeffs = [alpha_1, alpha_2]
+    //     //1*f(alpha_1X) + 2*g(alpha_2X) - 2
+    //     let term0 = Term {
+    //         concrete_oracle_indices: vec![0],
+    //         alpha_coeff_indices: vec![0],
+    //         constant: Fr::from(1 as u64),
+    //     };
+    //     let term1 = Term {
+    //         concrete_oracle_indices: vec![1],
+    //         alpha_coeff_indices: vec![1],
+    //         constant: Fr::from(2 as u64),
+    //     };
 
-        let term2 = Term {
-            concrete_oracle_indices: vec![],
-            alpha_coeff_indices: vec![],
-            constant: -F::from(2u64),
-        };
+    //     let term2 = Term {
+    //         concrete_oracle_indices: vec![],
+    //         alpha_coeff_indices: vec![],
+    //         constant: -F::from(2u64),
+    //     };
 
-        let description = Description::<Fr> {
-            terms: vec![term0, term1, term2],
-        };
-        let vo = NormalizedVirtualOracle::new(description).unwrap();
+    //     let description = Description::<Fr> {
+    //         terms: vec![term0, term1, term2],
+    //     };
+    //     let vo = NormalizedVirtualOracle::new(description).unwrap();
 
-        let concrete_oracles2 = [a_poly.clone(), b_poly.clone()].to_vec();
+    //     let concrete_oracles2 = [a_poly.clone(), b_poly.clone()].to_vec();
 
-        let eval2 = concrete_oracles2
-            .evaluate(&vo, domain.element(1), &alphas.to_vec())
-            .unwrap();
-        assert_eq!(eval2, F::zero());
+    //     let eval2 = concrete_oracles2
+    //         .evaluate(&vo, domain.element(1), &alphas.to_vec())
+    //         .unwrap();
+    //     assert_eq!(eval2, F::zero());
 
-        // The proof of zero over K
-        let maximum_degree: usize = 30;
+    //     // The proof of zero over K
+    //     let maximum_degree: usize = 30;
 
-        let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
-        let (ck, vk) = PC::trim(&pp, maximum_degree, 0, Some(&[2, 5])).unwrap();
+    //     let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
+    //     let (ck, vk) = PC::trim(&pp, maximum_degree, 0, Some(&[2, 5])).unwrap();
 
-        let (concrete_oracles_commitments, concrete_oracle_rands) =
-            PC::commit(&ck, &concrete_oracles, None).unwrap();
+    //     let (concrete_oracles_commitments, concrete_oracle_rands) =
+    //         PC::commit(&ck, &concrete_oracles, None).unwrap();
 
-        let proof = ZeroOverK::<F, KZG10<Bn254>, Blake2s>::prove(
-            &concrete_oracles,
-            &concrete_oracles_commitments,
-            &concrete_oracle_rands,
-            &vo,
-            &alphas.to_vec(),
-            domain,
-            &ck,
-            &mut OsRng,
-        )
-        .unwrap();
+    //     let proof = ZeroOverK::<F, KZG10<Bn254>, Blake2s>::prove(
+    //         &concrete_oracles,
+    //         &concrete_oracles_commitments,
+    //         &concrete_oracle_rands,
+    //         &vo,
+    //         &alphas.to_vec(),
+    //         domain,
+    //         &ck,
+    //         &mut OsRng,
+    //     )
+    //     .unwrap();
 
-        assert_eq!(
-            true,
-            ZeroOverK::<F, KZG10<Bn254>, Blake2s>::verify(
-                proof,
-                &concrete_oracles_commitments,
-                &vo,
-                domain,
-                &alphas,
-                &vk,
-            )
-            .is_ok()
-        );
-    }
+    //     assert_eq!(
+    //         true,
+    //         ZeroOverK::<F, KZG10<Bn254>, Blake2s>::verify(
+    //             proof,
+    //             &concrete_oracles_commitments,
+    //             &vo,
+    //             domain,
+    //             &alphas,
+    //             &vk,
+    //         )
+    //         .is_ok()
+    //     );
+    // }
 
     #[test]
-    fn test_failure_on_malicious_normalized_virtual_oracle() {
-        let n = 4;
-        let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();
+    // fn test_failure_on_malicious_normalized_virtual_oracle() {
+    //     let n = 4;
+    //     let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();
 
-        let alphas = [F::one(), F::one()];
-        // let alphas = [F::one(), F::one()];
+    //     let alphas = [F::one(), F::one()];
+    //     // let alphas = [F::one(), F::one()];
 
-        //a_evals (2, 4, 6, 8) -> f(w * x) = (4, 6, 8, 2)
-        //b_evals (-1, -2, -3, 0) -> 2 * g(x) = (-2, -4, -6, 0)
+    //     //a_evals (2, 4, 6, 8) -> f(w * x) = (4, 6, 8, 2)
+    //     //b_evals (-1, -2, -3, 0) -> 2 * g(x) = (-2, -4, -6, 0)
 
-        //test oracle to be zero at roots of unity
-        let a_evals = vec![
-            F::from(2u64),
-            F::from(4 as u64),
-            F::from(6 as u64),
-            F::from(8 as u64),
-        ];
-        let a_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&a_evals));
-        let a_poly = LabeledPolynomial::new(String::from("b"), a_poly, None, None);
+    //     //test oracle to be zero at roots of unity
+    //     let a_evals = vec![
+    //         F::from(2u64),
+    //         F::from(4 as u64),
+    //         F::from(6 as u64),
+    //         F::from(8 as u64),
+    //     ];
+    //     let a_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&a_evals));
+    //     let a_poly = LabeledPolynomial::new(String::from("b"), a_poly, None, None);
 
-        let b_evals = vec![
-            -F::from(1u64),
-            -F::from(2u64),
-            -F::from(3u64),
-            -F::from(0u64),
-        ];
-        let b_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&b_evals));
-        let b_poly = LabeledPolynomial::new(String::from("b"), b_poly, None, None);
+    //     let b_evals = vec![
+    //         -F::from(1u64),
+    //         -F::from(2u64),
+    //         -F::from(3u64),
+    //         -F::from(0u64),
+    //     ];
+    //     let b_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&b_evals));
+    //     let b_poly = LabeledPolynomial::new(String::from("b"), b_poly, None, None);
 
-        let concrete_oracles = [a_poly.clone(), b_poly.clone()];
+    //     let concrete_oracles = [a_poly.clone(), b_poly.clone()];
 
-        // let instantiated_virtual_oracle =
-        //     TestVirtualOracle::instantiate(&concrete_oracles, &alphas);
+    //     // let instantiated_virtual_oracle =
+    //     //     TestVirtualOracle::instantiate(&concrete_oracles, &alphas);
 
-        // let _ = instantiated_virtual_oracle.evaluate(&domain.element(1));
-        //
-        // concrete_oracles = [f, g]
-        // alpha_coeffs = [alpha_1, alpha_2]
-        let term0 = Term {
-            concrete_oracle_indices: vec![0],
-            alpha_coeff_indices: vec![0],
-            constant: Fr::from(1 as u64),
-        };
-        let term1 = Term {
-            concrete_oracle_indices: vec![1],
-            alpha_coeff_indices: vec![1],
-            constant: Fr::from(2 as u64),
-        };
+    //     // let _ = instantiated_virtual_oracle.evaluate(&domain.element(1));
+    //     //
+    //     // concrete_oracles = [f, g]
+    //     // alpha_coeffs = [alpha_1, alpha_2]
+    //     let term0 = Term {
+    //         concrete_oracle_indices: vec![0],
+    //         alpha_coeff_indices: vec![0],
+    //         constant: Fr::from(1 as u64),
+    //     };
+    //     let term1 = Term {
+    //         concrete_oracle_indices: vec![1],
+    //         alpha_coeff_indices: vec![1],
+    //         constant: Fr::from(2 as u64),
+    //     };
 
-        let term2 = Term {
-            concrete_oracle_indices: vec![],
-            alpha_coeff_indices: vec![],
-            constant: -F::from(2u64),
-        };
+    //     let term2 = Term {
+    //         concrete_oracle_indices: vec![],
+    //         alpha_coeff_indices: vec![],
+    //         constant: -F::from(2u64),
+    //     };
 
-        let description = Description::<Fr> {
-            terms: vec![term0, term1, term2],
-        };
-        let vo = NormalizedVirtualOracle::new(description).unwrap();
+    //     let description = Description::<Fr> {
+    //         terms: vec![term0, term1, term2],
+    //     };
+    //     let vo = NormalizedVirtualOracle::new(description).unwrap();
 
-        let maximum_degree: usize = 16;
+    //     let maximum_degree: usize = 16;
 
-        let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
-        let (ck, vk) = PC::trim(&pp, maximum_degree, 0, None).unwrap();
+    //     let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
+    //     let (ck, vk) = PC::trim(&pp, maximum_degree, 0, None).unwrap();
 
-        // println!("vk: {}", vk);
+    //     // println!("vk: {}", vk);
 
-        let (concrete_oracles_commitments, concrete_oracle_rands) =
-            PC::commit(&ck, &concrete_oracles, None).unwrap();
+    //     let (concrete_oracles_commitments, concrete_oracle_rands) =
+    //         PC::commit(&ck, &concrete_oracles, None).unwrap();
 
-        let proof = ZeroOverK::<F, KZG10<Bn254>, Blake2s>::prove(
-            &concrete_oracles,
-            &concrete_oracles_commitments,
-            &concrete_oracle_rands,
-            &vo,
-            &alphas.to_vec(),
-            domain,
-            &ck,
-            &mut OsRng,
-        )
-        .unwrap();
+    //     let proof = ZeroOverK::<F, KZG10<Bn254>, Blake2s>::prove(
+    //         &concrete_oracles,
+    //         &concrete_oracles_commitments,
+    //         &concrete_oracle_rands,
+    //         &vo,
+    //         &alphas.to_vec(),
+    //         domain,
+    //         &ck,
+    //         &mut OsRng,
+    //     )
+    //     .unwrap();
 
-        let verification_result = ZeroOverK::<F, KZG10<Bn254>, Blake2s>::verify(
-            proof,
-            &concrete_oracles_commitments,
-            &vo,
-            domain,
-            &alphas,
-            &vk,
-        );
+    //     let verification_result = ZeroOverK::<F, KZG10<Bn254>, Blake2s>::verify(
+    //         proof,
+    //         &concrete_oracles_commitments,
+    //         &vo,
+    //         domain,
+    //         &alphas,
+    //         &vk,
+    //     );
 
-        assert_eq!(Err(Error::Check2Failed), verification_result);
-    }
-
+    //     assert_eq!(Err(Error::Check2Failed), verification_result);
+    // }
     #[test]
     fn test_commit_with_bounds() {
         let n = 4;

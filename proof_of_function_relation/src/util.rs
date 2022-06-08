@@ -1,5 +1,7 @@
-use ark_ff::Field;
+use ark_ff::{Field, PrimeField};
 use ark_poly::{univariate::DensePolynomial, UVPolynomial};
+use ark_std::UniformRand;
+use rand::Rng;
 
 #[inline]
 pub fn powers_of<F>(scalar: F) -> impl Iterator<Item = F>
@@ -41,4 +43,32 @@ pub fn shift_dense_poly<F: Field>(
     }
 
     DensePolynomial::from_coefficients_vec(coeffs)
+}
+
+pub fn generate_sequence<F: PrimeField>(r: F, a_s: &[F], c_s: &[usize]) -> Vec<F> {
+    assert_eq!(c_s.len(), a_s.len());
+    let mut concatenation = Vec::<F>::default();
+
+    for (i, a) in a_s.iter().enumerate() {
+        for j in 0..c_s[i] {
+            // r ** j (is there a pow() library function in Fp256?)
+            let mut r_pow = F::from(1 as u64);
+            for _ in 0..j {
+                r_pow = r_pow * r;
+            }
+            let val = *a * r_pow;
+            concatenation.push(val);
+        }
+    }
+
+    concatenation
+}
+
+/// Sample a vector of random elements of type T
+pub fn sample_vector<T: UniformRand, R: Rng>(seed: &mut R, length: usize) -> Vec<T> {
+    (0..length)
+        .collect::<Vec<usize>>()
+        .iter()
+        .map(|_| T::rand(seed))
+        .collect::<Vec<_>>()
 }
