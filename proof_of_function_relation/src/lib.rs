@@ -1,4 +1,5 @@
 mod commitment;
+mod discrete_log_comparison;
 mod error;
 mod geo_seq;
 mod non_zero_over_k;
