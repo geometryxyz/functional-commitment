@@ -39,6 +39,19 @@ pub struct ProverFirstOracles<F: PrimeField + SquareRootField> {
     pub h: LabeledPolynomial<F, DensePolynomial<F>>,
 }
 
+impl<F: PrimeField + SquareRootField> ProverFirstOracles<F> {
+    pub fn iter(&self) -> impl Iterator<Item = &LabeledPolynomial<F, DensePolynomial<F>>> {
+        vec![
+            &self.s,
+            &self.f_prime,
+            &self.g_prime,
+            &self.s_prime,
+            &self.h,
+        ]
+        .into_iter()
+    }
+}
+
 impl<F: PrimeField + SquareRootField> PIOPforDLComparison<F> {
     pub fn prover_init<'a>(
         domain_k: &'a GeneralEvaluationDomain<F>,

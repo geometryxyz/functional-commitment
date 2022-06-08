@@ -1,6 +1,7 @@
 use crate::commitment::HomomorphicPolynomialCommitment;
 use ark_ff::PrimeField;
 
+#[derive(Clone)]
 pub struct Proof<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> {
     // commitments
     pub m_commitments: Vec<PC::Commitment>,

@@ -21,7 +21,7 @@ use digest::Digest; // Note that in the latest Marlin commit, Digest has been re
 use rand::Rng;
 use rand_core::OsRng;
 
-mod proof;
+pub mod proof;
 mod tests;
 
 pub struct GeoSeqTest<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
@@ -35,7 +35,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
     // TODO: have an assertion that domain is large enough given m
     // TODO: move the padding outside and the check that the length is correct
     // TODO: verifier should check that the size of the sequence is correct given the domain
-    fn prove<R: Rng>(
+    pub fn prove<R: Rng>(
         ck: &PC::CommitterKey,
         r: F,
         a_s: &Vec<F>,

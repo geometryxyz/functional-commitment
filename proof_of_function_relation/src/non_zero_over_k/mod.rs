@@ -17,10 +17,10 @@ use std::marker::PhantomData;
 pub mod proof;
 mod tests;
 
-struct NonZeroOverK<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
+pub struct NonZeroOverK<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
-    _diges: PhantomData<D>,
+    _digest: PhantomData<D>,
 }
 
 impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> NonZeroOverK<F, PC, D> {

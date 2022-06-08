@@ -6,6 +6,8 @@ use ark_poly_commit::{LabeledPolynomial, QuerySet};
 pub mod geometric_sequence_vo;
 pub mod inverse_check_oracle;
 pub mod normalized_vo;
+pub mod product_check_oracle;
+pub mod square_check_oracle;
 
 pub trait VirtualOracle<F: PrimeField> {
     /// abstract function which will return instantiation of virtual oracle from concrete oracles and shifting factors
