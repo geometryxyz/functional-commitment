@@ -30,6 +30,10 @@ impl<F: PrimeField> GeoSequenceVO<F> {
             r,
         }
     }
+
+    pub fn get_pi_s(&self) -> Vec<usize> {
+        self.pi_s.clone()
+    }
 }
 
 impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
