@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::discrete_log_comparison::piop::PIOPforDLComparison;
 use crate::error::Error;
 use crate::label_polynomial;
@@ -23,6 +25,12 @@ pub struct ProverState<'a, F: PrimeField + SquareRootField> {
     g: &'a LabeledPolynomial<F, DensePolynomial<F>>,
 
     first_oracles: Option<ProverFirstOracles<F>>,
+
+    pub a_s: Option<Vec<F>>,
+
+    pub c_s: Option<Vec<usize>>,
+
+    pub delta: Option<F>,
 }
 
 /// The first set of prover oracles
@@ -52,6 +60,7 @@ impl<F: PrimeField + SquareRootField> ProverFirstOracles<F> {
     }
 }
 
+#[allow(dead_code)]
 impl<F: PrimeField + SquareRootField> PIOPforDLComparison<F> {
     pub fn prover_init<'a>(
         domain_k: &'a GeneralEvaluationDomain<F>,
@@ -65,6 +74,9 @@ impl<F: PrimeField + SquareRootField> PIOPforDLComparison<F> {
             f,
             g,
             first_oracles: None,
+            a_s: None,
+            c_s: None,
+            delta: None,
         })
     }
 
@@ -90,7 +102,6 @@ impl<F: PrimeField + SquareRootField> PIOPforDLComparison<F> {
         let s = label_polynomial!(s);
 
         // For b in {f, g, s}, compute b_prime
-
         let omegas = state.domain_h.elements();
         let omega_powers_mapping = omegas
             .enumerate()
@@ -139,12 +150,12 @@ impl<F: PrimeField + SquareRootField> PIOPforDLComparison<F> {
 
         let to_pad = m - n;
         if to_pad > 0 {
-            a_s.push(F::from(0u64));
+            a_s.push(F::zero());
             c_s.push(to_pad);
         }
 
         let seq = generate_sequence(delta, &a_s, &c_s);
-        let h = DensePolynomial::<F>::from_coefficients_slice(&state.domain_h.ifft(&seq));
+        let h = DensePolynomial::<F>::from_coefficients_slice(&state.domain_k.ifft(&seq));
         let h = label_polynomial!(h);
 
         // create ProverFirstOracles struct
@@ -161,6 +172,9 @@ impl<F: PrimeField + SquareRootField> PIOPforDLComparison<F> {
 
         // Update Prover state
         state.first_oracles = Some(prover_oracles.clone());
+        state.a_s = Some(a_s);
+        state.c_s = Some(c_s);
+        state.delta = Some(delta);
 
         Ok((msg, prover_oracles, state))
     }

@@ -1,14 +1,8 @@
 use crate::commitment::HomomorphicPolynomialCommitment;
 use crate::error::{to_pc_error, Error};
 use crate::geo_seq::proof::Proof;
-use crate::label_polynomial;
-use crate::util::generate_sequence;
 use crate::virtual_oracle::geometric_sequence_vo::GeoSequenceVO;
-use crate::virtual_oracle::normalized_vo::{Description, Term};
-use crate::virtual_oracle::{EvaluationsProvider, VirtualOracle};
-use crate::zero_over_k::proof::Proof as Z_Proof;
 use crate::zero_over_k::ZeroOverK;
-use ark_bn254::Fr;
 use ark_ff::{to_bytes, PrimeField};
 use ark_marlin::rng::FiatShamirRng;
 use ark_poly::{
@@ -41,24 +35,18 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
     pub fn prove<R: Rng>(
         ck: &PC::CommitterKey,
         r: F,
+        f: &LabeledPolynomial<F, DensePolynomial<F>>,
+        f_commit: &LabeledCommitment<PC::Commitment>,
+        f_rand: &PC::Randomness,
         a_s: &Vec<F>,
         c_s: &Vec<usize>,
         domain: &GeneralEvaluationDomain<F>,
         rng: &mut R,
     ) -> Result<Proof<F, PC>, Error> {
-        let seq = generate_sequence::<F>(r, &a_s.as_slice(), &c_s.as_slice());
-
-        // Generate f() such that f(w^n) = a_i*r^n
-        let f = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&seq));
-        let f = label_polynomial!(f);
         // Generate the GeoSequenceVO virtual oracle
         let geo_seq_vo = GeoSequenceVO::new(&c_s, domain.element(1), r);
 
-        let concrete_oracles = [f.clone()];
         let alphas = [F::from(1u64), domain.element(1)];
-
-        let (concrete_oracle_commitments, concrete_oracle_rands) =
-            PC::commit(ck, &concrete_oracles, None).unwrap();
 
         let mut fs_rng = FiatShamirRng::<D>::from_seed(
             &to_bytes![
@@ -66,7 +54,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
                 a_s,
                 c_s.iter().map(|&x| x as u64).collect::<Vec<_>>(),
                 r,
-                &concrete_oracle_commitments.to_vec(),
+                &[f_commit.clone()].to_vec(),
                 &alphas.to_vec()
             ]
             .unwrap(),
@@ -84,22 +72,24 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
             ));
         }
 
+        let evals = ark_poly_commit::evaluate_query_set(&[f.clone()], &query_set);
+
         let separation_challenge = F::rand(&mut fs_rng);
         let opening_proof = PC::batch_open(
             ck,
-            &concrete_oracles,
-            &concrete_oracle_commitments,
+            &[f.clone()],
+            &[f_commit.clone()],
             &query_set,
             separation_challenge,
-            &concrete_oracle_rands,
+            &[f_rand.clone()],
             None,
         )
         .map_err(to_pc_error::<F, PC>)?;
 
         let z_proof = ZeroOverK::<F, PC, D>::prove(
-            &concrete_oracles,
-            &concrete_oracle_commitments,
-            &concrete_oracle_rands,
+            &[f.clone()],
+            &[f_commit.clone()],
+            &[f_rand.clone()],
             &geo_seq_vo,
             &alphas.to_vec(),
             &domain,
@@ -109,7 +99,6 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
 
         let proof = Proof::<F, PC> {
             z_proof,
-            f_commit: concrete_oracle_commitments[0].commitment().clone(),
             opening_proof,
         };
         Ok(proof)
@@ -120,16 +109,12 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
         a_s: &Vec<F>,
         c_s: &Vec<usize>,
         domain: &GeneralEvaluationDomain<F>,
+        f_commit: &LabeledCommitment<PC::Commitment>,
         proof: Proof<F, PC>,
         vk: &PC::VerifierKey,
     ) -> Result<(), Error> {
         let alphas = [F::from(1u64), domain.element(1)];
         let geo_seq_vo = GeoSequenceVO::new(&c_s, domain.element(1), r);
-        let concrete_oracle_commitments = [LabeledCommitment::new(
-            String::from("f"),
-            proof.f_commit,
-            None,
-        )];
 
         // Test that for all i in n, check that f(gamma^p_i) = a_i
         let pi_s = geo_seq_vo.get_pi_s();
@@ -144,7 +129,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
                 a_s,
                 c_s.iter().map(|&x| x as u64).collect::<Vec<_>>(),
                 r,
-                &concrete_oracle_commitments.to_vec(),
+                &[&f_commit].to_vec(),
                 &alphas.to_vec()
             ]
             .unwrap(),
@@ -152,17 +137,20 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
 
         let mut query_set = QuerySet::new();
         for (i, &point_i) in points.iter().enumerate() {
-            query_set.insert((String::from("f"), (format!("gamma_pi_{}", i), point_i)));
+            query_set.insert((
+                f_commit.label().clone(),
+                (format!("gamma_pi_{}", i), point_i),
+            ));
         }
         let mut evaluations = ark_poly_commit::Evaluations::new();
         for (&point_i, &a_i) in points.iter().zip(a_s.iter()) {
-            evaluations.insert((String::from("f"), point_i), a_i);
+            evaluations.insert((f_commit.label().clone(), point_i), a_i);
         }
 
         let separation_challenge = F::rand(&mut fs_rng);
         match PC::batch_check(
             vk,
-            &concrete_oracle_commitments,
+            &[f_commit.clone()],
             &query_set,
             &evaluations,
             &proof.opening_proof,
@@ -178,7 +166,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
         // let f = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&seq));
         ZeroOverK::<F, PC, D>::verify(
             proof.z_proof,
-            &concrete_oracle_commitments,
+            &[f_commit.clone()],
             &geo_seq_vo,
             &domain,
             &alphas,

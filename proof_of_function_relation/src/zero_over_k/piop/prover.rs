@@ -46,6 +46,7 @@ pub struct ProverFirstOracles<F: PrimeField> {
     pub q_1: LabeledPolynomial<F>,
 }
 
+#[allow(dead_code)]
 impl<F: PrimeField> ProverFirstOracles<F> {
     pub fn iter(&self) -> impl Iterator<Item = &LabeledPolynomial<F>> {
         self.masking_polynomials
@@ -60,6 +61,7 @@ pub struct ProverSecondOracles<F: PrimeField> {
     pub q_2: LabeledPolynomial<F>,
 }
 
+#[allow(dead_code)]
 impl<F: PrimeField> ProverSecondOracles<F> {
     pub fn iter(&self) -> impl Iterator<Item = &LabeledPolynomial<F>> {
         iter::once(&self.q_2)

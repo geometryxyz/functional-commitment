@@ -2,7 +2,6 @@
 mod test {
     use crate::{
         commitment::{HomomorphicPolynomialCommitment, KZG10},
-        error::Error,
         virtual_oracle::{
             normalized_vo::{Description, NormalizedVirtualOracle, Term},
             EvaluationsProvider, VirtualOracle,

@@ -43,7 +43,7 @@ mod tests {
 
         assert_eq!(sq_root2.pow(&[2 * n as u64]), F::from(1u64));
 
-        println!("{}", sq_root);
+        // println!("{}", sq_root);
 
         assert_eq!(generator, sq_root * sq_root);
         assert_eq!(g2, sq_root2 * sq_root2);
@@ -116,8 +116,9 @@ mod tests {
                 &commitments[1],
                 proof,
                 &mut fs_rng,
-            ).is_ok(), 
-            true 
+            )
+            .is_ok(),
+            true
         );
     }
 

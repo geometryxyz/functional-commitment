@@ -1,12 +1,13 @@
 use crate::{
     commitment::HomomorphicPolynomialCommitment,
     discrete_log_comparison::{piop::PIOPforDLComparison, proof::Proof},
-    error::Error,
+    error::{to_pc_error, Error},
     geo_seq::GeoSeqTest,
     label_polynomial,
     non_zero_over_k::NonZeroOverK,
     subset_over_k::SubsetOverK,
     to_poly,
+    util::generate_sequence,
     virtual_oracle::{
         product_check_oracle::ProductCheckVO, square_check_oracle::SquareCheckOracle,
     },
@@ -59,12 +60,13 @@ where
 
         //------------------------------------------------------------------
         // First Round
-        let (_, prover_first_oracles, _) =
+        let (_, prover_first_oracles, prover_state) =
             PIOPforDLComparison::prover_first_round(prover_initial_state, rng)?;
 
         // commit to s and p where p in {f_prime, g_prime, s_prime}
         // order of commitments is: s, f_prime, g_prime, s_prime, h
-        let (commitments, _) = PC::commit(ck, prover_first_oracles.iter(), None).unwrap();
+        let (commitments, rands) =
+            PC::commit(ck, prover_first_oracles.iter(), None).map_err(to_pc_error::<F, PC>)?;
         fs_rng.absorb(&to_bytes![Self::PROTOCOL_NAME, commitments].unwrap());
 
         let square_check_vo = SquareCheckOracle::new();
@@ -144,20 +146,27 @@ where
             rng,
         )?;
 
-        // Geometric Sequence Test for h
-        let omega: F = domain_h.element(1);
-        let delta = omega.sqrt().unwrap();
-        let mut a_s = vec![F::one()];
-        let mut c_s = vec![domain_h.size()];
+        let delta = prover_state
+            .delta
+            .expect("Delta should be computed in the prover's first round");
+        let a_s = prover_state
+            .a_s
+            .expect("\'a\' values should be computed in the prover's first round");
+        let c_s = prover_state
+            .c_s
+            .expect("\'c\' values should be computed in the prover's first round");
 
-        let to_pad = domain_k.size() - domain_h.size();
-        if to_pad > 0 {
-            a_s.push(F::zero());
-            c_s.push(to_pad);
-        }
-
-        let h_proof =
-            GeoSeqTest::<F, PC, D>::prove(&ck, delta, &mut a_s, &mut c_s, &domain_k, rng)?;
+        let h_proof = GeoSeqTest::<F, PC, D>::prove(
+            &ck,
+            delta,
+            &prover_first_oracles.h,
+            &commitments[4].clone(),
+            &rands[4],
+            &a_s,
+            &c_s,
+            &domain_k,
+            rng,
+        )?;
 
         // Subset over K for f'
         let f_prime_subset_proof = SubsetOverK::<F, PC, D>::prove();
@@ -309,7 +318,16 @@ where
             a_s.push(F::zero());
             c_s.push(to_pad);
         }
-        GeoSeqTest::<F, PC, D>::verify(delta, &mut a_s, &mut c_s, &domain_k, proof.h_proof, &vk)?;
+
+        GeoSeqTest::<F, PC, D>::verify(
+            delta,
+            &mut a_s,
+            &mut c_s,
+            &domain_k,
+            &commitments[4],
+            proof.h_proof,
+            &vk,
+        )?;
 
         // Subset over K for f'
         SubsetOverK::<F, PC, D>::verify(proof.f_prime_subset_proof)?;

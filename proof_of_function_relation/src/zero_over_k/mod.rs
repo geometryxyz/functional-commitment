@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::commitment::HomomorphicPolynomialCommitment;
 use crate::error::{to_pc_error, Error};
 use crate::util::powers_of;
@@ -7,9 +9,7 @@ use crate::zero_over_k::proof::Proof;
 use ark_ff::to_bytes;
 use ark_ff::PrimeField;
 use ark_marlin::rng::FiatShamirRng;
-use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
-};
+use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::Evaluations;
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PCRandomness};
 use ark_std::marker::PhantomData;
@@ -34,7 +34,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
     pub fn prove<R: Rng, VO: VirtualOracle<F>>(
         concrete_oracles: &[LabeledPolynomial<F, DensePolynomial<F>>],
         concrete_oracle_commitments: &[LabeledCommitment<PC::Commitment>],
-        concrete_oracle_commit_rands: &[PC::Randomness],
+        _concrete_oracle_commit_rands: &[PC::Randomness],
         virtual_oracle: &VO,
         alphas: &Vec<F>,
         domain: &GeneralEvaluationDomain<F>,

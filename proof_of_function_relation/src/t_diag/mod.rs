@@ -1,0 +1,205 @@
+use crate::{
+    commitment::HomomorphicPolynomialCommitment,
+    discrete_log_comparison::DLComparison,
+    error::{to_pc_error, Error},
+    geo_seq::GeoSeqTest,
+    label_polynomial,
+    non_zero_over_k::NonZeroOverK,
+    subset_over_k::SubsetOverK,
+    t_diag::proof::Proof,
+    util::generate_sequence,
+    virtual_oracle::{add_vo::AddVO, eq_vo::EqVO, prod_vo::ProdVO},
+    virtual_oracle::{inverse_check_oracle::InverseCheckOracle, VirtualOracle},
+    zero_over_k::{proof::Proof as ZeroOverKProof, ZeroOverK},
+};
+use ark_ff::{to_bytes, PrimeField, SquareRootField};
+use ark_marlin::rng::FiatShamirRng;
+use ark_poly::{
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
+};
+use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PCRandomness};
+use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
+use rand::Rng;
+use std::marker::PhantomData;
+
+pub mod proof;
+mod tests;
+
+struct TDiag<F: PrimeField + SquareRootField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
+    _field: PhantomData<F>,
+    _pc: PhantomData<PC>,
+    _digest: PhantomData<D>,
+}
+
+impl<F, PC, D> TDiag<F, PC, D>
+where
+    F: PrimeField + SquareRootField,
+    PC: HomomorphicPolynomialCommitment<F>,
+    D: Digest,
+{
+    pub const PROTOCOL_NAME: &'static [u8] = b"t-Diagonal Test";
+
+    pub fn prove<R: Rng>(
+        ck: &PC::CommitterKey,
+        t: usize,
+        row_m: &LabeledPolynomial<F, DensePolynomial<F>>,
+        col_m: &LabeledPolynomial<F, DensePolynomial<F>>,
+        val_m: &LabeledPolynomial<F, DensePolynomial<F>>,
+        row_m_commitment: &LabeledCommitment<PC::Commitment>,
+        col_m_commitment: &LabeledCommitment<PC::Commitment>,
+        val_m_commitment: &LabeledCommitment<PC::Commitment>,
+        _row_m_random: &PC::Randomness,
+        _col_m_random: &PC::Randomness,
+        _val_m_random: &PC::Randomness,
+        domain_k: &GeneralEvaluationDomain<F>,
+        domain_h: &GeneralEvaluationDomain<F>,
+        rng: &mut R,
+    ) -> Result<Proof<F, PC>, Error> {
+        if t > domain_h.size() {
+            return Err(Error::T2Large);
+        }
+
+        // Step 1a produce h1 = w^t, w^(t+1), ..., w^(n-1), 0, 0, ..., 0
+
+        let r = domain_h.element(1);
+        let mut a_s = vec![domain_h.element(t)];
+        let mut c_s = vec![domain_h.size() - t];
+
+        let to_pad = domain_k.size() - (domain_h.size() - t);
+        if to_pad > 0 {
+            a_s.push(F::zero());
+            c_s.push(to_pad);
+        }
+
+        let seq = generate_sequence::<F>(r, &a_s.as_slice(), &c_s.as_slice());
+        let h1 = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&seq));
+        let h1 = label_polynomial!(h1);
+
+        // Step 1b produce h2 = 0, 0, ..., 0, 1, 1, ..., 1
+        let r = domain_h.element(0);
+        let mut a_s = vec![F::zero()];
+        let mut c_s = vec![domain_h.size() - t];
+
+        let to_pad = domain_k.size() - (domain_h.size() - t);
+        if to_pad > 0 {
+            a_s.push(F::one());
+            c_s.push(to_pad);
+        }
+
+        let seq = generate_sequence::<F>(r, &a_s.as_slice(), &c_s.as_slice());
+        let h2 = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&seq));
+        let h2 = label_polynomial!(h2);
+
+        let (h_commitments, h_rands) =
+            PC::commit(ck, &[h1.clone(), h2.clone()], None).map_err(to_pc_error::<F, PC>)?;
+
+        // Step 2: Geometric Sequence Test on h1
+        let h1_seq_proof = GeoSeqTest::<F, PC, D>::prove(
+            ck,
+            r,
+            &h1,
+            &h_commitments[0],
+            &h_rands[0],
+            &a_s,
+            &c_s,
+            domain_k,
+            rng,
+        )?;
+
+        // Step 3: Geometric Sequence Test on h2
+        let h2_seq_proof = GeoSeqTest::<F, PC, D>::prove(
+            ck,
+            r,
+            &h2,
+            &h_commitments[1],
+            &h_rands[1],
+            &a_s,
+            &c_s,
+            domain_k,
+            rng,
+        )?;
+
+        // Step 4a: h = h1 + h2
+        let h = h1.polynomial() + h2.polynomial();
+        let h = label_polynomial!(h);
+        let alphas = vec![F::one(), F::one()];
+
+        let h_commitment = PC::multi_scalar_mul(&h_commitments, &alphas);
+        let h_commitment = LabeledCommitment::new(String::from("h"), h_commitment, None);
+
+        // Step 4b: Zero over K for h = rowM
+        let eq_vo = EqVO::new();
+        let h_eq_row_m = ZeroOverK::<F, PC, D>::prove(
+            &[h.clone(), row_m.clone()],
+            &[h_commitment.clone(), row_m_commitment.clone()],
+            &[PC::Randomness::empty(), PC::Randomness::empty()],
+            &eq_vo,
+            &alphas,
+            domain_k,
+            ck,
+            rng,
+        )?;
+
+        // Step 4c: Zero over K for rowM = colM
+        let row_m_eq_col_m = ZeroOverK::<F, PC, D>::prove(
+            &[row_m.clone(), col_m.clone()],
+            &[row_m_commitment.clone(), col_m_commitment.clone()],
+            &[PC::Randomness::empty(), PC::Randomness::empty()],
+            &eq_vo,
+            &alphas,
+            domain_k,
+            ck,
+            rng,
+        )?;
+
+        // Step 5: Zero over K for valM * h2 = 0
+        let prod_vo = ProdVO::new();
+        let val_m_times_h2_proof = ZeroOverK::<F, PC, D>::prove(
+            &[val_m.clone(), h2.clone()],
+            &[val_m_commitment.clone(), h_commitments[1].clone()],
+            &[PC::Randomness::empty(), PC::Randomness::empty()],
+            &prod_vo,
+            &alphas,
+            domain_k,
+            ck,
+            rng,
+        )?;
+
+        // Step 6: Non-zero over K for valM + h2 != 0
+        let val_plus_h2 = val_m.polynomial() + h2.polynomial();
+        let val_plus_h2 = label_polynomial!(val_plus_h2);
+
+        let val_plus_h2_proof = NonZeroOverK::<F, PC, D>::prove(ck, domain_k, val_plus_h2, rng)?;
+
+        let proof = Proof {
+            h1_commit: h_commitments[0].commitment().clone(),
+            h2_commit: h_commitments[1].commitment().clone(),
+            h1_seq_proof,
+            h2_seq_proof,
+            h_eq_row_m,
+            row_m_eq_col_m,
+            val_m_times_h2_proof,
+            val_plus_h2_proof,
+        };
+
+        Ok(proof)
+    }
+
+    pub fn verify() -> Result<(), Error> {
+        // Step 2: Geometric Sequence Test on h1
+
+        // Step 3: Geometric Sequence Test on h2
+
+        // Step 4a: Verifier derives a commitment to h = h1 + h2
+
+        // Step 4b: Zero over K for h = rowM
+
+        // Step 4c: Zero over K for rowM = colM
+
+        // Step 5: Zero over K for valM * h2 = 0
+
+        // Step 6: Non-zero over K for valM + h2 != 0
+
+        Ok(())
+    }
+}

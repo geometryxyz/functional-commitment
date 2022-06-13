@@ -2,10 +2,12 @@ use crate::{
     commitment::HomomorphicPolynomialCommitment,
     discrete_log_comparison::DLComparison,
     error::{to_pc_error, Error},
-    t_strictly_lower_triangular_test::proof::Proof,
-    virtual_oracle::{inverse_check_oracle::InverseCheckOracle, VirtualOracle},
-    geo_seq::{GeoSeqTest},
+    geo_seq::GeoSeqTest,
+    label_polynomial,
     subset_over_k::SubsetOverK,
+    t_strictly_lower_triangular_test::proof::Proof,
+    util::generate_sequence,
+    virtual_oracle::{inverse_check_oracle::InverseCheckOracle, VirtualOracle},
 };
 use ark_ff::{to_bytes, PrimeField, SquareRootField};
 use ark_marlin::rng::FiatShamirRng;
@@ -20,7 +22,7 @@ use std::marker::PhantomData;
 pub mod proof;
 mod tests;
 
-struct TStrictlyLowerTriangular<
+pub struct TStrictlyLowerTriangular<
     F: PrimeField + SquareRootField,
     PC: HomomorphicPolynomialCommitment<F>,
     D: Digest,
@@ -52,27 +54,32 @@ where
     ) -> Result<Proof<F, PC>, Error> {
         fs_rng.absorb(&to_bytes![Self::PROTOCOL_NAME].unwrap());
 
-        // Step 2: Geometric sequence test on h
         let r = domain_h.element(1);
-        
+
         if t > domain_h.size() {
-            return Err(Error::T2Large)
+            return Err(Error::T2Large);
         }
+
+        // Step 1: interpolate h
         let mut a_s = vec![domain_h.element(t)];
         let mut c_s = vec![domain_h.size() - t];
-        
+
         let to_pad = domain_k.size() - (domain_h.size() - t);
         if to_pad > 0 {
             a_s.push(F::zero());
             c_s.push(to_pad);
         }
+
+        let seq = generate_sequence::<F>(r, &a_s.as_slice(), &c_s.as_slice());
+        let h = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&seq));
+        let h = label_polynomial!(h);
+
+        let (commitment, rands) = PC::commit(&ck, &[h.clone()], None).unwrap();
+        let h_commit = commitment[0].clone();
+
+        // Step 2: Geometric sequence test on h
         let geo_seq_proof = GeoSeqTest::<F, PC, D>::prove(
-            ck,
-            r,
-            &a_s,
-            &c_s,
-            domain_k,
-            rng,
+            ck, r, &h, &h_commit, &rands[0], &a_s, &c_s, domain_k, rng,
         )?;
 
         // Step 3: Subset over K between row_M and h
@@ -83,7 +90,12 @@ where
             ck, domain_k, domain_h, row_poly, col_poly, row_commit, col_commit, fs_rng, rng,
         )?;
 
-        let proof = Proof { dl_proof, geo_seq_proof, subset_proof };
+        let proof = Proof {
+            h_commit: h_commit.commitment().clone(),
+            dl_proof,
+            geo_seq_proof,
+            subset_proof,
+        };
 
         Ok(proof)
     }
@@ -99,23 +111,26 @@ where
         proof: Proof<F, PC>,
         fs_rng: &mut FiatShamirRng<D>,
     ) -> Result<(), Error> {
-
         // Step 2: Geometric sequence test on h
         let mut a_s = vec![domain_h.element(t)];
         let mut c_s = vec![domain_h.size() - t];
-        
+
         let to_pad = domain_k.size() - (domain_h.size() - t);
         if to_pad > 0 {
             a_s.push(F::zero());
             c_s.push(to_pad);
         }
+
+        let h_commit = LabeledCommitment::new(String::from("h"), proof.h_commit, None);
+
         GeoSeqTest::<F, PC, D>::verify(
-            domain_h.element(1), 
-            &a_s, 
-            &c_s, 
-            domain_k, 
+            domain_h.element(1),
+            &a_s,
+            &c_s,
+            domain_k,
+            &h_commit,
             proof.geo_seq_proof,
-            vk
+            vk,
         )?;
 
         // Step 3: Subset over K between row_M and h

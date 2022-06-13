@@ -3,9 +3,12 @@ use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, Polynomial};
 use ark_poly_commit::{LabeledPolynomial, QuerySet};
 
+pub mod add_vo;
+pub mod eq_vo;
 pub mod geometric_sequence_vo;
 pub mod inverse_check_oracle;
 pub mod normalized_vo;
+pub mod prod_vo;
 pub mod product_check_oracle;
 pub mod square_check_oracle;
 

@@ -4,8 +4,10 @@ mod tests {
     use crate::{
         commitment::{HomomorphicPolynomialCommitment, KZG10},
         geo_seq::GeoSeqTest,
+        label_polynomial,
+        util::generate_sequence,
+        zero_over_k::ZeroOverK,
     };
-    use crate::{label_polynomial, util::generate_sequence, zero_over_k::ZeroOverK};
     use ark_bn254::{Bn254, Fr};
     use ark_ff::PrimeField;
     use ark_poly::{
@@ -89,15 +91,37 @@ mod tests {
             c_s.push(to_pad);
         }
 
+        let seq = generate_sequence::<F>(r, &a_s.as_slice(), &c_s.as_slice());
+
+        // Generate f() such that f(w^n) = a_i*r^n
+        let f = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&seq));
+        let f = label_polynomial!(f);
+
+        let (commitment, rands) = PC::commit(&ck, &[f.clone()], None).unwrap();
+
         let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(
-            &ck, r, &mut a_s, &mut c_s, &domain, &mut rng,
+            &ck,
+            r,
+            &f,
+            &commitment[0].clone(),
+            &rands[0].clone(),
+            &mut a_s,
+            &mut c_s,
+            &domain,
+            &mut rng,
         )
         .unwrap();
 
         assert_eq!(
             true,
             GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::verify(
-                r, &mut a_s, &mut c_s, &domain, proof, &vk,
+                r,
+                &mut a_s,
+                &mut c_s,
+                &domain,
+                &commitment[0].clone(),
+                proof,
+                &vk,
             )
             .is_ok()
         );

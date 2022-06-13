@@ -1,4 +1,5 @@
 #[derive(Debug, PartialEq)]
+#[allow(dead_code)]
 pub enum Error {
     MaxDegreeExceeded,
     PCError { error: String },
@@ -9,7 +10,7 @@ pub enum Error {
     EvaluationError,
     InstantiationError,
     InvalidGeoSeq,
-    T2Large
+    T2Large,
 }
 
 /// Convert an ark_poly_commit error
