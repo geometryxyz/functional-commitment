@@ -16,6 +16,7 @@ use ark_poly::{
     UVPolynomial,
 };
 use ark_poly_commit::{Evaluations, LabeledCommitment, LabeledPolynomial, QuerySet};
+use ark_std::marker::PhantomData;
 use ark_std::rand::thread_rng;
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use rand::Rng;
@@ -25,7 +26,9 @@ pub mod proof;
 mod tests;
 
 pub struct GeoSeqTest<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
-    _zero_over_k: ZeroOverK<F, PC, D>,
+    _field: PhantomData<F>,
+    _pc: PhantomData<PC>,
+    _digest: PhantomData<D>,
 }
 
 impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTest<F, PC, D> {
@@ -182,82 +185,6 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
             vk,
         )
     }
-
-    //pub fn prove2(
-    //seq: &Vec<F>,
-    //r: F,
-    //a_s: &[F],
-    //c_s: &[usize],
-    //) -> Result<Proof<F, PC>, Error>{
-    //// Check that seq is valid; otherwise, return an error
-    //if !GeoSeqTest::<F, PC, D>::naive_verify(&seq, r, a_s, c_s) {
-    //return Err(Error::InvalidGeoSeq);
-    //}
-
-    //// Generate f() such that f(w^n) = a_i*r^n
-    //let m: usize = c_s.iter().sum();
-    //let domain = GeneralEvaluationDomain::<F>::new(m).unwrap();
-    //let to_pad: usize = domain.size() - m;
-
-    //// Generate the GeoSequenceVO virtual oracle
-    //let coeffs = domain.ifft(seq);
-    //let coeffs_len = coeffs.len();
-    //let f = DensePolynomial::<F>::from_coefficients_vec(coeffs);
-    //let mut a_vec: Vec<F> = a_s.to_vec();
-    //let mut c_vec = c_s.to_vec();
-
-    //if to_pad > 0 {
-    //a_vec.push(F::from(0u64));
-    //c_vec.push(to_pad);
-    //}
-
-    //let concrete_oracles = [label_polynomial!(f)];
-    //let alphas = [F::from(1u64), domain.element(1)];
-
-    //let geo_seq_vo = GeoSequenceVO::new(&c_vec, domain.element(1), r);
-
-    ////let instantiatied_geo_seq_vo = geo_seq_vo
-    ////.instantiate(
-    ////&concrete_oracles,
-    ////&[F::from(1u64), domain.element(1)],
-    ////)
-    ////.unwrap();
-    ////for root_of_unity in domain.elements() {
-    ////let eval = instantiatied_geo_seq_vo.evaluate(&root_of_unity);
-    ////assert_eq!(eval, F::from(0u64));
-    ////}
-
-    //let mut rng = thread_rng();
-
-    //// perform zero over k
-    //let max_degree = 80;
-    //let pp = PC::setup(max_degree, None, &mut thread_rng()).unwrap();
-    //let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
-
-    //let (concrete_oracle_commitments, concrete_oracle_rands) =
-    //PC::commit(&ck, &concrete_oracles, None).unwrap();
-
-    //let z_proof = ZeroOverK::<F, PC, D>::prove(
-    //&concrete_oracles,
-    //&concrete_oracle_commitments,
-    //&concrete_oracle_rands,
-    //&geo_seq_vo,
-    //&alphas.to_vec(),
-    //&domain,
-    //&ck,
-    //&mut rng,
-    //);
-
-    //let proof = Proof::<F, PC> {
-    //z_proof: z_proof.unwrap(),
-    //concrete_oracle_commitments,
-    //seq: seq.clone(),
-    //r: r,
-    //a_s: a_vec,
-    //c_s: c_vec,
-    //};
-    //Ok(proof)
-    //}
 
     /// Inefficiently verify that the sequence is valid
     pub fn naive_verify(seq: &Vec<F>, r: F, a_s: &[F], c_s: &[usize]) -> bool {

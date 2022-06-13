@@ -103,21 +103,22 @@ mod tests {
             &commitments[1],
             &mut fs_rng,
             &mut rng,
-            &vk,
         )
         .unwrap();
 
-        DLComparison::verify(
-            &vk,
-            &ck,
-            &domain_k,
-            &domain_h,
-            &commitments[0],
-            &commitments[1],
-            proof,
-            &mut fs_rng,
-        )
-        .unwrap();
+        assert_eq!(
+            DLComparison::verify(
+                &vk,
+                &ck,
+                &domain_k,
+                &domain_h,
+                &commitments[0],
+                &commitments[1],
+                proof,
+                &mut fs_rng,
+            ).is_ok(), 
+            true 
+        );
     }
 
     #[test]
@@ -175,7 +176,6 @@ mod tests {
             &commitments[1],
             &mut fs_rng,
             &mut rng,
-            &vk,
         )
         .unwrap();
 

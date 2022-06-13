@@ -5,6 +5,7 @@ use crate::{
     geo_seq::GeoSeqTest,
     label_polynomial,
     non_zero_over_k::NonZeroOverK,
+    subset_over_k::SubsetOverK,
     to_poly,
     virtual_oracle::{
         product_check_oracle::ProductCheckVO, square_check_oracle::SquareCheckOracle,
@@ -53,7 +54,6 @@ where
         g_commit: &LabeledCommitment<PC::Commitment>,
         fs_rng: &mut FiatShamirRng<D>,
         rng: &mut R,
-        vk: &PC::VerifierKey, //TODO remove after verifications
     ) -> Result<Proof<F, PC>, Error> {
         let prover_initial_state = PIOPforDLComparison::prover_init(domain_k, domain_h, f, g)?;
 
@@ -159,6 +159,15 @@ where
         let h_proof =
             GeoSeqTest::<F, PC, D>::prove(&ck, delta, &mut a_s, &mut c_s, &domain_k, rng)?;
 
+        // Subset over K for f'
+        let f_prime_subset_proof = SubsetOverK::<F, PC, D>::prove();
+
+        // Subset over K for g'
+        let g_prime_subset_proof = SubsetOverK::<F, PC, D>::prove();
+
+        // Subset over K for s'
+        let s_prime_subset_proof = SubsetOverK::<F, PC, D>::prove();
+
         // Non-zero over K for f′
         let nzk_f_prime_proof = NonZeroOverK::<F, PC, D>::prove(
             ck,
@@ -192,8 +201,6 @@ where
         let nzk_s_minus_one_proof =
             NonZeroOverK::<F, PC, D>::prove(ck, domain_k, s_minus_one.clone(), rng)?;
 
-        // TODO here we need to do also subset checks
-
         let proof = Proof {
             // Commitments
             s_commit: commitments[0].commitment().clone(),
@@ -208,6 +215,9 @@ where
             s_prime_square_proof,
             f_prime_product_proof,
             h_proof,
+            f_prime_subset_proof,
+            g_prime_subset_proof,
+            s_prime_subset_proof,
             nzk_f_prime_proof,
             nzk_g_prime_proof,
             nzk_s_prime_proof,
@@ -300,6 +310,15 @@ where
             c_s.push(to_pad);
         }
         GeoSeqTest::<F, PC, D>::verify(delta, &mut a_s, &mut c_s, &domain_k, proof.h_proof, &vk)?;
+
+        // Subset over K for f'
+        SubsetOverK::<F, PC, D>::verify(proof.f_prime_subset_proof)?;
+
+        // Subset over K for g'
+        SubsetOverK::<F, PC, D>::verify(proof.g_prime_subset_proof)?;
+
+        // Subset over K for s'
+        SubsetOverK::<F, PC, D>::verify(proof.s_prime_subset_proof)?;
 
         // Non-zero over K for f′
         NonZeroOverK::<F, PC, D>::verify(

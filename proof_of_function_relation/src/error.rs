@@ -9,6 +9,7 @@ pub enum Error {
     EvaluationError,
     InstantiationError,
     InvalidGeoSeq,
+    T2Large
 }
 
 /// Convert an ark_poly_commit error
