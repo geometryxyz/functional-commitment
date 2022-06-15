@@ -150,8 +150,12 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
         domain_size + 1 + n
     }
 
-    fn compute_scaling_factor(&self, _domain: &GeneralEvaluationDomain<F>) -> usize {
-        2
+    // fn compute_scaling_factor(&self, _domain: &GeneralEvaluationDomain<F>) -> usize {
+    //     2
+    // }
+
+    fn name(&self) -> String {
+        String::from("geo_seq")
     }
 }
 
@@ -231,25 +235,12 @@ mod test {
             )
             .unwrap();
 
-        // for root_of_unity in domain.elements() {
-        //     let eval = geo_seq_vo_coeffs.evaluate(&root_of_unity);
-        //     assert_eq!(eval, Fr::from(0u64));
-        // }
-
         let (q_1, _r) = DenseOrSparsePolynomial::from(&geo_seq_vo_coeffs)
             .divide_with_q_and_r(&DenseOrSparsePolynomial::from(
                 &domain.vanishing_polynomial(),
             ))
             .unwrap();
 
-        // if k == 1 {
-        //     println!("ARE FS EQUAL");
-        //     let domain_kn = GeneralEvaluationDomain::<Fr>::new(2 * domain.size()).unwrap();
-        //     let f_prime_back = DensePolynomial::from_coefficients_slice(&domain_kn.coset_ifft(&geo_seq_vo_evals));
-        //     assert_eq!(f_prime_back, geo_seq_vo_coeffs);
-        //     println!("FS ARE EQUAL");
-        // }
-        
         assert_eq!(_r, DensePolynomial::<Fr>::zero());
         println!("div deg: {}, eval deg: {}", q_1.degree(), quotient.degree());
         assert_eq!(q_1, quotient);

@@ -75,4 +75,8 @@ impl<F: PrimeField> VirtualOracle<F> for SquareCheckOracle {
     fn degree_bound(&self, domain_size: usize) -> usize {
         2 * domain_size + 2
     }
+
+    fn name(&self) -> String {
+        String::from("square check vo")
+    }
 }

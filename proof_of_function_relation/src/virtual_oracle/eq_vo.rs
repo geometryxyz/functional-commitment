@@ -73,4 +73,8 @@ impl<F: PrimeField> VirtualOracle<F> for EqVO {
     fn degree_bound(&self, domai_size: usize) -> usize {
         domai_size + 1
     }
+
+    fn name(&self) -> String {
+        String::from("eq")
+    }
 }

@@ -50,8 +50,9 @@ pub trait VirtualOracle<F: PrimeField> {
         let n = domain.size();
         let kn = self.degree_bound(n) - n;
 
+        // this migh seem unintuitive, but since our concrete oracles are all deg (n+1) to represent just one in evals form we must work in double domain size 
         if kn <= n {
-            return 1
+            return 2
         }
 
         let kn = if kn.is_power_of_two() {
@@ -62,6 +63,8 @@ pub trait VirtualOracle<F: PrimeField> {
 
         kn / n
     }
+
+    fn name(&self) -> String;
 }
 
 pub trait EvaluationsProvider<F: PrimeField> {

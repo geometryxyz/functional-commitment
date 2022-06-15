@@ -71,4 +71,8 @@ impl<F: PrimeField> VirtualOracle<F> for ProdVO {
     fn degree_bound(&self, domai_size: usize) -> usize {
         2 * domai_size + 2
     }
+
+    fn name(&self) -> String {
+        String::from("prod vo")
+    }
 }

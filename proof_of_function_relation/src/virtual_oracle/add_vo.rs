@@ -73,4 +73,8 @@ impl<F: PrimeField> VirtualOracle<F> for AddVO {
     fn degree_bound(&self, domain_size: usize) -> usize {
         domain_size + 1
     }
+
+    fn name(&self) -> String {
+        String::from("add")
+    }
 }

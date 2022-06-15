@@ -122,23 +122,7 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
             })
             .collect::<Vec<_>>();
 
-        // TODO REMOVE THIS
-        // let h_primes = hs
-        //     .iter()
-        //     .zip(masking_polynomials.iter())
-        //     .enumerate()
-        //     .map(|(i, (oracle, masking_poly))| {
-        //         LabeledPolynomial::new(
-        //             format!("h_prime_{}", i),
-        //             oracle.polynomial().clone(),
-        //             None,
-        //             None,
-        //         )
-        //     })
-        //     .collect::<Vec<_>>();
-
         let k = state.virtual_oracle.compute_scaling_factor(&domain);
-        // let k = 2;
         let domain_kn = GeneralEvaluationDomain::<F>::new(k * domain.size()).unwrap();
         let vh = compute_vanishing_poly_over_coset(&domain_kn, domain.size() as u64);
 
@@ -155,29 +139,25 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
             })
             .collect::<Vec<_>>();
 
-        let mut quotient =
+        let quotient =
             DensePolynomial::from_coefficients_slice(&domain_kn.coset_ifft(&quotient_evals));
 
-        let f_prime = state
-            .virtual_oracle
-            .instantiate_in_coeffs_form(h_primes.as_slice(), &alphas)?;
+        ///////////////////////////////////////////////////////////
+        /// HOW TO COMPUTE Q IN COEFFS FORM
+        // let f_prime = state
+        //     .virtual_oracle
+        //     .instantiate_in_coeffs_form(h_primes.as_slice(), &alphas)?;
 
-        let (q_1, _r) = DenseOrSparsePolynomial::from(&f_prime)
-            .divide_with_q_and_r(&DenseOrSparsePolynomial::from(
-                &domain.vanishing_polynomial(),
-            ))
-            .unwrap();
+        // let (quotient, _r) = DenseOrSparsePolynomial::from(&f_prime)
+        //     .divide_with_q_and_r(&DenseOrSparsePolynomial::from(
+        //         &domain.vanishing_polynomial(),
+        //     ))
+        //     .unwrap();
+        //
+        // sanity check
+        // assert_eq!(_r, DensePolynomial::<F>::zero());
         ///////////////////////////////////////////////////////////
 
-        // // sanity check
-        assert_eq!(_r, DensePolynomial::<F>::zero());
-        // println!("div deg: {}, eval deg: {}", q_1.degree(), quotient.degree());
-        // assert_eq!(q_1, quotient);
-        if q_1 != quotient {
-            println!("we are different!");
-            quotient = q_1.clone()
-        }
-        // println!("quotients are the same!");
 
         let msg = ProverMsg::EmptyMessage;
 
