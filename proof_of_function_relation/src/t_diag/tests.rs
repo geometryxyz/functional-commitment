@@ -98,9 +98,9 @@ mod test {
         )
         .unwrap();
 
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
+        //let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
 
-        let _proof = TDiag::<F, PC, D>::prove(
+        let proof = TDiag::<F, PC, D>::prove(
             &ck,
             t,
             &row_poly,
@@ -117,5 +117,18 @@ mod test {
             &mut rng,
         )
         .unwrap();
+
+        let is_valid = TDiag::<F, PC, D>::verify(
+            &vk,
+            t,
+            &commitments[0],
+            &commitments[1],
+            &commitments[2],
+            &domain_h,
+            &domain_k,
+            proof,
+        );
+
+        assert!(is_valid.is_ok());
     }
 }

@@ -5,6 +5,7 @@ mod geo_seq;
 mod non_zero_over_k;
 mod subset_over_k;
 mod t_diag;
+mod t_functional_triple;
 mod t_strictly_lower_triangular_test;
 mod transcript;
 mod util;
