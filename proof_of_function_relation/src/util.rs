@@ -1,5 +1,5 @@
-use ark_ff::{Field, PrimeField};
-use ark_poly::{univariate::DensePolynomial, UVPolynomial};
+use ark_ff::{Field, PrimeField, FftField};
+use ark_poly::{univariate::DensePolynomial, UVPolynomial, GeneralEvaluationDomain, EvaluationDomain, Evaluations};
 use ark_std::UniformRand;
 use rand::Rng;
 
@@ -35,6 +35,10 @@ pub fn shift_dense_poly<F: Field>(
     p: &DensePolynomial<F>,
     shifting_factor: &F,
 ) -> DensePolynomial<F> {
+    if *shifting_factor == F::one() {
+        return p.clone();
+    }
+
     let mut coeffs = p.coeffs().to_vec();
     let mut acc = F::one();
     for i in 0..coeffs.len() {
@@ -71,4 +75,23 @@ pub fn sample_vector<T: UniformRand, R: Rng>(seed: &mut R, length: usize) -> Vec
         .iter()
         .map(|_| T::rand(seed))
         .collect::<Vec<_>>()
+}
+
+pub fn compute_vanishing_poly_over_coset<F: FftField>(
+    domain: &GeneralEvaluationDomain<F>, // domain to evaluate over
+    poly_degree: u64,                    // degree of the vanishing polynomial
+) -> Evaluations<F> {
+    assert!(
+        (domain.size() as u64) > poly_degree,
+        "domain_size = {}, poly_degree = {}",
+        domain.size() as u64,
+        poly_degree
+    );
+
+    let group_gen = domain.element(1);
+    let coset_gen = F::multiplicative_generator().pow(&[poly_degree, 0, 0, 0]);
+    let v_h: Vec<_> = (0..domain.size())
+        .map(|i| (coset_gen * group_gen.pow(&[poly_degree * i as u64, 0, 0, 0])) - F::one())
+        .collect();
+    Evaluations::from_vec_and_domain(v_h, *domain)
 }

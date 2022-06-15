@@ -2,14 +2,14 @@ use crate::error::Error;
 use crate::to_poly;
 use crate::virtual_oracle::VirtualOracle;
 use ark_ff::PrimeField;
-use ark_poly::{univariate::DensePolynomial, UVPolynomial};
+use ark_poly::{univariate::DensePolynomial, UVPolynomial, GeneralEvaluationDomain, EvaluationDomain};
 use ark_poly_commit::LabeledPolynomial;
 
 pub struct InverseCheckOracle {}
 
 impl<F: PrimeField> VirtualOracle<F> for InverseCheckOracle {
     /// abstract function which will return instantiation of virtual oracle from concrete oracles and shifting factors
-    fn instantiate(
+    fn instantiate_in_coeffs_form(
         &self,
         concrete_oracles: &[LabeledPolynomial<F, DensePolynomial<F>>],
         _alphas: &[F],
@@ -22,6 +22,31 @@ impl<F: PrimeField> VirtualOracle<F> for InverseCheckOracle {
             concrete_oracles[0].polynomial() * concrete_oracles[1].polynomial()
                 + to_poly!(-F::one()),
         )
+    }
+
+    fn instantiate_in_evals_form(
+        &self,
+        concrete_oracles: &[LabeledPolynomial<F, DensePolynomial<F>>],
+        _alphas: &[F],
+        domain: &GeneralEvaluationDomain<F>,
+    ) -> Result<Vec<F>, Error> {
+        if concrete_oracles.len() != 2 {
+            return Err(Error::InstantiationError);
+        }
+
+        let n = domain.size();
+        let k = self.compute_scaling_factor(domain);
+
+        let domain_kn = GeneralEvaluationDomain::<F>::new(k * n).unwrap();
+
+        let f_evals = domain_kn.coset_fft(concrete_oracles[0].polynomial());
+        let g_evals = domain_kn.coset_fft(concrete_oracles[1].polynomial());
+
+        let vo_evals = (0..domain_kn.size())
+            .map(|i| f_evals[i] * g_evals[i] - F::one())
+            .collect::<Vec<_>>();
+
+        Ok(vo_evals)
     }
 
     fn num_of_oracles(&self) -> usize {
@@ -39,6 +64,14 @@ impl<F: PrimeField> VirtualOracle<F> for InverseCheckOracle {
     /// this function provides mapping from concrete oracle inidices to h indices
     fn mapping_vector(&self) -> Vec<usize> {
         Vec::from([0, 1])
+    }
+
+    fn degree_bound(&self, domain_size: usize) -> usize {
+        2 * domain_size + 2
+    }
+
+    fn name(&self) -> String {
+        String::from("inverse check")
     }
 }
 
@@ -76,7 +109,7 @@ mod test {
         let inverse_check_vo = InverseCheckOracle {};
 
         let instantiated_poly = inverse_check_vo
-            .instantiate(
+            .instantiate_in_coeffs_form(
                 &[label_polynomial!(f), label_polynomial!(g)],
                 &[F::one(), F::one()],
             )

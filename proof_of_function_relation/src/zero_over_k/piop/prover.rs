@@ -7,7 +7,7 @@ use ark_ff::{PrimeField, Zero};
 use ark_marlin::ahp::prover::ProverMsg;
 use ark_poly::{
     univariate::{DenseOrSparsePolynomial, DensePolynomial},
-    EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
+    EvaluationDomain, GeneralEvaluationDomain, UVPolynomial, Polynomial
 };
 use ark_std::rand::Rng;
 use std::iter;
@@ -122,22 +122,46 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
             })
             .collect::<Vec<_>>();
 
-        let f_prime = state
-            .virtual_oracle
-            .instantiate(h_primes.as_slice(), &alphas)?;
-        let (q_1, _r) = DenseOrSparsePolynomial::from(&f_prime)
-            .divide_with_q_and_r(&DenseOrSparsePolynomial::from(
-                &domain.vanishing_polynomial(),
-            ))
-            .unwrap();
+        let k = state.virtual_oracle.compute_scaling_factor(&domain);
+        let domain_kn = GeneralEvaluationDomain::<F>::new(k * domain.size()).unwrap();
+        let vh = compute_vanishing_poly_over_coset(&domain_kn, domain.size() as u64);
+
+        let f_prime_evals =
+            state
+                .virtual_oracle
+                .instantiate_in_evals_form(h_primes.as_slice(), &alphas, domain)?;
+
+        let quotient_evals = f_prime_evals
+            .iter()
+            .zip(vh.evals.iter())
+            .map(|(&nominator_eval, &denominator_eval)| {
+                nominator_eval * denominator_eval.inverse().unwrap()
+            })
+            .collect::<Vec<_>>();
+
+        let quotient =
+            DensePolynomial::from_coefficients_slice(&domain_kn.coset_ifft(&quotient_evals));
+
+        ///////////////////////////////////////////////////////////
+        /// HOW TO COMPUTE Q IN COEFFS FORM
+        // let f_prime = state
+        //     .virtual_oracle
+        //     .instantiate_in_coeffs_form(h_primes.as_slice(), &alphas)?;
+
+        // let (quotient, _r) = DenseOrSparsePolynomial::from(&f_prime)
+        //     .divide_with_q_and_r(&DenseOrSparsePolynomial::from(
+        //         &domain.vanishing_polynomial(),
+        //     ))
+        //     .unwrap();
+        //
+        // sanity check
+        // assert_eq!(_r, DensePolynomial::<F>::zero());
         ///////////////////////////////////////////////////////////
 
-        // // sanity check
-        // assert_eq!(_r, DensePolynomial::<F>::zero());
 
         let msg = ProverMsg::EmptyMessage;
 
-        let q_1 = LabeledPolynomial::new(String::from("q_1"), q_1, None, None);
+        let q_1 = LabeledPolynomial::new(String::from("q_1"), quotient, None, None);
 
         let oracles = ProverFirstOracles {
             masking_polynomials: masking_polynomials.clone(),
