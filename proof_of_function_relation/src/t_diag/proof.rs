@@ -1,10 +1,9 @@
 use crate::{
-    commitment::HomomorphicPolynomialCommitment, discrete_log_comparison::proof::Proof as DLProof,
+    commitment::HomomorphicPolynomialCommitment,
     geo_seq::proof::Proof as GeoSeqProof, non_zero_over_k::proof::Proof as NonZeroProof,
     zero_over_k::proof::Proof as ZeroProof,
 };
-use ark_ff::{PrimeField, SquareRootField};
-use ark_std::marker::PhantomData;
+use ark_ff::{PrimeField};
 
 pub struct Proof<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> {
     pub h1_commit: PC::Commitment,

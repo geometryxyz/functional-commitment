@@ -25,7 +25,7 @@ use std::marker::PhantomData;
 pub mod proof;
 mod tests;
 
-struct TDiag<F: PrimeField + SquareRootField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
+pub struct TDiag<F: PrimeField + SquareRootField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
     _digest: PhantomData<D>,
