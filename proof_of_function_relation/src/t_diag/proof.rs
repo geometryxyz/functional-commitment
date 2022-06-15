@@ -1,9 +1,8 @@
 use crate::{
-    commitment::HomomorphicPolynomialCommitment,
-    geo_seq::proof::Proof as GeoSeqProof, non_zero_over_k::proof::Proof as NonZeroProof,
-    zero_over_k::proof::Proof as ZeroProof,
+    commitment::HomomorphicPolynomialCommitment, geo_seq::proof::Proof as GeoSeqProof,
+    non_zero_over_k::proof::Proof as NonZeroProof, zero_over_k::proof::Proof as ZeroProof,
 };
-use ark_ff::{PrimeField};
+use ark_ff::PrimeField;
 
 pub struct Proof<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> {
     pub h1_commit: PC::Commitment,

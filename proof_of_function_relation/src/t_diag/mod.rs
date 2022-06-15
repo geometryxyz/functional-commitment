@@ -25,7 +25,8 @@ use std::marker::PhantomData;
 pub mod proof;
 mod tests;
 
-pub struct TDiag<F: PrimeField + SquareRootField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
+pub struct TDiag<F: PrimeField + SquareRootField, PC: HomomorphicPolynomialCommitment<F>, D: Digest>
+{
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
     _digest: PhantomData<D>,
@@ -60,33 +61,32 @@ where
         }
 
         // Step 1a produce h1 = w^t, w^(t+1), ..., w^(n-1), 0, 0, ..., 0
-
-        let r = domain_h.element(1);
-        let mut a_s = vec![domain_h.element(t)];
-        let mut c_s = vec![domain_h.size() - t];
+        let r_h1 = domain_h.element(1);
+        let mut a_s_h1 = vec![domain_h.element(t)];
+        let mut c_s_h1 = vec![domain_h.size() - t];
 
         let to_pad = domain_k.size() - (domain_h.size() - t);
         if to_pad > 0 {
-            a_s.push(F::zero());
-            c_s.push(to_pad);
+            a_s_h1.push(F::zero());
+            c_s_h1.push(to_pad);
         }
 
-        let seq = generate_sequence::<F>(r, &a_s.as_slice(), &c_s.as_slice());
+        let seq = generate_sequence::<F>(r_h1, &a_s_h1.as_slice(), &c_s_h1.as_slice());
         let h1 = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&seq));
         let h1 = label_polynomial!(h1);
 
         // Step 1b produce h2 = 0, 0, ..., 0, 1, 1, ..., 1
-        let r = domain_h.element(0);
-        let mut a_s = vec![F::zero()];
-        let mut c_s = vec![domain_h.size() - t];
+        let r_h2 = domain_h.element(0);
+        let mut a_s_h2 = vec![F::zero()];
+        let mut c_s_h2 = vec![domain_h.size() - t];
 
         let to_pad = domain_k.size() - (domain_h.size() - t);
         if to_pad > 0 {
-            a_s.push(F::one());
-            c_s.push(to_pad);
+            a_s_h2.push(F::one());
+            c_s_h2.push(to_pad);
         }
 
-        let seq = generate_sequence::<F>(r, &a_s.as_slice(), &c_s.as_slice());
+        let seq = generate_sequence::<F>(r_h2, &a_s_h2.as_slice(), &c_s_h2.as_slice());
         let h2 = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&seq));
         let h2 = label_polynomial!(h2);
 
@@ -96,12 +96,12 @@ where
         // Step 2: Geometric Sequence Test on h1
         let h1_seq_proof = GeoSeqTest::<F, PC, D>::prove(
             ck,
-            r,
+            r_h1,
             &h1,
             &h_commitments[0],
             &h_rands[0],
-            &a_s,
-            &c_s,
+            &a_s_h1,
+            &c_s_h1,
             domain_k,
             rng,
         )?;
@@ -109,12 +109,12 @@ where
         // Step 3: Geometric Sequence Test on h2
         let h2_seq_proof = GeoSeqTest::<F, PC, D>::prove(
             ck,
-            r,
+            r_h2,
             &h2,
             &h_commitments[1],
             &h_rands[1],
-            &a_s,
-            &c_s,
+            &a_s_h2,
+            &c_s_h2,
             domain_k,
             rng,
         )?;
@@ -196,123 +196,103 @@ where
         proof: Proof<F, PC>,
     ) -> Result<(), Error> {
         // Step 2: Geometric Sequence Test on h1
-        let r = domain_h.element(0);
-        let mut a_s = vec![F::zero()];
-        let mut c_s = vec![domain_h.size() - t];
+        let r_h1 = domain_h.element(1);
+        let mut a_s_h1 = vec![domain_h.element(t)];
+        let mut c_s_h1 = vec![domain_h.size() - t];
 
         let to_pad = domain_k.size() - (domain_h.size() - t);
         if to_pad > 0 {
-            a_s.push(F::one());
-            c_s.push(to_pad);
+            a_s_h1.push(F::zero());
+            c_s_h1.push(to_pad);
         }
 
-        let h1_seq_is_valid = GeoSeqTest::<F, PC, D>::verify(
-            r,
-            &a_s,
-            &c_s,
+        let h_commitments = vec![
+            LabeledCommitment::new(String::from("h1"), proof.h1_commit.clone(), None),
+            LabeledCommitment::new(String::from("h2"), proof.h2_commit.clone(), None),
+        ];
+
+        GeoSeqTest::<F, PC, D>::verify(
+            r_h1,
+            &a_s_h1,
+            &c_s_h1,
             domain_k,
-            &LabeledCommitment::new(String::from("h1"), proof.h1_commit.clone(), None),
+            &h_commitments[0],
             proof.h1_seq_proof,
             vk,
-        );
-        
-        if h1_seq_is_valid.is_err() {
-            return Err(Error::ProofVerificationError);
+        )?;
+
+        // h2 params
+        let r_h2 = F::one();
+        let mut a_s_h2 = vec![F::zero()];
+        let mut c_s_h2 = vec![domain_h.size() - t];
+
+        let to_pad = domain_k.size() - (domain_h.size() - t);
+        if to_pad > 0 {
+            a_s_h2.push(F::one());
+            c_s_h2.push(to_pad);
         }
 
         // Step 3: Geometric Sequence Test on h2
-        let h2_seq_is_valid = GeoSeqTest::<F, PC, D>::verify(
-            r,
-            &a_s,
-            &c_s,
+        GeoSeqTest::<F, PC, D>::verify(
+            r_h2,
+            &a_s_h2,
+            &c_s_h2,
             domain_k,
-            &LabeledCommitment::new(String::from("h2"), proof.h2_commit.clone(), None),
+            &h_commitments[1],
             proof.h2_seq_proof,
             vk,
-        );
-
-        if h2_seq_is_valid.is_err() {
-            return Err(Error::ProofVerificationError);
-        }
+        )?;
 
         // Step 4a: Verifier derives a commitment to h = h1 + h2
-        let h_commitments = vec![
-            LabeledCommitment::new(String::from("h1"), proof.h1_commit.clone(), None),
-            LabeledCommitment::new(String::from("h2"), proof.h2_commit.clone(), None)
-        ];
         let alphas = [F::one(), F::one()];
-        let h_commit = PC::multi_scalar_mul(h_commitments.as_slice(), &alphas);
+        let h_commit = PC::multi_scalar_mul(h_commitments.as_slice(), &[F::one(), F::one()]);
 
         // Step 4b: Zero over K for h = rowM
         let eq_vo = EqVO::new();
-        let h_row_m_zok_is_valid = ZeroOverK::<F, PC, D>::verify(
+        ZeroOverK::<F, PC, D>::verify(
             proof.h_eq_row_m,
             vec![
                 LabeledCommitment::new(String::from("h"), h_commit.clone(), None),
                 row_m_commitment.clone(),
-            ].as_slice(),
+            ]
+            .as_slice(),
             &eq_vo,
             domain_k,
             &alphas,
             vk,
-        );
-
-        if h_row_m_zok_is_valid.is_err() {
-            return Err(Error::ProofVerificationError);
-        }
+        )?;
 
         // Step 4c: Zero over K for rowM = colM
-        let col_m_row_m_zok_is_valid = ZeroOverK::<F, PC, D>::verify(
+        ZeroOverK::<F, PC, D>::verify(
             proof.row_m_eq_col_m,
-            vec![
-                row_m_commitment.clone(),
-                col_m_commitment.clone(),
-            ].as_slice(),
+            vec![row_m_commitment.clone(), col_m_commitment.clone()].as_slice(),
             &eq_vo,
             domain_k,
             &alphas,
             vk,
-        );
-
-        if col_m_row_m_zok_is_valid.is_err() {
-            return Err(Error::ProofVerificationError);
-        }
+        )?;
 
         // Step 5: Zero over K for valM * h2 = 0
         let prod_vo = ProdVO::new();
-        let val_m_h2_zok_is_valid = ZeroOverK::<F, PC, D>::verify(
+        ZeroOverK::<F, PC, D>::verify(
             proof.val_m_times_h2_proof,
-            vec![
-                val_m_commitment.clone(),
-                LabeledCommitment::new(String::from("h2"), proof.h2_commit.clone(), None)
-            ].as_slice(),
+            vec![val_m_commitment.clone(), h_commitments[1].clone()].as_slice(),
             &prod_vo,
             domain_k,
             &alphas,
             vk,
-        );
-
-        if val_m_h2_zok_is_valid.is_err() {
-            return Err(Error::ProofVerificationError);
-        }
+        )?;
 
         // Step 6: Non-zero over K for valM + h2 != 0
-        let v = vec![
-            val_m_commitment.clone(),
-            LabeledCommitment::new(String::from("h2"), proof.h2_commit.clone(), None)
-        ];
-        let v_commit = PC::multi_scalar_mul(v.as_slice(), &alphas);
+        let v = vec![val_m_commitment.clone(), h_commitments[1].clone()];
+        let v_commit = PC::multi_scalar_mul(v.as_slice(), &[F::one(), F::one()]);
 
-        let val_m_h2_nzok_is_valid = NonZeroOverK::<F, PC, D>::verify(
+        NonZeroOverK::<F, PC, D>::verify(
             vk,
             domain_k,
             LabeledCommitment::new(String::from("v"), v_commit.clone(), None),
             proof.val_plus_h2_proof,
-        );
-
-        if val_m_h2_nzok_is_valid.is_err() {
-            return Err(Error::ProofVerificationError);
-        }
+        )?;
 
         Ok(())
     }

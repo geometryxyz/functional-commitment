@@ -165,7 +165,6 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
         // TODO: is this check done or does the function return before it should if the above batch
         // check passes?
 
-
         // let seq = generate_sequence::<F>(r, &a_s.as_slice(), &c_s.as_slice());
         // let f = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&seq));
         ZeroOverK::<F, PC, D>::verify(
