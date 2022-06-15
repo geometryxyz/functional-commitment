@@ -72,8 +72,6 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
             ));
         }
 
-        let evals = ark_poly_commit::evaluate_query_set(&[f.clone()], &query_set);
-
         let separation_challenge = F::rand(&mut fs_rng);
         let opening_proof = PC::batch_open(
             ck,
@@ -174,7 +172,9 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
             &domain,
             &alphas,
             vk,
-        )
+        )?;
+
+        Ok(())
     }
 
     /// Inefficiently verify that the sequence is valid

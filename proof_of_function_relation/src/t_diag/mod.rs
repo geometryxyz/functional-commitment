@@ -221,6 +221,8 @@ where
             vk,
         )?;
 
+        println!("geo seq 1 passed");
+
         // h2 params
         let r_h2 = F::one();
         let mut a_s_h2 = vec![F::zero()];
@@ -243,6 +245,8 @@ where
             vk,
         )?;
 
+        println!("geo seq 2 passed");
+
         // Step 4a: Verifier derives a commitment to h = h1 + h2
         let alphas = [F::one(), F::one()];
         let h_commit = PC::multi_scalar_mul(h_commitments.as_slice(), &[F::one(), F::one()]);
@@ -261,6 +265,8 @@ where
             &alphas,
             vk,
         )?;
+
+        println!("zero over 1 passed");
 
         // Step 4c: Zero over K for rowM = colM
         ZeroOverK::<F, PC, D>::verify(

@@ -3,7 +3,6 @@ mod test {
     use crate::{
         commitment::{HomomorphicPolynomialCommitment, KZG10},
         virtual_oracle::{
-            normalized_vo::{Description, NormalizedVirtualOracle, Term},
             EvaluationsProvider, VirtualOracle,
         },
         zero_over_k::ZeroOverK,
