@@ -20,6 +20,7 @@ use digest::Digest; // Note that in the latest Marlin commit, Digest has been re
 
 pub mod proof;
 mod tests;
+mod errors;
 
 struct TFT<F: PrimeField + SquareRootField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
     _field: PhantomData<F>,
@@ -67,10 +68,10 @@ where
         //rands
         fs_rng: &mut FiatShamirRng<D>,
         rng: &mut R,
-    ) -> Result<Proof<F, PC>, Error> {
+    ) -> Result<Proof<F, PC>, errors::TftError> {
         // ) -> Result<Proof, Error> {
         // 1. t-SLT test on A
-        let a_slt_proof = TStrictlyLowerTriangular::<F, PC, D>::prove(
+        let a_slt_proof_r = TStrictlyLowerTriangular::<F, PC, D>::prove(
             ck,
             t,
             domain_k,
@@ -81,10 +82,16 @@ where
             col_a_commit,
             fs_rng,
             rng,
-        )?;
+        );
+
+        if a_slt_proof_r.is_err() {
+            return Err(errors::TftError::TsltAProofError(a_slt_proof_r.err().unwrap()));
+        }
+
+        let a_slt_proof = a_slt_proof_r.unwrap();
 
         // 2. t-SLT test on B
-        let b_slt_proof = TStrictlyLowerTriangular::<F, PC, D>::prove(
+        let b_slt_proof_r = TStrictlyLowerTriangular::<F, PC, D>::prove(
             ck,
             t,
             domain_k,
@@ -95,10 +102,16 @@ where
             col_b_commit,
             fs_rng,
             rng,
-        )?;
+        );
+
+        if b_slt_proof_r.is_err() {
+            return Err(errors::TftError::TsltBProofError(b_slt_proof_r.err().unwrap()));
+        }
+
+        let b_slt_proof = b_slt_proof_r.unwrap();
 
         // 3. t-Diag test on C
-        let c_diag_proof = TDiag::<F, PC, D>::prove(
+        let c_diag_proof_r = TDiag::<F, PC, D>::prove(
             ck,
             t,
             row_c_poly,
@@ -113,7 +126,13 @@ where
             domain_k,
             domain_h,
             rng,
-        )?;
+        );
+
+        if c_diag_proof_r.is_err() {
+            return Err(errors::TftError::TdiagProofError(c_diag_proof_r.err().unwrap()));
+        }
+
+        let c_diag_proof = c_diag_proof_r.unwrap();
 
         let proof = Proof {
             a_slt_proof,
@@ -139,7 +158,7 @@ where
         domain_k: &GeneralEvaluationDomain<F>,
         proof: Proof<F, PC>,
         fs_rng: &mut FiatShamirRng<D>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), errors::TftError> {
         TStrictlyLowerTriangular::<F, PC, D>::verify(
             vk,
             ck,
@@ -150,7 +169,8 @@ where
             col_a_commitment,
             proof.a_slt_proof,
             fs_rng,
-        )?;
+        ).map_err(|e| errors::TftError::TsltAVerifyError(e))?;
+
 
         TStrictlyLowerTriangular::<F, PC, D>::verify(
             vk,
@@ -162,7 +182,7 @@ where
             col_b_commitment,
             proof.b_slt_proof,
             fs_rng,
-        )?;
+        ).map_err(|e| errors::TftError::TsltBVerifyError(e))?;
 
         TDiag::<F, PC, D>::verify(
             vk,
@@ -173,7 +193,7 @@ where
             domain_h,
             domain_k,
             proof.c_diag_proof,
-        )?;
+        ).map_err(|e| errors::TftError::TdiagVerifyError(e))?;
 
         Ok(())
     }

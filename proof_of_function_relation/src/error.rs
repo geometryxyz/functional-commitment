@@ -1,8 +1,9 @@
 #[derive(Debug, PartialEq)]
 #[allow(dead_code)]
 pub enum Error {
-    MaxDegreeExceeded,
     PCError { error: String },
+    FEvalIsZero,
+    MaxDegreeExceeded,
     Check1Failed,
     Check2Failed,
     ProofVerificationError,
@@ -11,8 +12,14 @@ pub enum Error {
     InstantiationError,
     InvalidGeoSeq,
     T2Large,
+
+    // These will be replaced
+    DLPlaceholderError,
+    TDiagPlaceholderError,
+    GeoSeqPlaceholderError,
 }
 
+// TODO: obsolete this
 /// Convert an ark_poly_commit error
 pub fn to_pc_error<F, PC>(error: PC::Error) -> Error
 where

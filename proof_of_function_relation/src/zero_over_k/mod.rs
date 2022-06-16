@@ -21,6 +21,7 @@ use std::iter;
 mod piop;
 pub mod proof;
 mod tests;
+pub mod errors;
 
 pub struct ZeroOverK<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
     _field: PhantomData<F>,
@@ -40,11 +41,14 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         domain: &GeneralEvaluationDomain<F>,
         ck: &PC::CommitterKey,
         rng: &mut R,
-    ) -> Result<Proof<F, PC>, Error> {
+    ) -> Result<Proof<F, PC>, errors::ZeroOverKError> {
         let prover_initial_state =
-            PIOPforZeroOverK::prover_init(domain, concrete_oracles, virtual_oracle, &alphas)?;
+            PIOPforZeroOverK::prover_init(domain, concrete_oracles, virtual_oracle, &alphas)
+            .map_err(|_| errors::ZeroOverKError::ProverInitError)?;
+
         let verifier_initial_state =
-            PIOPforZeroOverK::<F, VO>::verifier_init(virtual_oracle, domain)?;
+            PIOPforZeroOverK::<F, VO>::verifier_init(virtual_oracle, domain)
+            .map_err(|_| errors::ZeroOverKError::VerifierInitError)?;
 
         let mut fs_rng = FiatShamirRng::<D>::from_seed(
             &to_bytes![&Self::PROTOCOL_NAME, concrete_oracle_commitments, alphas].unwrap(),
@@ -53,7 +57,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         //------------------------------------------------------------------
         // First Round
         let (_, prover_first_oracles, prover_state) =
-            PIOPforZeroOverK::prover_first_round(prover_initial_state, rng)?;
+            PIOPforZeroOverK::prover_first_round(prover_initial_state, rng)
+            .map_err(|_| errors::ZeroOverKError::ProverFirstRoundError)?;
 
         let random_polynomials = prover_first_oracles.random_polynomials.clone();
         let masking_polynomials = prover_first_oracles.masking_polynomials.clone();
@@ -61,20 +66,24 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
 
         // commit to the random polynomials
         let (r_commitments, _) =
-            PC::commit(ck, random_polynomials.iter(), None).map_err(to_pc_error::<F, PC>)?;
+            PC::commit(ck, random_polynomials.iter(), None)
+            .map_err(|_| errors::ZeroOverKError::PCErrorR)?;
 
         // commit to the masking polynomials
         let (m_commitments, _m_rands) =
-            PC::commit(ck, masking_polynomials.iter(), None).map_err(to_pc_error::<F, PC>)?;
+            PC::commit(ck, masking_polynomials.iter(), None)
+            .map_err(|_| errors::ZeroOverKError::PCErrorM)?;
 
         // commit to q_1
         let (q1_commit, _q1_rand) =
-            PC::commit(ck, &[q_1.clone()], None).map_err(to_pc_error::<F, PC>)?;
+            PC::commit(ck, &[q_1.clone()], None)
+            .map_err(|_| errors::ZeroOverKError::PCErrorQ1)?;
 
         fs_rng.absorb(&to_bytes![r_commitments, m_commitments, q1_commit].unwrap());
 
         let (verifier_first_msg, verifier_state) =
-            PIOPforZeroOverK::<F, VO>::verifier_first_round(verifier_initial_state, &mut fs_rng)?;
+            PIOPforZeroOverK::<F, VO>::verifier_first_round(verifier_initial_state, &mut fs_rng)
+            .map_err(|_| errors::ZeroOverKError::VerifierFirstRoundError)?;
         //------------------------------------------------------------------
 
         //------------------------------------------------------------------
@@ -83,7 +92,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         let (_prover_second_msg, prover_second_oracles, prover_state) =
             PIOPforZeroOverK::prover_second_round(&verifier_first_msg, prover_state, rng);
 
-        let query_set = PIOPforZeroOverK::<F, VO>::verifier_query_set(&verifier_state, alphas)?;
+        let query_set = PIOPforZeroOverK::<F, VO>::verifier_query_set(&verifier_state, alphas)
+            .map_err(|_| errors::ZeroOverKError::VerifierQuerySetError)?;
         //------------------------------------------------------------------
 
         let h_primes = prover_state
@@ -181,7 +191,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             &rands,
             Some(&mut fs_rng),
         )
-        .map_err(to_pc_error::<F, PC>)?;
+        .map_err(|_| errors::ZeroOverKError::PCErrorBatchOpen)?;
 
         // let f_prime = virtual_oracle.instantiate(&h_primes, alphas).unwrap();
         // println!("F PRIME EVAL ON PROVER SIDE: {}", f_prime.evaluate(&verifier_state.beta_1.expect("")));

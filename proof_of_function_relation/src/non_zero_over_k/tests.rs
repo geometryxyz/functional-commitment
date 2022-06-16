@@ -6,6 +6,7 @@ mod test {
         non_zero_over_k::NonZeroOverK,
         util::sample_vector,
         virtual_oracle::{inverse_check_oracle::InverseCheckOracle, VirtualOracle},
+        non_zero_over_k::errors,
     };
     use ark_bn254::{Bn254, Fr};
     use ark_ff::{Field, One, Zero};
@@ -52,12 +53,13 @@ mod test {
     }
 
     #[test]
-    #[should_panic]
-    fn rand_failig_test() {
+    fn test_f_eval_is_zero() {
         let mut rng = thread_rng();
         let n = 8;
 
         let mut f_evals: Vec<F> = sample_vector(&mut rng, n);
+
+        // Set one of the f_evals to zero, which will cause an error
         f_evals[4] = F::zero();
 
         let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();
@@ -69,7 +71,13 @@ mod test {
         let pp = PC::setup(max_degree, None, &mut rng).unwrap();
         let (ck, _) = PC::trim(&pp, max_degree, 0, None).unwrap();
 
-        // panic here because there is no inverse of 0
-        let proof = NonZeroOverK::<F, PC, Blake2s>::prove(&ck, &domain, f, &mut rng).unwrap();
+        let proof = NonZeroOverK::<F, PC, Blake2s>::prove(&ck, &domain, f, &mut rng);
+
+        // Test whether the correct error is thrown. In this case
+        assert!(proof.is_err());
+        assert_eq!(
+            proof.err().unwrap(),
+            errors::NonZeroOverKError::FEvalIsZero
+        );
     }
 }

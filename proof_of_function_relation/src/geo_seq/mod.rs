@@ -81,8 +81,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
             separation_challenge,
             &[f_rand.clone()],
             None,
-        )
-        .map_err(to_pc_error::<F, PC>)?;
+        ).map_err(|_| Error::GeoSeqPlaceholderError)?;
 
         let z_proof = ZeroOverK::<F, PC, D>::prove(
             &[f.clone()],
@@ -93,7 +92,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
             &domain,
             &ck,
             rng,
-        )?;
+        ).map_err(|_| Error::GeoSeqPlaceholderError)?;
 
         let proof = Proof::<F, PC> {
             z_proof,

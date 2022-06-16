@@ -15,6 +15,7 @@ use rand::Rng;
 use std::marker::PhantomData;
 
 pub mod proof;
+pub mod errors;
 mod tests;
 
 pub struct NonZeroOverK<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
@@ -29,8 +30,16 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> NonZeroOv
         domain: &GeneralEvaluationDomain<F>,
         f: LabeledPolynomial<F, DensePolynomial<F>>,
         rng: &mut R,
-    ) -> Result<Proof<F, PC>, Error> {
+    ) -> Result<Proof<F, PC>, errors::NonZeroOverKError> {
         let f_evals = domain.fft(f.coeffs());
+
+        // Check that all the f_evals are nonzero; otherwise, .inverse() will return None and
+        // .unwrap() will panic
+        for f in f_evals.iter() {
+            if f.inverse().is_none() {
+                return Err(errors::NonZeroOverKError::FEvalIsZero);
+            }
+        }
 
         let g_evals = f_evals
             .iter()
@@ -43,7 +52,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> NonZeroOv
         let concrete_oracles = [f, g];
         let alphas = vec![F::one(), F::one()];
         let (commitments, rands) =
-            PC::commit(ck, &concrete_oracles, None).map_err(to_pc_error::<F, PC>)?;
+            //PC::commit(ck, &concrete_oracles, None).map_err(to_pc_error::<F, PC>)?;
+            PC::commit(ck, &concrete_oracles, None).map_err(|x| errors::NonZeroOverKError::PCError)?;
 
         let zero_over_k_vo = InverseCheckOracle {};
 
@@ -56,7 +66,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> NonZeroOv
             &domain,
             ck,
             rng,
-        )?;
+        )
+        .map_err(|_| errors::NonZeroOverKError::ZeroOverKProofError)?;
 
         let proof = Proof {
             g_commit: commitments[1].commitment().clone(),

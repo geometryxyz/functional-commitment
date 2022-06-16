@@ -138,7 +138,7 @@ where
             domain_k,
             ck,
             rng,
-        )?;
+        ).map_err(|_| Error::TDiagPlaceholderError)?;
 
         // Step 4c: Zero over K for rowM = colM
         let row_m_eq_col_m = ZeroOverK::<F, PC, D>::prove(
@@ -150,7 +150,7 @@ where
             domain_k,
             ck,
             rng,
-        )?;
+        ).map_err(|_| Error::TDiagPlaceholderError)?;
 
         // Step 5: Zero over K for valM * h2 = 0
         let prod_vo = ProdVO::new();
@@ -163,13 +163,13 @@ where
             domain_k,
             ck,
             rng,
-        )?;
+        ).map_err(|_| Error::TDiagPlaceholderError)?;
 
         // Step 6: Non-zero over K for valM + h2 != 0
         let val_plus_h2 = val_m.polynomial() + h2.polynomial();
         let val_plus_h2 = label_polynomial!(val_plus_h2);
 
-        let val_plus_h2_proof = NonZeroOverK::<F, PC, D>::prove(ck, domain_k, val_plus_h2, rng)?;
+        let val_plus_h2_proof = NonZeroOverK::<F, PC, D>::prove(ck, domain_k, val_plus_h2, rng).map_err(|_| Error::TDiagPlaceholderError)?;
 
         let proof = Proof {
             h1_commit: h_commitments[0].commitment().clone(),

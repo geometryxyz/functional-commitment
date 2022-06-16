@@ -83,7 +83,7 @@ where
             &domain_k,
             &ck,
             rng,
-        )?;
+        ).map_err(|_| Error::DLPlaceholderError)?;
 
         // Zero over K for g = (g')^2
         let g_prime_square_proof = ZeroOverK::<F, PC, D>::prove(
@@ -95,7 +95,7 @@ where
             &domain_k,
             &ck,
             rng,
-        )?;
+        ).map_err(|_| Error::DLPlaceholderError)?;
 
         // Zero over K for s = (s')^2
         let s_prime_square_proof = ZeroOverK::<F, PC, D>::prove(
@@ -110,7 +110,7 @@ where
             &domain_k,
             &ck,
             rng,
-        )?;
+        ).map_err(|_| Error::DLPlaceholderError)?;
 
         // // SANITY CHECK
         // for element in domain_k.elements() {
@@ -144,7 +144,7 @@ where
             &domain_k,
             &ck,
             rng,
-        )?;
+        ).map_err(|_| Error::DLPlaceholderError)?;
 
         let delta = prover_state
             .delta
@@ -166,7 +166,7 @@ where
             &c_s,
             &domain_k,
             rng,
-        )?;
+        ).map_err(|_| Error::DLPlaceholderError)?;
 
         // Subset over K for f'
         let f_prime_subset_proof = SubsetOverK::<F, PC, D>::prove();
@@ -183,7 +183,7 @@ where
             domain_k,
             prover_first_oracles.f_prime.clone(),
             rng,
-        )?;
+        ).map_err(|_| Error::DLPlaceholderError)?;
 
         // Non-zero over K for g′
         let nzk_g_prime_proof = NonZeroOverK::<F, PC, D>::prove(
@@ -191,7 +191,7 @@ where
             domain_k,
             prover_first_oracles.g_prime.clone(),
             rng,
-        )?;
+        ).map_err(|_| Error::DLPlaceholderError)?;
 
         // Non-zero over K for s′
         let nzk_s_prime_proof = NonZeroOverK::<F, PC, D>::prove(
@@ -199,7 +199,7 @@ where
             domain_k,
             prover_first_oracles.s_prime.clone(),
             rng,
-        )?;
+        ).map_err(|_| Error::DLPlaceholderError)?;
 
         // Non-zero over K for s(X) − 1
         // it's important to note that verifier will derive S(x) - 1 commitment on it's own side
@@ -208,7 +208,10 @@ where
         let s_minus_one = prover_first_oracles.s.polynomial() - one_poly.polynomial();
         let s_minus_one = label_polynomial!(s_minus_one);
         let nzk_s_minus_one_proof =
-            NonZeroOverK::<F, PC, D>::prove(ck, domain_k, s_minus_one.clone(), rng)?;
+            NonZeroOverK::<F, PC, D>::prove(
+                ck, domain_k, s_minus_one.clone(), rng
+            )
+            .map_err(|_| Error::DLPlaceholderError)?;
 
         let proof = Proof {
             // Commitments
