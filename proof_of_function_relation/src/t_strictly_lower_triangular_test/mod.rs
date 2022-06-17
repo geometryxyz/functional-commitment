@@ -77,7 +77,8 @@ where
         let h = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&seq));
         let h = label_polynomial!(h);
 
-        let (commitment, rands) = PC::commit(&ck, &[h.clone()], None).unwrap();
+        let (commitment, rands) = PC::commit(&ck, &[h.clone()], None).map_err(to_pc_error::<F, PC>)?;
+
         let h_commit = commitment[0].clone();
 
         // Step 2: Geometric sequence test on h

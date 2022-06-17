@@ -5,9 +5,13 @@ pub enum Error {
 
     // In non_zero_over_k
     FEvalIsZero,
+    FPrimeEvalError,
 
     // In zero_over_k, discrete_log_comparison,
     ToBytesError,
+    
+    // In discrete_log_comparison
+    OmegaSqrtError,
 
     PCError { error: String },
     FsRngAbsorbError,

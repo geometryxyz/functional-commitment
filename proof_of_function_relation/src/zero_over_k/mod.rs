@@ -366,10 +366,14 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         let z_k_at_beta_2 = domain.evaluate_vanishing_polynomial(beta_2);
 
         // compute F_prime(beta_1)
-        let f_prime_eval = proof
+        let f_prime_eval_r = proof
             .h_prime_evals
-            .evaluate(virtual_oracle, beta_1, &Vec::<F>::default())
-            .unwrap();
+            .evaluate(virtual_oracle, beta_1, &Vec::<F>::default());
+
+        if f_prime_eval_r.is_err() {
+            return Err(Error::FPrimeEvalError);
+        }
+        let f_prime_eval = f_prime_eval_r.unwrap();
 
         // check that M(beta_2) - q2(beta_2)*zK(beta_2) = 0
         let check_1 = *big_m_at_beta_2 - proof.q2_eval * z_k_at_beta_2;

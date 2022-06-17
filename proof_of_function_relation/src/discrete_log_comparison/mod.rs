@@ -313,7 +313,13 @@ where
 
         // Geometric Sequence Test for h
         let omega: F = domain_h.element(1);
-        let delta = omega.sqrt().unwrap();
+        let delta_r = omega.sqrt();
+        if delta_r.is_none() {
+            return Err(Error::OmegaSqrtError);
+        }
+
+        let delta = delta_r.unwrap();
+
         let mut a_s = vec![F::one()];
         let mut c_s = vec![domain_h.size()];
 
@@ -368,7 +374,9 @@ where
 
         // Non-zero over K for s(X) − 1
         let one_poly = label_polynomial!(to_poly!(F::one()));
-        let (commit_to_one, _) = PC::commit(ck, &[one_poly], None).unwrap();
+        let (commit_to_one, _) = PC::commit(
+            ck, &[one_poly], None
+        ).map_err(to_pc_error::<F, PC>)?;
 
         let s_minus_one_commitment = PC::multi_scalar_mul(
             &[commitments[0].clone(), commit_to_one[0].clone()],
