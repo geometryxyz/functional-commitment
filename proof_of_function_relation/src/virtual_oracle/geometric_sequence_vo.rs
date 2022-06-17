@@ -3,7 +3,7 @@ use crate::to_poly;
 use crate::util::shift_dense_poly;
 use crate::virtual_oracle::VirtualOracle;
 use ark_ff::PrimeField;
-use ark_poly::{univariate::DensePolynomial, UVPolynomial, GeneralEvaluationDomain, EvaluationDomain, Polynomial};
+use ark_poly::{univariate::DensePolynomial, UVPolynomial, GeneralEvaluationDomain, EvaluationDomain};
 use ark_poly_commit::LabeledPolynomial;
 use std::iter;
 

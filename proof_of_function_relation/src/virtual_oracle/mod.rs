@@ -1,7 +1,7 @@
 use crate::error::Error;
 use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, Polynomial, GeneralEvaluationDomain, EvaluationDomain};
-use ark_poly_commit::{LabeledPolynomial, QuerySet};
+use ark_poly_commit::{LabeledPolynomial};
 
 pub mod add_vo;
 pub mod eq_vo;

@@ -295,7 +295,7 @@ where
         )?;
 
         let product_check_vo = ProductCheckVO::new();
-        let mut alphas = [F::one(), F::one(), F::one()];
+        let alphas = [F::one(), F::one(), F::one()];
 
         // Zero over K for f' = (s')*(g')
         ZeroOverK::<F, PC, D>::verify(

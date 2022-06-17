@@ -78,6 +78,5 @@ mod test {
             proof.err().unwrap(),
             Error::FEvalIsZero
         );
-
     }
 }
