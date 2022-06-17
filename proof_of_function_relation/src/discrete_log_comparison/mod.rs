@@ -7,7 +7,6 @@ use crate::{
     non_zero_over_k::NonZeroOverK,
     subset_over_k::SubsetOverK,
     to_poly,
-    util::generate_sequence,
     virtual_oracle::{
         product_check_oracle::ProductCheckVO, square_check_oracle::SquareCheckOracle,
     },
@@ -67,7 +66,10 @@ where
         // order of commitments is: s, f_prime, g_prime, s_prime, h
         let (commitments, rands) =
             PC::commit(ck, prover_first_oracles.iter(), None).map_err(to_pc_error::<F, PC>)?;
-        fs_rng.absorb(&to_bytes![Self::PROTOCOL_NAME, commitments].unwrap());
+        
+        let fs_bytes = &to_bytes![Self::PROTOCOL_NAME, commitments]
+            .map_err(|_| Error::ToBytesError)?;
+        fs_rng.absorb(fs_bytes);
 
         let square_check_vo = SquareCheckOracle::new();
 
@@ -254,7 +256,9 @@ where
             LabeledCommitment::new(String::from("h"), proof.h_commit, None),
         ];
 
-        fs_rng.absorb(&to_bytes![Self::PROTOCOL_NAME, commitments].unwrap());
+        let fs_bytes = &to_bytes![Self::PROTOCOL_NAME, commitments]
+            .map_err(|_| Error::ToBytesError)?;
+        fs_rng.absorb(fs_bytes);
 
         let square_check_vo = SquareCheckOracle::new();
 

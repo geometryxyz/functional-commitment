@@ -52,7 +52,10 @@ where
         fs_rng: &mut FiatShamirRng<D>,
         rng: &mut R,
     ) -> Result<Proof<F, PC>, Error> {
-        fs_rng.absorb(&to_bytes![Self::PROTOCOL_NAME].unwrap());
+
+        let fs_bytes = &to_bytes![&Self::PROTOCOL_NAME]
+            .map_err(|_| Error::ToBytesError)?;
+        fs_rng.absorb(fs_bytes);
 
         let r = domain_h.element(1);
 

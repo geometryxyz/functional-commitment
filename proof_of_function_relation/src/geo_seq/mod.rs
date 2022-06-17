@@ -6,12 +6,10 @@ use crate::zero_over_k::ZeroOverK;
 use ark_ff::{to_bytes, PrimeField};
 use ark_marlin::rng::FiatShamirRng;
 use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
-    UVPolynomial,
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain
 };
-use ark_poly_commit::{Evaluations, LabeledCommitment, LabeledPolynomial, QuerySet};
+use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, QuerySet};
 use ark_std::marker::PhantomData;
-use ark_std::rand::thread_rng;
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use rand::Rng;
 use rand_core::OsRng;
@@ -48,17 +46,16 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
 
         let alphas = [F::from(1u64), domain.element(1)];
 
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(
-            &to_bytes![
-                &Self::PROTOCOL_NAME,
-                a_s,
-                c_s.iter().map(|&x| x as u64).collect::<Vec<_>>(),
-                r,
-                &[f_commit.clone()].to_vec(),
-                &alphas.to_vec()
-            ]
-            .unwrap(),
-        );
+        let fs_bytes = &to_bytes![
+            &Self::PROTOCOL_NAME,
+            a_s,
+            c_s.iter().map(|&x| x as u64).collect::<Vec<_>>(),
+            r,
+            &[f_commit.clone()].to_vec(),
+            &alphas.to_vec()
+        ]
+        .map_err(|_| Error::ToBytesError)?;
+        let mut fs_rng = FiatShamirRng::<D>::from_seed(fs_bytes);
 
         let mut query_set = QuerySet::new();
         let pi_s = geo_seq_vo.get_pi_s();
@@ -121,17 +118,16 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
             .map(|&pi| domain.element(1).pow([pi as u64]))
             .collect::<Vec<_>>();
 
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(
-            &to_bytes![
-                &Self::PROTOCOL_NAME,
-                a_s,
-                c_s.iter().map(|&x| x as u64).collect::<Vec<_>>(),
-                r,
-                &[&f_commit].to_vec(),
-                &alphas.to_vec()
-            ]
-            .unwrap(),
-        );
+        let fs_bytes = &to_bytes![
+            &Self::PROTOCOL_NAME,
+            a_s,
+            c_s.iter().map(|&x| x as u64).collect::<Vec<_>>(),
+            r,
+            &[&f_commit].to_vec(),
+            &alphas.to_vec()
+        ]
+        .map_err(|_| Error::ToBytesError)?;
+        let mut fs_rng = FiatShamirRng::<D>::from_seed(fs_bytes);
 
         let mut query_set = QuerySet::new();
         for (i, &point_i) in points.iter().enumerate() {

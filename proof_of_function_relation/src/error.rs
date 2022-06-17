@@ -2,7 +2,15 @@
 #[allow(dead_code)]
 pub enum Error {
     MaxDegreeExceeded,
+
+    // In non_zero_over_k
+    FEvalIsZero,
+
+    // In zero_over_k, discrete_log_comparison,
+    ToBytesError,
+
     PCError { error: String },
+    FsRngAbsorbError,
     Check1Failed,
     Check2Failed,
     ProofVerificationError,
