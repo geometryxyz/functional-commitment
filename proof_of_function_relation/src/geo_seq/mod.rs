@@ -152,6 +152,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
             &mut OsRng,
         ) {
             Ok(true) => Ok(()),
+            // TODO: raise a different error?
             Ok(false) => Err(Error::ProofVerificationError),
             Err(e) => panic!("{:?}", e),
         }?;
@@ -161,6 +162,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
 
         // let seq = generate_sequence::<F>(r, &a_s.as_slice(), &c_s.as_slice());
         // let f = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&seq));
+ 
+        // TODO: raise a different error?
         ZeroOverK::<F, PC, D>::verify(
             proof.z_proof,
             &[f_commit.clone()],

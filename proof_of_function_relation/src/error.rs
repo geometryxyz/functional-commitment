@@ -3,6 +3,11 @@
 pub enum Error {
     MaxDegreeExceeded,
 
+    // In zero_over_k
+    BatchCheckError,
+    Check1Failed,
+    Check2Failed,
+
     // In non_zero_over_k
     FEvalIsZero,
     FPrimeEvalError,
@@ -14,9 +19,10 @@ pub enum Error {
     OmegaSqrtError,
 
     PCError { error: String },
+
+    // In various protocols
     FsRngAbsorbError,
-    Check1Failed,
-    Check2Failed,
+
     ProofVerificationError,
     InvalidDescriptionError,
     EvaluationError,

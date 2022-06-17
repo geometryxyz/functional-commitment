@@ -348,7 +348,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             &mut OsRng,
         ) {
             Ok(true) => Ok(()),
-            Ok(false) => Err(Error::ProofVerificationError),
+            Ok(false) => Err(Error::BatchCheckError),
             Err(e) => panic!("{:?}", e),
         }?;
 
