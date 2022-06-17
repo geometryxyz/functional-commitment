@@ -1,25 +1,20 @@
 #[cfg(test)]
 mod tests {
-    use crate::virtual_oracle::{geometric_sequence_vo::GeoSequenceVO, VirtualOracle};
     use crate::{
-        commitment::{HomomorphicPolynomialCommitment, KZG10},
+        commitment::KZG10,
         geo_seq::GeoSeqTest,
         label_polynomial,
         util::generate_sequence,
-        zero_over_k::ZeroOverK,
+        error::Error,
     };
     use ark_bn254::{Bn254, Fr};
-    use ark_ff::PrimeField;
     use ark_poly::{
-        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
         UVPolynomial,
     };
-    use ark_poly_commit::{
-        LabeledCommitment, LabeledPolynomial, PCRandomness, PolynomialCommitment,
-    };
+    use ark_poly_commit::PolynomialCommitment;
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
-    use rand::Rng;
 
     type F = Fr;
     type PC = KZG10<Bn254>;
@@ -181,5 +176,71 @@ mod tests {
         );
 
         assert!(is_valid.is_ok());
+    }
+
+    #[test]
+    fn test_geo_seq_invalid() {
+        let r = F::from(2u64);
+        let mut a_s = vec![F::from(1u64), F::from(2u64)];
+        let mut c_s = vec![3, 3];
+
+        let seq = generate_sequence::<Fr>(r, &a_s.as_slice(), &c_s.as_slice());
+
+        let m = c_s.iter().sum();
+
+        let domain = GeneralEvaluationDomain::<Fr>::new(m).unwrap();
+        let to_pad = domain.size() - m;
+        if to_pad > 0 {
+            a_s.push(Fr::from(0u64));
+            c_s.push(to_pad);
+        }
+
+        let f = DensePolynomial::<Fr>::from_coefficients_slice(&domain.ifft(&seq));
+
+        let concrete_oracles = [label_polynomial!(f)];
+
+        let max_degree: usize = 80;
+
+        let pp = PC::setup(max_degree, None, &mut thread_rng()).unwrap();
+        let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
+
+        let (concrete_oracle_commitments, concrete_oracle_rands) =
+            PC::commit(&ck, &concrete_oracles, None).unwrap();
+
+        let mut rng = thread_rng();
+
+        let r_invalid = F::from(9u64);
+
+        let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(
+            &ck,
+            r_invalid, // This will create a proof for an r value which the verifier does not expect
+            &concrete_oracles[0],
+            &concrete_oracle_commitments[0],
+            &concrete_oracle_rands[0],
+            &a_s,
+            &c_s,
+            &domain,
+            &mut rng,
+        );
+
+        let is_valid = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::verify(
+            r,
+            &a_s,
+            &c_s,
+            &domain,
+            &concrete_oracle_commitments[0],
+            proof.unwrap(),
+            &vk,
+        );
+
+        assert_eq!(false, r == r_invalid);
+
+        assert!(is_valid.is_err());
+
+        // Test for a specific error
+        assert_eq!(
+            is_valid.err().unwrap(),
+            Error::Check2Failed
+        );
     }
 }
