@@ -2,22 +2,15 @@
 mod test {
     use crate::{
         commitment::{HomomorphicPolynomialCommitment, KZG10},
-        virtual_oracle::{
-            EvaluationsProvider, VirtualOracle,
-        },
-        zero_over_k::ZeroOverK,
     };
     use ark_bn254::{Bn254, Fr};
-    use ark_ff::{One, Zero};
+    use ark_ff::One;
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
     };
     use ark_poly_commit::{
         LabeledCommitment, LabeledPolynomial, PCRandomness, PolynomialCommitment,
     };
-    //use ark_std::UniformRand;
-    use blake2::Blake2s;
-    //use rand::thread_rng;
     use rand_core::OsRng;
     use std::iter;
 
@@ -122,7 +115,7 @@ mod test {
     //     );
     // }
 
-    #[test]
+    //#[test]
     // fn test_failure_on_malicious_normalized_virtual_oracle() {
     //     let n = 4;
     //     let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();

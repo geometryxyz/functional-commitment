@@ -3,8 +3,10 @@
 pub enum Error {
     MaxDegreeExceeded,
 
-    // In zero_over_k
+    // In zero_over_k and geo_seq
     BatchCheckError,
+
+    // In zero_over_k
     Check1Failed,
     Check2Failed,
 
@@ -23,7 +25,6 @@ pub enum Error {
     // In various protocols
     FsRngAbsorbError,
 
-    ProofVerificationError,
     InvalidDescriptionError,
     EvaluationError,
     InstantiationError,

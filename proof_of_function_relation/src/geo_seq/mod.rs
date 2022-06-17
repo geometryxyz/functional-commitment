@@ -152,8 +152,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
             &mut OsRng,
         ) {
             Ok(true) => Ok(()),
-            // TODO: raise a different error?
-            Ok(false) => Err(Error::ProofVerificationError),
+            Ok(false) => Err(Error::BatchCheckError),
             Err(e) => panic!("{:?}", e),
         }?;
 

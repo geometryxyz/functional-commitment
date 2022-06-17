@@ -7,7 +7,6 @@ use crate::{
     subset_over_k::SubsetOverK,
     t_strictly_lower_triangular_test::proof::Proof,
     util::generate_sequence,
-    virtual_oracle::{inverse_check_oracle::InverseCheckOracle, VirtualOracle},
 };
 use ark_ff::{to_bytes, PrimeField, SquareRootField};
 use ark_marlin::rng::FiatShamirRng;
