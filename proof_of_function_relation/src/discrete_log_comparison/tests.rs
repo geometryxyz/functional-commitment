@@ -1,20 +1,19 @@
 #[cfg(test)]
 mod tests {
     use ark_bn254::{Bn254, Fr};
-    use ark_ff::{to_bytes, FftField, Field, SquareRootField};
+    use ark_ff::{to_bytes, Field, SquareRootField};
     use ark_marlin::rng::FiatShamirRng;
     use ark_poly::{
-        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
         UVPolynomial,
     };
     use ark_poly_commit::PolynomialCommitment;
     use ark_std::rand::thread_rng;
-    use ark_std::UniformRand;
     use blake2::Blake2s;
-    use rand::Rng;
 
     use crate::{
-        commitment::{HomomorphicPolynomialCommitment, KZG10},
+        error::Error,
+        commitment::KZG10,
         discrete_log_comparison::DLComparison,
         label_polynomial,
     };
@@ -88,7 +87,7 @@ mod tests {
         let pp = PC::setup(max_degree, None, &mut rng).unwrap();
         let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
 
-        let (commitments, rands) =
+        let (commitments, _) =
             PC::commit(&ck, &[f_poly.clone(), g_poly.clone()], Some(&mut rng)).unwrap();
 
         let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
@@ -123,7 +122,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_malicious_discrete_log_proof() {
         let mut rng = thread_rng();
         let m = 8;
@@ -162,7 +160,7 @@ mod tests {
         let pp = PC::setup(max_degree, None, &mut rng).unwrap();
         let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
 
-        let (commitments, rands) =
+        let (commitments, _) =
             PC::commit(&ck, &[f_poly.clone(), g_poly.clone()], Some(&mut rng)).unwrap();
 
         let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
@@ -177,10 +175,9 @@ mod tests {
             &commitments[1],
             &mut fs_rng,
             &mut rng,
-        )
-        .unwrap();
+        ).unwrap();
 
-        DLComparison::verify(
+        let is_valid = DLComparison::verify(
             &vk,
             &ck,
             &domain_k,
@@ -189,7 +186,13 @@ mod tests {
             &commitments[1],
             proof,
             &mut fs_rng,
-        )
-        .unwrap();
+        );
+        assert!(is_valid.is_err());
+
+        // Test for a specific error
+        assert_eq!(
+            is_valid.err().unwrap(),
+            Error::Check2Failed
+        );
     }
 }
