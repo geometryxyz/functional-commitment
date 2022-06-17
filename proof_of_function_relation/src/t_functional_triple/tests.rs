@@ -2,9 +2,9 @@
 mod test {
     use crate::{
         commitment::{KZG10},
-        label_polynomial,
         t_functional_triple::TFT,
         error::{Error},
+        util::gen_t_diag_test_polys,
     };
 
     use ark_poly_commit::kzg10::Randomness;
@@ -17,7 +17,6 @@ mod test {
     use ark_marlin::rng::FiatShamirRng;
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-        UVPolynomial,
     };
     use ark_poly_commit::{PolynomialCommitment, LabeledCommitment};
     use ark_poly_commit::kzg10::Commitment;
@@ -27,135 +26,6 @@ mod test {
     type F = Fr;
     type PC = KZG10<Bn254>;
     type D = Blake2s;
-
-    fn gen_polys(
-        domain_k: GeneralEvaluationDomain<F>,
-        domain_h: GeneralEvaluationDomain<F>,
-    ) -> Vec::<LabeledPolynomial<F, DensePolynomial<F>>> {
-        // M indices
-        /*
-            00, 01, 02, 03
-            10, 11, 12, 13
-            20, 21, 22, 23
-            30, 31, 32, 33
-        */
-
-        // A (slt), t = 2
-        /*
-            0, 0, 0, 0
-            1, 0, 0, 0
-            1, 2, 0, 0
-            0, 3, 0, 0
-        */
-
-        // rowM and colM are vectors that encode position of each non-zero element
-
-        // domain       =  1,    gamma,   gamma^2   gamma^3  gamma^4  gamma^5  gamma^6  gamma^7
-        // rowA_evals   =  w^1    w^2       w^2       w^3      w^3      w^3      w^3     w^3
-        // colA_evals   =  w^0    w^0       w^1       w^1      w^1      w^1      w^1     w^1
-
-        // B (stl), t = 1
-        /*
-            0, 0, 0, 0
-            7, 0, 0, 0
-            0, 0, 0, 0
-            2, 2, 0, 0
-        */
-
-        // rowM and colM are vectors that encode position of each non-zero element
-
-        // domain       =  1,    gamma,   gamma^2   gamma^3  gamma^4  gamma^5  gamma^6  gamma^7
-        // rowB_evals   =  w^1    w^3       w^3       w^3      w^3      w^3      w^3     w^3
-        // colB_evals   =  w^0    w^0       w^1       w^1      w^1      w^1      w^1     w^1
-
-        // C (diag)
-        /*
-            0, 0, 0, 0
-            0, 0, 0, 0
-            0, 0, 2, 0
-            0, 0, 0, 2
-        */
-
-        // rowM and colM are vectors that encode position of each non-zero element
-
-        // domain       =  1,    gamma,   gamma^2   gamma^3  gamma^4  gamma^5  gamma^6  gamma^7
-        // rowC_evals   =  w^2    w^3       w^0       w^0      w^0      w^0      w^0     w^0
-        // colC_evals   =  w^2    w^3       w^0       w^0      w^0      w^0      w^0     w^0
-        // vaLC_evals   =   2      2         0         0        0        0        0       0
-
-        let gamma = domain_k.element(1);
-
-        let omega_0 = domain_h.element(0);
-        let omega_1 = domain_h.element(1);
-        let omega_2 = domain_h.element(2);
-        let omega_3 = domain_h.element(3);
-
-        let row_a_evals = vec![
-            omega_1, omega_2, omega_2, omega_3, omega_3, omega_3, omega_3, omega_3,
-        ];
-        let col_a_evals = vec![
-            omega_0, omega_0, omega_1, omega_1, omega_1, omega_1, omega_1, omega_1,
-        ];
-
-        let row_b_evals = vec![
-            omega_1, omega_3, omega_3, omega_3, omega_3, omega_3, omega_3, omega_3,
-        ];
-        let col_b_evals = vec![
-            omega_0, omega_0, omega_1, omega_1, omega_1, omega_1, omega_1, omega_1,
-        ];
-
-        let row_c_evals = vec![
-            omega_2, omega_3, omega_0, omega_0, omega_0, omega_0, omega_0, omega_0,
-        ];
-        let col_c_evals = vec![
-            omega_2, omega_3, omega_0, omega_0, omega_0, omega_0, omega_0, omega_0,
-        ];
-
-        let val_c_evals = vec![
-            F::from(2u64),
-            F::from(2u64),
-            F::from(0u64),
-            F::from(0u64),
-            F::from(0u64),
-            F::from(0u64),
-            F::from(0u64),
-            F::from(0u64),
-        ];
-
-        let row_a_poly =
-            DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&row_a_evals));
-        let col_a_poly =
-            DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&col_a_evals));
-        let row_a_poly = label_polynomial!(row_a_poly);
-        let col_a_poly = label_polynomial!(col_a_poly);
-
-        let row_b_poly =
-            DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&row_b_evals));
-        let col_b_poly =
-            DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&col_b_evals));
-        let row_b_poly = label_polynomial!(row_b_poly);
-        let col_b_poly = label_polynomial!(col_b_poly);
-
-        let row_c_poly =
-            DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&row_c_evals));
-        let col_c_poly =
-            DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&col_c_evals));
-        let val_c_poly =
-            DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&val_c_evals));
-        let row_c_poly = label_polynomial!(row_c_poly);
-        let col_c_poly = label_polynomial!(col_c_poly);
-        let val_c_poly = label_polynomial!(val_c_poly);
-
-        vec![
-            row_a_poly,
-            col_a_poly,
-            row_b_poly,
-            col_b_poly,
-            row_c_poly,
-            col_c_poly,
-            val_c_poly,
-        ]
-    }
 
     fn gen_commitments_and_rands(
         ck: &ark_poly_commit::sonic_pc::CommitterKey<ark_ec::bn::Bn<ark_bn254::Parameters>>,
@@ -203,7 +73,7 @@ mod test {
         let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
         let domain_h = GeneralEvaluationDomain::<F>::new(n).unwrap();
 
-        let polys = gen_polys(domain_k, domain_h);
+        let polys = gen_t_diag_test_polys(domain_k, domain_h);
 
         let row_a_poly = polys[0].clone();
         let col_a_poly = polys[1].clone();
@@ -296,7 +166,7 @@ mod test {
         let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
         let domain_h = GeneralEvaluationDomain::<F>::new(n).unwrap();
 
-        let polys = gen_polys(domain_k, domain_h);
+        let polys = gen_t_diag_test_polys(domain_k, domain_h);
 
         let row_a_poly = polys[1].clone(); // this will make the first proof step return an error
         let col_a_poly = polys[1].clone();
@@ -377,7 +247,7 @@ mod test {
         let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
         let domain_h = GeneralEvaluationDomain::<F>::new(n).unwrap();
 
-        let polys = gen_polys(domain_k, domain_h);
+        let polys = gen_t_diag_test_polys(domain_k, domain_h);
 
         let row_a_poly = polys[0].clone();
         let col_a_poly = polys[1].clone();
@@ -458,7 +328,7 @@ mod test {
         let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
         let domain_h = GeneralEvaluationDomain::<F>::new(n).unwrap();
 
-        let polys = gen_polys(domain_k, domain_h);
+        let polys = gen_t_diag_test_polys(domain_k, domain_h);
 
         let row_a_poly = polys[0].clone();
         let col_a_poly = polys[1].clone();
@@ -539,7 +409,7 @@ mod test {
         let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
         let domain_h = GeneralEvaluationDomain::<F>::new(n).unwrap();
 
-        let polys = gen_polys(domain_k, domain_h);
+        let polys = gen_t_diag_test_polys(domain_k, domain_h);
 
         let row_a_poly = polys[0].clone();
         let col_a_poly = polys[1].clone();
@@ -639,7 +509,7 @@ mod test {
         let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
         let domain_h = GeneralEvaluationDomain::<F>::new(n).unwrap();
 
-        let polys = gen_polys(domain_k, domain_h);
+        let polys = gen_t_diag_test_polys(domain_k, domain_h);
 
         let row_a_poly = polys[0].clone();
         let col_a_poly = polys[1].clone();
@@ -740,7 +610,7 @@ mod test {
         let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
         let domain_h = GeneralEvaluationDomain::<F>::new(n).unwrap();
 
-        let polys = gen_polys(domain_k, domain_h);
+        let polys = gen_t_diag_test_polys(domain_k, domain_h);
 
         let row_a_poly = polys[0].clone();
         let col_a_poly = polys[1].clone();
