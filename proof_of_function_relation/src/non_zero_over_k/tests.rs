@@ -5,12 +5,12 @@ mod test {
         label_polynomial,
         non_zero_over_k::NonZeroOverK,
         util::sample_vector,
-        virtual_oracle::{inverse_check_oracle::InverseCheckOracle, VirtualOracle},
+        error::Error,
     };
     use ark_bn254::{Bn254, Fr};
-    use ark_ff::{Field, One, Zero};
+    use ark_ff::Zero;
     use ark_poly::{
-        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
         UVPolynomial,
     };
     use ark_poly_commit::PolynomialCommitment;
@@ -52,8 +52,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic]
-    fn rand_failig_test() {
+    fn rand_failing_test() {
         let mut rng = thread_rng();
         let n = 8;
 
@@ -70,6 +69,15 @@ mod test {
         let (ck, _) = PC::trim(&pp, max_degree, 0, None).unwrap();
 
         // panic here because there is no inverse of 0
-        let proof = NonZeroOverK::<F, PC, Blake2s>::prove(&ck, &domain, f, &mut rng).unwrap();
+        let proof = NonZeroOverK::<F, PC, Blake2s>::prove(&ck, &domain, f, &mut rng);
+
+        assert!(proof.is_err());
+
+        // Test for a specific error
+        assert_eq!(
+            proof.err().unwrap(),
+            Error::FEvalIsZero
+        );
+
     }
 }
