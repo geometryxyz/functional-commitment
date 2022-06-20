@@ -45,6 +45,10 @@ mod test {
         // domain       =  1,    gamma,   gamma^2   gamma^3  gamma^4  gamma^5  gamma^6  gamma^7
         // row_m_evals   =  w^2    w^2       w^3       w^3      w^3      w^3      w^3     w^3
         // col_m_evals   =  w^0    w^1       w^1       w^2      w^2      w^2      w^2     w^2
+        //
+        // or should it be:
+        //
+        // col_m_evals   =  w^0    w^1       w^1       w^2      w^2      w^2      w^2     w^2
 
         let mut rng = thread_rng();
         let m = 6;
@@ -65,6 +69,8 @@ mod test {
         ];
         let col_m_evals = vec![
             omega_0, omega_1, omega_2, omega_2, omega_2, omega_2, omega_2, omega_2,
+            // or should it be:
+            //omega_0, omega_0, omega_0, omega_1, omega_1, omega_1, omega_1, omega_1,
         ];
 
         let t = 2;
@@ -117,7 +123,6 @@ mod test {
     }
 
     #[test]
-    //#[should_panic]
     fn test_outside_of_lower_triangle() {
         // M indices
         /*
