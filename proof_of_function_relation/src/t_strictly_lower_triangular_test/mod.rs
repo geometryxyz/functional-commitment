@@ -17,6 +17,8 @@ use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use rand::Rng;
 use std::marker::PhantomData;
+use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
+use std::io::{BufReader, BufWriter};
 
 pub mod proof;
 mod tests;
@@ -50,7 +52,7 @@ where
         col_commit: &LabeledCommitment<PC::Commitment>,
         fs_rng: &mut FiatShamirRng<D>,
         rng: &mut R,
-    ) -> Result<Proof<F, PC>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         let fs_bytes = &to_bytes![&Self::PROTOCOL_NAME].map_err(|_| Error::ToBytesError)?;
         fs_rng.absorb(fs_bytes);
 
@@ -92,14 +94,17 @@ where
             ck, domain_k, domain_h, row_poly, col_poly, row_commit, col_commit, fs_rng, rng,
         )?;
 
-        let proof = Proof {
+        let proof = Proof::<F, PC> {
             h_commit: h_commit.commitment().clone(),
             dl_proof,
             geo_seq_proof,
             subset_proof,
         };
 
-        Ok(proof)
+        let mut writer = BufWriter::new(Vec::new());
+        let _ = proof.serialize(&mut writer).map_err(|_| Error::ProofSerializationError)?;
+
+        Ok(Vec::from(writer.buffer()))
     }
 
     pub fn verify(
@@ -110,9 +115,13 @@ where
         domain_h: &GeneralEvaluationDomain<F>,
         row_commit: &LabeledCommitment<PC::Commitment>,
         col_commit: &LabeledCommitment<PC::Commitment>,
-        proof: Proof<F, PC>,
+        proof_bytes: Vec<u8>,
         fs_rng: &mut FiatShamirRng<D>,
     ) -> Result<(), Error> {
+        let reader = BufReader::new(proof_bytes.as_slice());
+        let proof: Proof::<F, PC> = Proof::<F, PC>::deserialize(reader)
+            .map_err(|_| Error::ProofDeserializationError)?;
+
         // Step 2: Geometric sequence test on h
         let mut a_s = vec![domain_h.element(t)];
         let mut c_s = vec![domain_h.size() - t];

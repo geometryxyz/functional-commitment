@@ -1,6 +1,5 @@
 use crate::{
-    commitment::HomomorphicPolynomialCommitment, discrete_log_comparison::proof::Proof as DLProof,
-    geo_seq::proof::Proof as GeoSeqProof, subset_over_k::proof::Proof as SubsetProof,
+    commitment::HomomorphicPolynomialCommitment, 
 };
 use ark_ff::{PrimeField, SquareRootField};
 
@@ -14,7 +13,7 @@ where
     PC: HomomorphicPolynomialCommitment<F>,
 {
     pub h_commit: PC::Commitment,
-    pub dl_proof: Vec<u8>, // DLProof<F, PC>,
-    pub geo_seq_proof: Vec<u8>, // GeoSeqProof<F, PC>,
-    pub subset_proof: SubsetProof,
+    pub dl_proof: Vec<u8>,
+    pub geo_seq_proof: Vec<u8>,
+    pub subset_proof: Vec<u8>,
 }

@@ -74,20 +74,16 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> NonZeroOv
             zero_over_k_proof,
         };
 
-        //Ok(proof)
- 
-        let proof_bytes = Vec::new();
-        let writer = BufWriter::new(proof_bytes.clone());
-        let _ = proof.serialize(writer).map_err(|_| Error::ProofSerializationError)?;
+        let mut writer = BufWriter::new(Vec::new());
+        let _ = proof.serialize(&mut writer).map_err(|_| Error::ProofSerializationError)?;
 
-        Ok(proof_bytes)
+        Ok(Vec::from(writer.buffer()))
     }
 
     pub fn verify(
         vk: &PC::VerifierKey,
         domain: &GeneralEvaluationDomain<F>,
         f_commit: LabeledCommitment<PC::Commitment>,
-        //proof: Proof<F, PC>,
         proof_bytes: Vec<u8>,
     ) -> Result<(), Error> {
         let reader = BufReader::new(proof_bytes.as_slice());

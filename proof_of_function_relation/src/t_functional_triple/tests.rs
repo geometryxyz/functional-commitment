@@ -118,6 +118,8 @@ mod test {
         )
         .unwrap();
 
+        print!("xxx {}", proof.len());
+
         let is_valid = TFT::<F, PC, D>::verify(
             &vk,
             &ck,

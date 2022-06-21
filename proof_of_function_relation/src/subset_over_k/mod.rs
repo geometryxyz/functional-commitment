@@ -20,11 +20,12 @@ where
     PC: HomomorphicPolynomialCommitment<F>,
     D: Digest,
 {
-    pub fn prove() -> Proof {
-        Proof {}
+    pub fn prove() -> Vec<u8> {
+        //Proof {}
+        Vec::<u8>::new()
     }
 
-    pub fn verify(proof: Proof) -> Result<(), Error> {
+    pub fn verify(proof_bytes: Vec<u8>) -> Result<(), Error> {
         Ok(())
     }
 }

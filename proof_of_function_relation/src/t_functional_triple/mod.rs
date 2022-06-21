@@ -10,6 +10,8 @@ use std::marker::PhantomData;
 
 use ark_ff::{PrimeField, SquareRootField};
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
+use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
+use std::io::{BufReader, BufWriter};
 
 pub mod proof;
 mod tests;
@@ -60,7 +62,7 @@ where
         //rands
         fs_rng: &mut FiatShamirRng<D>,
         rng: &mut R,
-    ) -> Result<Proof<F, PC>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         // ) -> Result<Proof, Error> {
         // 1. t-SLT test on A
         let a_slt_proof = TStrictlyLowerTriangular::<F, PC, D>::prove(
@@ -108,13 +110,18 @@ where
             rng,
         )?;
 
-        let proof = Proof {
+        let proof = Proof::<F, PC> {
             a_slt_proof,
             b_slt_proof,
             c_diag_proof,
+            blah: PhantomData,
+            blah2: PhantomData,
         };
 
-        Ok(proof)
+        let mut writer = BufWriter::new(Vec::new());
+        let _ = proof.serialize(&mut writer).map_err(|_| Error::ProofSerializationError)?;
+
+        Ok(Vec::from(writer.buffer()))
     }
 
     pub fn verify(
@@ -130,9 +137,17 @@ where
         val_c_commitment: &LabeledCommitment<PC::Commitment>,
         domain_h: &GeneralEvaluationDomain<F>,
         domain_k: &GeneralEvaluationDomain<F>,
-        proof: Proof<F, PC>,
+        proof_bytes: Vec<u8>,
         fs_rng: &mut FiatShamirRng<D>,
     ) -> Result<(), Error> {
+        print!("yyy {}", proof_bytes.len());
+        let reader = BufReader::new(proof_bytes.as_slice());
+        //let proof = Proof::<F, PC>::deserialize(reader)
+            //.map_err(|_| Error::ProofDeserializationError)?;
+
+        // TODO: fix error here
+        let proof = Proof::<F, PC>::deserialize(reader).unwrap();
+
         TStrictlyLowerTriangular::<F, PC, D>::verify(
             vk,
             ck,

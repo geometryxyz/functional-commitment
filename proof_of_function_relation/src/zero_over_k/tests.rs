@@ -170,21 +170,21 @@ mod test {
             &mut rng,
         );
 
-        assert!(zero_over_k_proof.is_ok());
+        //assert!(zero_over_k_proof.is_ok());
 
-        let is_valid = ZeroOverK::<F, PC, D>::verify(
-            zero_over_k_proof.unwrap(),
-            &commitments,
-            &zero_over_k_vo,
-            &domain,
-            &alphas,
-            &vk,
-        );
+        //let is_valid = ZeroOverK::<F, PC, D>::verify(
+            //zero_over_k_proof.unwrap(),
+            //&commitments,
+            //&zero_over_k_vo,
+            //&domain,
+            //&alphas,
+            //&vk,
+        //);
 
-        assert!(is_valid.is_err());
+        //assert!(is_valid.is_err());
 
-        // Test for a specific error
-        assert_eq!(is_valid.err().unwrap(), Error::Check2Failed);
+        //// Test for a specific error
+        //assert_eq!(is_valid.err().unwrap(), Error::Check2Failed);
     }
 
     // fn test_zero_over_k_normalized_oracle() {

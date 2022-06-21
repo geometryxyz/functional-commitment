@@ -238,11 +238,10 @@ where
             nzk_s_minus_one_proof,
         };
 
-        let proof_bytes = Vec::new();
-        let writer = BufWriter::new(proof_bytes.clone());
-        let _ = proof.serialize(writer).map_err(|_| Error::ProofSerializationError)?;
+        let mut writer = BufWriter::new(Vec::new());
+        let _ = proof.serialize(&mut writer).map_err(|_| Error::ProofSerializationError)?;
 
-        Ok(proof_bytes)
+        Ok(Vec::from(writer.buffer()))
     }
 
     pub fn verify(
