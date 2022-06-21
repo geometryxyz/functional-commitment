@@ -21,6 +21,8 @@ use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PCRandomness};
 use ark_std::marker::PhantomData;
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use rand::Rng;
+use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
+use std::io::{BufReader, BufWriter};
 
 pub mod piop;
 pub mod proof;
@@ -54,7 +56,8 @@ where
         g_commit: &LabeledCommitment<PC::Commitment>,
         fs_rng: &mut FiatShamirRng<D>,
         rng: &mut R,
-    ) -> Result<Proof<F, PC>, Error> {
+    ) -> Result<Vec<u8>, Error> {
+    //) -> Result<Proof<F, PC>, Error> {
         let prover_initial_state = PIOPforDLComparison::prover_init(domain_k, domain_h, f, g)?;
 
         //------------------------------------------------------------------
@@ -212,7 +215,7 @@ where
         let nzk_s_minus_one_proof =
             NonZeroOverK::<F, PC, D>::prove(ck, domain_k, s_minus_one.clone(), rng)?;
 
-        let proof = Proof {
+        let proof = Proof::<F, PC> {
             // Commitments
             s_commit: commitments[0].commitment().clone(),
             f_prime_commit: commitments[1].commitment().clone(),
@@ -235,7 +238,11 @@ where
             nzk_s_minus_one_proof,
         };
 
-        Ok(proof)
+        let proof_bytes = Vec::new();
+        let writer = BufWriter::new(proof_bytes.clone());
+        let _ = proof.serialize(writer).map_err(|_| Error::ProofSerializationError)?;
+
+        Ok(proof_bytes)
     }
 
     pub fn verify(
@@ -245,9 +252,14 @@ where
         domain_h: &GeneralEvaluationDomain<F>,
         f_commit: &LabeledCommitment<PC::Commitment>,
         g_commit: &LabeledCommitment<PC::Commitment>,
-        proof: Proof<F, PC>,
+        //proof: Proof<F, PC>,
+        proof_bytes: Vec<u8>,
         fs_rng: &mut FiatShamirRng<D>,
     ) -> Result<(), Error> {
+        let reader = BufReader::new(proof_bytes.as_slice());
+        let proof: Proof::<F, PC> = Proof::<F, PC>::deserialize(reader)
+            .map_err(|_| Error::ProofDeserializationError)?;
+
         let commitments = vec![
             LabeledCommitment::new(String::from("s"), proof.s_commit, None),
             LabeledCommitment::new(String::from("f_prime"), proof.f_prime_commit, None),

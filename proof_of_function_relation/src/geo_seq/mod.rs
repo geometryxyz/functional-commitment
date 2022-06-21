@@ -11,6 +11,8 @@ use ark_std::marker::PhantomData;
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use rand::Rng;
 use rand_core::OsRng;
+use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
+use std::io::{BufReader, BufWriter};
 
 pub mod proof;
 mod tests;
@@ -38,7 +40,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
         c_s: &Vec<usize>,
         domain: &GeneralEvaluationDomain<F>,
         rng: &mut R,
-    ) -> Result<Proof<F, PC>, Error> {
+    //) -> Result<Proof<F, PC>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         // Generate the GeoSequenceVO virtual oracle
         let geo_seq_vo = GeoSequenceVO::new(&c_s, domain.element(1), r);
 
@@ -94,7 +97,13 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
             z_proof,
             opening_proof,
         };
-        Ok(proof)
+
+        let proof_bytes = Vec::new();
+        let writer = BufWriter::new(proof_bytes.clone());
+        let _ = proof.serialize(writer).map_err(|_| Error::ProofSerializationError)?;
+
+        Ok(proof_bytes)
+        //Ok(proof)
     }
 
     pub fn verify(
@@ -103,9 +112,14 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
         c_s: &Vec<usize>,
         domain: &GeneralEvaluationDomain<F>,
         f_commit: &LabeledCommitment<PC::Commitment>,
-        proof: Proof<F, PC>,
+        //proof: Proof<F, PC>,
+        proof_bytes: Vec<u8>,
         vk: &PC::VerifierKey,
     ) -> Result<(), Error> {
+        let reader = BufReader::new(proof_bytes.as_slice());
+        let proof: Proof::<F, PC> = Proof::<F, PC>::deserialize(reader)
+            .map_err(|_| Error::ProofDeserializationError)?;
+
         let alphas = [F::from(1u64), domain.element(1)];
         let geo_seq_vo = GeoSequenceVO::new(&c_s, domain.element(1), r);
 

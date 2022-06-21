@@ -13,6 +13,8 @@ use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use rand::Rng;
 use std::marker::PhantomData;
+use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
+use std::io::{BufReader, BufWriter};
 
 pub mod proof;
 mod tests;
@@ -29,7 +31,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> NonZeroOv
         domain: &GeneralEvaluationDomain<F>,
         f: LabeledPolynomial<F, DensePolynomial<F>>,
         rng: &mut R,
-    ) -> Result<Proof<F, PC>, Error> {
+    //) -> Result<Proof<F, PC>, Error> {
+    ) -> Result<Vec<u8>, Error> {
         let f_evals = domain.fft(f.coeffs());
 
         // Check that all the f_evals are nonzero; otherwise, .inverse() will return None and
@@ -66,20 +69,31 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> NonZeroOv
             rng,
         )?;
 
-        let proof = Proof {
+        let proof = Proof::<F, PC> {
             g_commit: commitments[1].commitment().clone(),
             zero_over_k_proof,
         };
 
-        Ok(proof)
+        //Ok(proof)
+ 
+        let proof_bytes = Vec::new();
+        let writer = BufWriter::new(proof_bytes.clone());
+        let _ = proof.serialize(writer).map_err(|_| Error::ProofSerializationError)?;
+
+        Ok(proof_bytes)
     }
 
     pub fn verify(
         vk: &PC::VerifierKey,
         domain: &GeneralEvaluationDomain<F>,
         f_commit: LabeledCommitment<PC::Commitment>,
-        proof: Proof<F, PC>,
+        //proof: Proof<F, PC>,
+        proof_bytes: Vec<u8>,
     ) -> Result<(), Error> {
+        let reader = BufReader::new(proof_bytes.as_slice());
+        let proof: Proof::<F, PC> = Proof::<F, PC>::deserialize(reader)
+            .map_err(|_| Error::ProofDeserializationError)?;
+
         //TODO check g bound
         let g_commit = LabeledCommitment::new(String::from("g"), proof.g_commit.clone(), None);
 

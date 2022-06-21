@@ -14,7 +14,7 @@ where
     PC: HomomorphicPolynomialCommitment<F>,
 {
     pub h_commit: PC::Commitment,
-    pub dl_proof: DLProof<F, PC>,
-    pub geo_seq_proof: GeoSeqProof<F, PC>,
+    pub dl_proof: Vec<u8>, // DLProof<F, PC>,
+    pub geo_seq_proof: Vec<u8>, // GeoSeqProof<F, PC>,
     pub subset_proof: SubsetProof,
 }

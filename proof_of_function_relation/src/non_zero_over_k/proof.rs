@@ -6,5 +6,5 @@ use ark_std::io::{Read, Write};
 #[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Proof<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> {
     pub g_commit: PC::Commitment,
-    pub zero_over_k_proof: zero_over_k::proof::Proof<F, PC>,
+    pub zero_over_k_proof: Vec<u8>, // zero_over_k::proof::Proof<F, PC>,
 }

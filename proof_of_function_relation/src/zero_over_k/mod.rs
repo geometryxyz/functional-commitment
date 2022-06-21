@@ -17,6 +17,8 @@ use digest::Digest; // Note that in the latest Marlin commit, Digest has been re
 use rand::Rng;
 use rand_core::OsRng;
 use std::iter;
+use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
+use std::io::{BufReader, BufWriter};
 
 mod piop;
 pub mod proof;
@@ -40,7 +42,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         domain: &GeneralEvaluationDomain<F>,
         ck: &PC::CommitterKey,
         rng: &mut R,
-    ) -> Result<Proof<F, PC>, Error> {
+    ) -> Result<Vec<u8>, Error> {
+    //) -> Result<Proof<F, PC>, Error> {
         let prover_initial_state =
             PIOPforZeroOverK::prover_init(domain, concrete_oracles, virtual_oracle, &alphas)?;
         let verifier_initial_state =
@@ -192,7 +195,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         // let f_prime = virtual_oracle.instantiate(&h_primes, alphas).unwrap();
         // println!("F PRIME EVAL ON PROVER SIDE: {}", f_prime.evaluate(&verifier_state.beta_1.expect("")));
 
-        let proof = Proof {
+        let proof = Proof::<F, PC> {
             // commitments
             m_commitments: m_commitments
                 .iter()
@@ -213,17 +216,27 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             opening_proof: batch_opening,
         };
 
-        Ok(proof)
+        let proof_bytes = Vec::new();
+        let writer = BufWriter::new(proof_bytes.clone());
+        let _ = proof.serialize(writer).map_err(|_| Error::ProofSerializationError)?;
+
+        Ok(proof_bytes)
+        //Ok(proof)
     }
 
     pub fn verify<VO: VirtualOracle<F>>(
-        proof: Proof<F, PC>,
+        //proof: Proof<F, PC>,
+        proof_bytes: Vec<u8>,
         concrete_oracle_commitments: &[LabeledCommitment<PC::Commitment>],
         virtual_oracle: &VO,
         domain: &GeneralEvaluationDomain<F>,
         alphas: &[F],
         vk: &PC::VerifierKey,
     ) -> Result<(), Error> {
+        let reader = BufReader::new(proof_bytes.as_slice());
+        let proof: Proof::<F, PC> = Proof::<F, PC>::deserialize(reader)
+            .map_err(|_| Error::ProofDeserializationError)?;
+
         let verifier_initial_state =
             PIOPforZeroOverK::<F, VO>::verifier_init(virtual_oracle, &domain)?;
 

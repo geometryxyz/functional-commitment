@@ -105,7 +105,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            DLComparison::verify(
+            DLComparison::<F, PC, D>::verify(
                 &vk,
                 &ck,
                 &domain_k,
@@ -177,7 +177,7 @@ mod tests {
         )
         .unwrap();
 
-        let is_valid = DLComparison::verify(
+        let is_valid = DLComparison::<F, PC, D>::verify(
             &vk,
             &ck,
             &domain_k,
