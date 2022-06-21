@@ -19,7 +19,3 @@ pub struct Proof<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> {
     // opening proof
     pub opening_proof: PC::BatchProof,
 }
-
-
-//impl CanonicalSerialize for Proof<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> {
-//}

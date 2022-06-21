@@ -86,9 +86,17 @@ mod test {
 
         let proof = zero_over_k_proof.unwrap();
 
-        //// TODO: Print serialized proof
-        //let serialized_proof = proof.serialize();
-        //println!("{}", serialized_proof);
+        /*
+         * Example of how to use serialize():
+         *
+         * use ark_serialize::CanonicalSerialize;
+         * use std::io::BufWriter;
+         * use std::fs::File;
+         * let f = File::create("foo.txt").unwrap();
+         * let mut writer = BufWriter::new(f);
+         * let serialized_proof = proof.serialize(writer);
+         *
+         */
 
         let is_valid = ZeroOverK::<F, PC, D>::verify(
             proof,
