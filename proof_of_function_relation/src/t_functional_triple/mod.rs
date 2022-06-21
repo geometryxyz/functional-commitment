@@ -110,12 +110,10 @@ where
             rng,
         )?;
 
-        let proof = Proof::<F, PC> {
+        let proof = Proof {
             a_slt_proof,
             b_slt_proof,
             c_diag_proof,
-            blah: PhantomData,
-            blah2: PhantomData,
         };
 
         let mut writer = BufWriter::new(Vec::new());
@@ -140,13 +138,13 @@ where
         proof_bytes: Vec<u8>,
         fs_rng: &mut FiatShamirRng<D>,
     ) -> Result<(), Error> {
-        print!("yyy {}", proof_bytes.len());
+        print!("tft proof length received by verify(): {}\n", proof_bytes.len());
         let reader = BufReader::new(proof_bytes.as_slice());
         //let proof = Proof::<F, PC>::deserialize(reader)
             //.map_err(|_| Error::ProofDeserializationError)?;
 
         // TODO: fix error here
-        let proof = Proof::<F, PC>::deserialize(reader).unwrap();
+        let proof = Proof::deserialize(reader).unwrap();
 
         TStrictlyLowerTriangular::<F, PC, D>::verify(
             vk,
