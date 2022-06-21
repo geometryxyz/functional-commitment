@@ -56,6 +56,9 @@ mod tests {
 
         let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
         let domain_h = GeneralEvaluationDomain::<F>::new(n).unwrap();
+        
+        // For the test to pass, each value in f_evals must be less than its corresponding value in
+        // g_evals, mod n (since we use domain_h)
 
         let f_evals = vec![
             domain_h.element(1),
