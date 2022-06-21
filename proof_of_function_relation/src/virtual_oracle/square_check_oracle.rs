@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::virtual_oracle::VirtualOracle;
 use ark_ff::PrimeField;
-use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain, EvaluationDomain};
+use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::LabeledPolynomial;
 
 pub struct SquareCheckOracle {}

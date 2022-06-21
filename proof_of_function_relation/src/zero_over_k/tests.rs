@@ -2,25 +2,25 @@
 mod test {
     use crate::{
         commitment::{HomomorphicPolynomialCommitment, KZG10},
+        error::{to_pc_error, Error},
+        label_polynomial,
         virtual_oracle::inverse_check_oracle::InverseCheckOracle,
         virtual_oracle::prod_vo::ProdVO,
         zero_over_k::ZeroOverK,
-        error::{to_pc_error, Error},
-        label_polynomial,
     };
     use ark_bn254::{Bn254, Fr};
-    use ark_ff::One;
     use ark_ff::Field;
+    use ark_ff::One;
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
     };
     use ark_poly_commit::{
         LabeledCommitment, LabeledPolynomial, PCRandomness, PolynomialCommitment,
     };
-    use rand_core::OsRng;
     use ark_std::rand::thread_rng;
-    use std::iter;
     use blake2::Blake2s;
+    use rand_core::OsRng;
+    use std::iter;
 
     type F = Fr;
     type PC = KZG10<Bn254>;
@@ -29,7 +29,7 @@ mod test {
     // TODO
     // Write more tests. e.g. non_zero_over_k uses zero_over_k with an InverseCheckOracle.
     // Try other virtual oracles like add_vo.
- 
+
     #[test]
     fn test_zero_over_k_inverse_check_oracle() {
         let n = 8;
@@ -66,8 +66,9 @@ mod test {
 
         let concrete_oracles = [f, g];
         let alphas = vec![F::one(), F::one()];
-        let (commitments, rands) =
-            PC::commit(&ck, &concrete_oracles, None).map_err(to_pc_error::<F, PC>).unwrap();
+        let (commitments, rands) = PC::commit(&ck, &concrete_oracles, None)
+            .map_err(to_pc_error::<F, PC>)
+            .unwrap();
 
         let zero_over_k_vo = InverseCheckOracle {};
 
@@ -92,7 +93,7 @@ mod test {
             &alphas,
             &vk,
         );
-            
+
         assert!(is_valid.is_ok());
     }
 
@@ -136,8 +137,9 @@ mod test {
 
         let concrete_oracles = [f, g];
         let alphas = vec![F::one(), F::one()];
-        let (commitments, rands) =
-            PC::commit(&ck, &concrete_oracles, None).map_err(to_pc_error::<F, PC>).unwrap();
+        let (commitments, rands) = PC::commit(&ck, &concrete_oracles, None)
+            .map_err(to_pc_error::<F, PC>)
+            .unwrap();
 
         let zero_over_k_vo = ProdVO {};
 
@@ -162,14 +164,11 @@ mod test {
             &alphas,
             &vk,
         );
-            
+
         assert!(is_valid.is_err());
 
         // Test for a specific error
-        assert_eq!(
-            is_valid.err().unwrap(),
-            Error::Check2Failed
-        );
+        assert_eq!(is_valid.err().unwrap(), Error::Check2Failed);
     }
 
     // fn test_zero_over_k_normalized_oracle() {

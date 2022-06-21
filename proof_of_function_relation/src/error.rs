@@ -16,7 +16,7 @@ pub enum Error {
 
     // In zero_over_k, discrete_log_comparison,
     ToBytesError,
-    
+
     // In discrete_log_comparison
     OmegaSqrtError,
 

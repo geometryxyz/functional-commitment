@@ -1,18 +1,15 @@
 #[cfg(test)]
 mod test {
     use crate::{
-        commitment::KZG10,
-        label_polynomial,
+        commitment::KZG10, error::Error, label_polynomial,
         t_strictly_lower_triangular_test::TStrictlyLowerTriangular,
-        error::Error,
     };
 
     use ark_bn254::{Bn254, Fr};
-    use ark_ff::{to_bytes};
+    use ark_ff::to_bytes;
     use ark_marlin::rng::FiatShamirRng;
     use ark_poly::{
-        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-        UVPolynomial,
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
     };
     use ark_poly_commit::PolynomialCommitment;
     use ark_std::rand::thread_rng;
@@ -67,7 +64,8 @@ mod test {
             omega_2, omega_2, omega_3, omega_3, omega_3, omega_3, omega_3, omega_3,
         ];
         let col_m_evals = vec![
-            omega_0, omega_1, omega_2, omega_2, omega_2, omega_2, omega_2, omega_2,
+            omega_0, omega_1, omega_2, omega_2, omega_2, omega_2, omega_2,
+            omega_2,
             // or should it be:
             //omega_0, omega_0, omega_0, omega_1, omega_1, omega_1, omega_1, omega_1,
         ];
@@ -197,10 +195,7 @@ mod test {
         );
 
         // Test for a specific error
-        assert_eq!(
-            proof.err().unwrap(),
-            Error::FEvalIsZero
-        );
+        assert_eq!(proof.err().unwrap(), Error::FEvalIsZero);
     }
 
     #[test]

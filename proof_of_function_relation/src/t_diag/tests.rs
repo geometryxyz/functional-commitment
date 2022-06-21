@@ -1,11 +1,6 @@
 #[cfg(test)]
 mod test {
-    use crate::{
-        commitment::{KZG10},
-        t_diag::TDiag,
-        util::gen_t_diag_test_polys,
-        error::Error,
-    };
+    use crate::{commitment::KZG10, error::Error, t_diag::TDiag, util::gen_t_diag_test_polys};
 
     use ark_bn254::{Bn254, Fr};
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
@@ -123,9 +118,6 @@ mod test {
         assert!(proof.is_err());
 
         // Test for a specific error
-        assert_eq!(
-            proof.err().unwrap(),
-            Error::FEvalIsZero
-        );
+        assert_eq!(proof.err().unwrap(), Error::FEvalIsZero);
     }
 }

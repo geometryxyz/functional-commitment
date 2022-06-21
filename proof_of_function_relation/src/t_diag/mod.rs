@@ -7,7 +7,7 @@ use crate::{
     t_diag::proof::Proof,
     util::generate_sequence,
     virtual_oracle::{eq_vo::EqVO, prod_vo::ProdVO},
-    zero_over_k::{ZeroOverK},
+    zero_over_k::ZeroOverK,
 };
 use ark_ff::{PrimeField, SquareRootField};
 use ark_poly::{

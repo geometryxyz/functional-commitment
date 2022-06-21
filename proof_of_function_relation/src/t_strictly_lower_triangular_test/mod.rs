@@ -51,9 +51,7 @@ where
         fs_rng: &mut FiatShamirRng<D>,
         rng: &mut R,
     ) -> Result<Proof<F, PC>, Error> {
-
-        let fs_bytes = &to_bytes![&Self::PROTOCOL_NAME]
-            .map_err(|_| Error::ToBytesError)?;
+        let fs_bytes = &to_bytes![&Self::PROTOCOL_NAME].map_err(|_| Error::ToBytesError)?;
         fs_rng.absorb(fs_bytes);
 
         let r = domain_h.element(1);
@@ -76,7 +74,8 @@ where
         let h = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&seq));
         let h = label_polynomial!(h);
 
-        let (commitment, rands) = PC::commit(&ck, &[h.clone()], None).map_err(to_pc_error::<F, PC>)?;
+        let (commitment, rands) =
+            PC::commit(&ck, &[h.clone()], None).map_err(to_pc_error::<F, PC>)?;
 
         let h_commit = commitment[0].clone();
 

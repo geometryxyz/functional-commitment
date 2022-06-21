@@ -1,7 +1,9 @@
 use crate::error::Error;
 use ark_ff::PrimeField;
-use ark_poly::{univariate::DensePolynomial, Polynomial, GeneralEvaluationDomain, EvaluationDomain};
-use ark_poly_commit::{LabeledPolynomial};
+use ark_poly::{
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
+};
+use ark_poly_commit::LabeledPolynomial;
 
 pub mod add_vo;
 pub mod eq_vo;
@@ -50,9 +52,9 @@ pub trait VirtualOracle<F: PrimeField> {
         let n = domain.size();
         let kn = self.degree_bound(n) - n;
 
-        // this migh seem unintuitive, but since our concrete oracles are all deg (n+1) to represent just one in evals form we must work in double domain size 
+        // this migh seem unintuitive, but since our concrete oracles are all deg (n+1) to represent just one in evals form we must work in double domain size
         if kn <= n {
-            return 2
+            return 2;
         }
 
         let kn = if kn.is_power_of_two() {
@@ -89,7 +91,9 @@ impl<F: PrimeField> EvaluationsProvider<F> for Vec<LabeledPolynomial<F, DensePol
             return Err(Error::EvaluationError);
         }
 
-        let poly = virtual_oracle.instantiate_in_coeffs_form(&self, alpha_coeffs).unwrap();
+        let poly = virtual_oracle
+            .instantiate_in_coeffs_form(&self, alpha_coeffs)
+            .unwrap();
         return Ok(poly.evaluate(&point));
     }
 }

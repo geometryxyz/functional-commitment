@@ -2,24 +2,17 @@
 mod test {
     use crate::virtual_oracle::VirtualOracle;
     use crate::{
-        virtual_oracle::inverse_check_oracle::InverseCheckOracle,
-        commitment::KZG10,
-        label_polynomial,
-        non_zero_over_k::NonZeroOverK,
-        util::sample_vector,
-        error::{Error},
+        commitment::KZG10, error::Error, label_polynomial, non_zero_over_k::NonZeroOverK,
+        util::sample_vector, virtual_oracle::inverse_check_oracle::InverseCheckOracle,
     };
     use ark_bn254::{Bn254, Fr};
+    use ark_ff::Field;
     use ark_ff::One;
     use ark_ff::Zero;
-    use ark_ff::Field;
     use ark_poly::{
-        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-        UVPolynomial,
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
     };
-    use ark_poly_commit::{
-        LabeledPolynomial, PolynomialCommitment,
-    };
+    use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
 
@@ -83,10 +76,7 @@ mod test {
         assert!(proof.is_err());
 
         // Test for a specific error
-        assert_eq!(
-            proof.err().unwrap(),
-            Error::FEvalIsZero
-        );
+        assert_eq!(proof.err().unwrap(), Error::FEvalIsZero);
     }
 
     // This test uses a virtual oracle that evalutes to zero over k.
@@ -126,7 +116,9 @@ mod test {
 
         let zero_over_k_vo = InverseCheckOracle {};
 
-        let f = zero_over_k_vo.instantiate_in_coeffs_form(&concrete_oracles, alphas.as_slice()).unwrap();
+        let f = zero_over_k_vo
+            .instantiate_in_coeffs_form(&concrete_oracles, alphas.as_slice())
+            .unwrap();
         let f = LabeledPolynomial::new(String::from("f"), f.clone(), None, None);
 
         let max_degree = 20;
@@ -136,13 +128,11 @@ mod test {
         let (f_commit, _) = PC::commit(&ck, &[f.clone()], Some(&mut rng)).unwrap();
 
         let proof = NonZeroOverK::<F, PC, Blake2s>::prove(&ck, &domain, f, &mut rng).unwrap();
-        let is_valid = NonZeroOverK::<F, PC, Blake2s>::verify(&vk, &domain, f_commit[0].clone(), proof);
+        let is_valid =
+            NonZeroOverK::<F, PC, Blake2s>::verify(&vk, &domain, f_commit[0].clone(), proof);
 
         assert!(is_valid.is_err());
         // Test for a specific error
-        assert_eq!(
-            is_valid.err().unwrap(),
-            Error::Check2Failed
-        );
+        assert_eq!(is_valid.err().unwrap(), Error::Check2Failed);
     }
 }

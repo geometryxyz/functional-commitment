@@ -1,8 +1,11 @@
-use ark_ff::{Field, PrimeField, FftField};
-use ark_poly::{univariate::DensePolynomial, UVPolynomial, GeneralEvaluationDomain, EvaluationDomain, Evaluations};
-use ark_std::UniformRand;
+use ark_bn254::Fr;
+use ark_ff::{FftField, Field, PrimeField};
+use ark_poly::{
+    univariate::DensePolynomial, EvaluationDomain, Evaluations, GeneralEvaluationDomain,
+    UVPolynomial,
+};
 use ark_poly_commit::LabeledPolynomial;
-use ark_bn254::{Fr};
+use ark_std::UniformRand;
 use rand::Rng;
 
 #[inline]
@@ -101,22 +104,22 @@ pub fn compute_vanishing_poly_over_coset<F: FftField>(
 pub fn gen_t_diag_test_polys(
     domain_k: GeneralEvaluationDomain<Fr>,
     domain_h: GeneralEvaluationDomain<Fr>,
-    ) -> Vec::<LabeledPolynomial<Fr, DensePolynomial<Fr>>> {
+) -> Vec<LabeledPolynomial<Fr, DensePolynomial<Fr>>> {
     // M indices
     /*
-       00, 01, 02, 03
-       10, 11, 12, 13
-       20, 21, 22, 23
-       30, 31, 32, 33
-       */
+    00, 01, 02, 03
+    10, 11, 12, 13
+    20, 21, 22, 23
+    30, 31, 32, 33
+    */
 
     // A (slt), t = 2
     /*
-       0, 0, 0, 0
-       1, 0, 0, 0
-       1, 2, 0, 0
-       0, 3, 0, 0
-       */
+    0, 0, 0, 0
+    1, 0, 0, 0
+    1, 2, 0, 0
+    0, 3, 0, 0
+    */
 
     // rowM and colM are vectors that encode position of each non-zero element
 
@@ -126,11 +129,11 @@ pub fn gen_t_diag_test_polys(
 
     // B (stl), t = 1
     /*
-       0, 0, 0, 0
-       7, 0, 0, 0
-       0, 0, 0, 0
-       2, 2, 0, 0
-       */
+    0, 0, 0, 0
+    7, 0, 0, 0
+    0, 0, 0, 0
+    2, 2, 0, 0
+    */
 
     // rowM and colM are vectors that encode position of each non-zero element
 
@@ -140,11 +143,11 @@ pub fn gen_t_diag_test_polys(
 
     // C (diag)
     /*
-       0, 0, 0, 0
-       0, 0, 0, 0
-       0, 0, 2, 0
-       0, 0, 0, 2
-       */
+    0, 0, 0, 0
+    0, 0, 0, 0
+    0, 0, 2, 0
+    0, 0, 0, 2
+    */
 
     // rowM and colM are vectors that encode position of each non-zero element
 
@@ -190,37 +193,24 @@ pub fn gen_t_diag_test_polys(
         Fr::from(0u64),
     ];
 
-    let row_a_poly =
-        DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&row_a_evals));
-    let col_a_poly =
-        DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&col_a_evals));
+    let row_a_poly = DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&row_a_evals));
+    let col_a_poly = DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&col_a_evals));
     let row_a_poly = label_polynomial!(row_a_poly);
     let col_a_poly = label_polynomial!(col_a_poly);
 
-    let row_b_poly =
-        DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&row_b_evals));
-    let col_b_poly =
-        DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&col_b_evals));
+    let row_b_poly = DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&row_b_evals));
+    let col_b_poly = DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&col_b_evals));
     let row_b_poly = label_polynomial!(row_b_poly);
     let col_b_poly = label_polynomial!(col_b_poly);
 
-    let row_c_poly =
-        DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&row_c_evals));
-    let col_c_poly =
-        DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&col_c_evals));
-    let val_c_poly =
-        DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&val_c_evals));
+    let row_c_poly = DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&row_c_evals));
+    let col_c_poly = DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&col_c_evals));
+    let val_c_poly = DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&val_c_evals));
     let row_c_poly = label_polynomial!(row_c_poly);
     let col_c_poly = label_polynomial!(col_c_poly);
     let val_c_poly = label_polynomial!(val_c_poly);
 
     vec![
-        row_a_poly,
-        col_a_poly,
-        row_b_poly,
-        col_b_poly,
-        row_c_poly,
-        col_c_poly,
-        val_c_poly,
+        row_a_poly, col_a_poly, row_b_poly, col_b_poly, row_c_poly, col_c_poly, val_c_poly,
     ]
 }

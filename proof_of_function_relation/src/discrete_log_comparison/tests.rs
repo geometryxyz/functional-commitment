@@ -4,18 +4,14 @@ mod tests {
     use ark_ff::{to_bytes, Field, SquareRootField};
     use ark_marlin::rng::FiatShamirRng;
     use ark_poly::{
-        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-        UVPolynomial,
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
     };
     use ark_poly_commit::PolynomialCommitment;
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
 
     use crate::{
-        error::Error,
-        commitment::KZG10,
-        discrete_log_comparison::DLComparison,
-        label_polynomial,
+        commitment::KZG10, discrete_log_comparison::DLComparison, error::Error, label_polynomial,
     };
 
     type F = Fr;
@@ -56,7 +52,7 @@ mod tests {
 
         let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
         let domain_h = GeneralEvaluationDomain::<F>::new(n).unwrap();
-        
+
         // For the test to pass, each value in f_evals must be less than its corresponding value in
         // g_evals, mod n (since we use domain_h)
 
@@ -178,7 +174,8 @@ mod tests {
             &commitments[1],
             &mut fs_rng,
             &mut rng,
-        ).unwrap();
+        )
+        .unwrap();
 
         let is_valid = DLComparison::verify(
             &vk,
@@ -193,9 +190,6 @@ mod tests {
         assert!(is_valid.is_err());
 
         // Test for a specific error
-        assert_eq!(
-            is_valid.err().unwrap(),
-            Error::Check2Failed
-        );
+        assert_eq!(is_valid.err().unwrap(), Error::Check2Failed);
     }
 }
