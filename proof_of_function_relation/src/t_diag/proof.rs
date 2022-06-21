@@ -3,7 +3,10 @@ use crate::{
     non_zero_over_k::proof::Proof as NonZeroProof, zero_over_k::proof::Proof as ZeroProof,
 };
 use ark_ff::PrimeField;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
+use ark_std::io::{Read, Write};
 
+#[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Proof<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> {
     pub h1_commit: PC::Commitment,
     pub h2_commit: PC::Commitment,

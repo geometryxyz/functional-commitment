@@ -84,8 +84,14 @@ mod test {
 
         assert!(zero_over_k_proof.is_ok());
 
+        let proof = zero_over_k_proof.unwrap();
+
+        //// TODO: Print serialized proof
+        //let serialized_proof = proof.serialize();
+        //println!("{}", serialized_proof);
+
         let is_valid = ZeroOverK::<F, PC, D>::verify(
-            zero_over_k_proof.unwrap(),
+            proof,
             &commitments,
             &zero_over_k_vo,
             &domain,
@@ -106,6 +112,7 @@ mod test {
         let pp = PC::setup(max_degree, None, &mut rng).unwrap();
         let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
 
+        // Create a virtual oracle that doesn't evaluate to zero over k
         let f_evals: Vec<F> = vec![
             F::from(1u64),
             F::from(2u64),
@@ -141,6 +148,7 @@ mod test {
 
         let zero_over_k_vo = ProdVO {};
 
+        // The proof can be created, but the verification will fail
         let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
             &concrete_oracles,
             &commitments,
