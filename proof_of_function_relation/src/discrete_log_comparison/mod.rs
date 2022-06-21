@@ -66,9 +66,9 @@ where
         // order of commitments is: s, f_prime, g_prime, s_prime, h
         let (commitments, rands) =
             PC::commit(ck, prover_first_oracles.iter(), None).map_err(to_pc_error::<F, PC>)?;
-        
-        let fs_bytes = &to_bytes![Self::PROTOCOL_NAME, commitments]
-            .map_err(|_| Error::ToBytesError)?;
+
+        let fs_bytes =
+            &to_bytes![Self::PROTOCOL_NAME, commitments].map_err(|_| Error::ToBytesError)?;
         fs_rng.absorb(fs_bytes);
 
         let square_check_vo = SquareCheckOracle::new();
@@ -256,8 +256,8 @@ where
             LabeledCommitment::new(String::from("h"), proof.h_commit, None),
         ];
 
-        let fs_bytes = &to_bytes![Self::PROTOCOL_NAME, commitments]
-            .map_err(|_| Error::ToBytesError)?;
+        let fs_bytes =
+            &to_bytes![Self::PROTOCOL_NAME, commitments].map_err(|_| Error::ToBytesError)?;
         fs_rng.absorb(fs_bytes);
 
         let square_check_vo = SquareCheckOracle::new();
@@ -374,9 +374,7 @@ where
 
         // Non-zero over K for s(X) − 1
         let one_poly = label_polynomial!(to_poly!(F::one()));
-        let (commit_to_one, _) = PC::commit(
-            ck, &[one_poly], None
-        ).map_err(to_pc_error::<F, PC>)?;
+        let (commit_to_one, _) = PC::commit(ck, &[one_poly], None).map_err(to_pc_error::<F, PC>)?;
 
         let s_minus_one_commitment = PC::multi_scalar_mul(
             &[commitments[0].clone(), commit_to_one[0].clone()],

@@ -1,16 +1,12 @@
 #[cfg(test)]
 mod tests {
     use crate::{
-        commitment::KZG10,
-        geo_seq::GeoSeqTest,
-        label_polynomial,
+        commitment::KZG10, error::Error, geo_seq::GeoSeqTest, label_polynomial,
         util::generate_sequence,
-        error::Error,
     };
     use ark_bn254::{Bn254, Fr};
     use ark_poly::{
-        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-        UVPolynomial,
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
     };
     use ark_poly_commit::PolynomialCommitment;
     use ark_std::rand::thread_rng;
@@ -238,9 +234,6 @@ mod tests {
         assert!(is_valid.is_err());
 
         // Test for a specific error
-        assert_eq!(
-            is_valid.err().unwrap(),
-            Error::Check2Failed
-        );
+        assert_eq!(is_valid.err().unwrap(), Error::Check2Failed);
     }
 }

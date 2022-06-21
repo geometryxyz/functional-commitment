@@ -1,9 +1,6 @@
-use crate::{
-    error::Error,
-    virtual_oracle::VirtualOracle,
-};
+use crate::{error::Error, virtual_oracle::VirtualOracle};
 use ark_ff::PrimeField;
-use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain, EvaluationDomain};
+use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::LabeledPolynomial;
 
 pub struct AddVO {}

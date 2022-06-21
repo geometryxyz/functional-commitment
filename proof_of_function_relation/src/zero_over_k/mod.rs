@@ -71,8 +71,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         let (q1_commit, _q1_rand) =
             PC::commit(ck, &[q_1.clone()], None).map_err(to_pc_error::<F, PC>)?;
 
-        let fs_bytes = &to_bytes![r_commitments, m_commitments, q1_commit]
-            .map_err(|_| Error::ToBytesError)?;
+        let fs_bytes =
+            &to_bytes![r_commitments, m_commitments, q1_commit].map_err(|_| Error::ToBytesError)?;
         fs_rng.absorb(fs_bytes);
 
         let (verifier_first_msg, verifier_state) =
@@ -163,8 +163,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             })
             .collect::<Vec<_>>();
 
-        let fs_bytes = &to_bytes![h_prime_commitments, q2_commit]
-            .map_err(|_| Error::ToBytesError)?;
+        let fs_bytes =
+            &to_bytes![h_prime_commitments, q2_commit].map_err(|_| Error::ToBytesError)?;
         fs_rng.absorb(fs_bytes);
 
         let commitments = m_commitments
@@ -243,12 +243,12 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         //------------------------------------------------------------------
         // Second Round
         let fs_bytes = &to_bytes![
-                proof.h_prime_evals,
-                proof.m_evals,
-                proof.q1_eval,
-                proof.q2_eval
-            ]
-            .map_err(|_| Error::ToBytesError)?;
+            proof.h_prime_evals,
+            proof.m_evals,
+            proof.q1_eval,
+            proof.q2_eval
+        ]
+        .map_err(|_| Error::ToBytesError)?;
         fs_rng.absorb(fs_bytes);
 
         let query_set = PIOPforZeroOverK::<F, VO>::verifier_query_set(&verifier_state, alphas)?;
@@ -305,8 +305,8 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         let q1_commit = LabeledCommitment::new(String::from("q_1"), proof.q1_commit, None);
         let q2_commit = LabeledCommitment::new(String::from("q_2"), q2_commit, None);
 
-        let fs_bytes = &to_bytes![h_prime_commitments, q2_commit]
-            .map_err(|_| Error::ToBytesError)?;
+        let fs_bytes =
+            &to_bytes![h_prime_commitments, q2_commit].map_err(|_| Error::ToBytesError)?;
         fs_rng.absorb(fs_bytes);
 
         // concatenate all the evaluations in alphabetical order
@@ -366,9 +366,10 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         let z_k_at_beta_2 = domain.evaluate_vanishing_polynomial(beta_2);
 
         // compute F_prime(beta_1)
-        let f_prime_eval_r = proof
-            .h_prime_evals
-            .evaluate(virtual_oracle, beta_1, &Vec::<F>::default());
+        let f_prime_eval_r =
+            proof
+                .h_prime_evals
+                .evaluate(virtual_oracle, beta_1, &Vec::<F>::default());
 
         if f_prime_eval_r.is_err() {
             return Err(Error::FPrimeEvalError);

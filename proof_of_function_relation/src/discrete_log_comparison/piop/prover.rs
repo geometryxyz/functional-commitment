@@ -7,8 +7,7 @@ use crate::util::*;
 use ark_ff::{PrimeField, SquareRootField};
 use ark_marlin::ahp::prover::ProverMsg;
 use ark_poly::{
-    univariate::DensePolynomial,
-    EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };
 use ark_poly_commit::LabeledPolynomial;
 use ark_std::rand::Rng;

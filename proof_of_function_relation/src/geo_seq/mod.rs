@@ -5,9 +5,7 @@ use crate::virtual_oracle::geometric_sequence_vo::GeoSequenceVO;
 use crate::zero_over_k::ZeroOverK;
 use ark_ff::{to_bytes, PrimeField};
 use ark_marlin::rng::FiatShamirRng;
-use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain
-};
+use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, QuerySet};
 use ark_std::marker::PhantomData;
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
@@ -161,7 +159,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
 
         // let seq = generate_sequence::<F>(r, &a_s.as_slice(), &c_s.as_slice());
         // let f = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&seq));
- 
+
         // TODO: raise a different error?
         ZeroOverK::<F, PC, D>::verify(
             proof.z_proof,

@@ -6,8 +6,7 @@ use crate::zero_over_k::piop::{verifier::VerifierFirstMsg, LabeledPolynomial};
 use ark_ff::{PrimeField, Zero};
 use ark_marlin::ahp::prover::ProverMsg;
 use ark_poly::{
-    univariate::DensePolynomial,
-    EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };
 use ark_std::rand::Rng;
 use std::iter;
@@ -157,7 +156,6 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
         // sanity check
         // assert_eq!(_r, DensePolynomial::<F>::zero());
         ///////////////////////////////////////////////////////////
-
 
         let msg = ProverMsg::EmptyMessage;
 
