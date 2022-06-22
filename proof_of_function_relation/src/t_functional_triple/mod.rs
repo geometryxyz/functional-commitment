@@ -10,6 +10,8 @@ use std::marker::PhantomData;
 
 use ark_ff::{PrimeField, SquareRootField};
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use std::io::{BufReader, BufWriter};
 
 pub mod proof;
 mod tests;
@@ -60,8 +62,7 @@ where
         //rands
         fs_rng: &mut FiatShamirRng<D>,
         rng: &mut R,
-    ) -> Result<Proof<F, PC>, Error> {
-        // ) -> Result<Proof, Error> {
+    ) -> Result<Vec<u8>, Error> {
         // 1. t-SLT test on A
         let a_slt_proof = TStrictlyLowerTriangular::<F, PC, D>::prove(
             ck,
@@ -114,7 +115,10 @@ where
             c_diag_proof,
         };
 
-        Ok(proof)
+        let mut writer = Vec::<u8>::new();
+        let _ = proof.serialize(&mut writer).map_err(|_| Error::ProofSerializationError).unwrap();
+
+        Ok(Vec::from(writer.as_slice()))
     }
 
     pub fn verify(
@@ -130,9 +134,13 @@ where
         val_c_commitment: &LabeledCommitment<PC::Commitment>,
         domain_h: &GeneralEvaluationDomain<F>,
         domain_k: &GeneralEvaluationDomain<F>,
-        proof: Proof<F, PC>,
+        proof_bytes: Vec<u8>,
         fs_rng: &mut FiatShamirRng<D>,
     ) -> Result<(), Error> {
+
+        let reader = BufReader::new(proof_bytes.as_slice());
+        let proof: Proof::<F, PC> = Proof::<F, PC>::deserialize(reader).unwrap();
+
         TStrictlyLowerTriangular::<F, PC, D>::verify(
             vk,
             ck,

@@ -30,6 +30,9 @@ pub enum Error {
     InstantiationError,
     InvalidGeoSeq,
     T2Large,
+
+    ProofSerializationError,
+    ProofDeserializationError,
 }
 
 /// Convert an ark_poly_commit error
