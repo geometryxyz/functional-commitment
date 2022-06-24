@@ -189,9 +189,6 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         )
         .map_err(to_pc_error::<F, PC>)?;
 
-        // let f_prime = virtual_oracle.instantiate(&h_primes, alphas).unwrap();
-        // println!("F PRIME EVAL ON PROVER SIDE: {}", f_prime.evaluate(&verifier_state.beta_1.expect("")));
-
         let proof = Proof {
             // commitments
             m_commitments: m_commitments

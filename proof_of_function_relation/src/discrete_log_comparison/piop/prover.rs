@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::discrete_log_comparison::piop::PIOPforDLComparison;
 use crate::error::Error;
 use crate::label_polynomial;

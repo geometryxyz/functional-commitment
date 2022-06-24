@@ -4,6 +4,8 @@ use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::LabeledPolynomial;
 
+/// A virtual oracle that accepts 3 concrete oracles f, g, h and computes: v(x) = f(x) - g(x)h(x).
+/// If this virtual oracle evaluates to 0 over a given set, then f = g*h at all points in that set.
 pub struct ProductCheckVO {}
 
 impl ProductCheckVO {

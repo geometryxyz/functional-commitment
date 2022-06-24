@@ -24,7 +24,7 @@ where
         Proof {}
     }
 
-    pub fn verify(proof: Proof) -> Result<(), Error> {
+    pub fn verify(_proof: Proof) -> Result<(), Error> {
         Ok(())
     }
 }

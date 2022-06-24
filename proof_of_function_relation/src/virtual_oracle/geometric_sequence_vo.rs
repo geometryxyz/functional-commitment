@@ -9,32 +9,34 @@ use ark_poly::{
 use ark_poly_commit::LabeledPolynomial;
 use std::iter;
 
+/// A virtual oracle for the equation testing whether a polynomial encodes a concatenation of
+/// geometric sequences in its evaluations (see protocol 4 in the Functional Commitments paper)
 pub struct GeoSequenceVO<F: PrimeField> {
-    pub pi_s: Vec<usize>,
-    pub ci_s: Vec<usize>,
+    pub initial_terms_indices: Vec<usize>,
+    pub subsequence_lengths: Vec<usize>,
     gamma: F,
-    r: F,
+    common_ratio: F,
 }
 
 impl<F: PrimeField> GeoSequenceVO<F> {
-    pub fn new(ci_s: &Vec<usize>, gamma: F, r: F) -> Self {
-        let pi_s = iter::once(0)
-            .chain(ci_s.iter().scan(0, |st, elem| {
+    pub fn new(subsequence_lengths: &Vec<usize>, gamma: F, common_ratio: F) -> Self {
+        let initial_terms_indices = iter::once(0)
+            .chain(subsequence_lengths.iter().scan(0, |st, elem| {
                 *st += elem;
                 Some(*st)
             }))
             .collect::<Vec<_>>();
 
         Self {
-            pi_s: pi_s.clone(),
-            ci_s: ci_s.clone(),
+            initial_terms_indices: initial_terms_indices.clone(),
+            subsequence_lengths: subsequence_lengths.clone(),
             gamma,
-            r,
+            common_ratio,
         }
     }
 
     pub fn get_pi_s(&self) -> Vec<usize> {
-        self.pi_s.clone()
+        self.initial_terms_indices.clone()
     }
 }
 
@@ -50,10 +52,14 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
 
         // construct (f(gamma * x) - r * f(x))
         let mut instantiation_poly = shift_dense_poly(&concrete_oracles[1], &alphas[1])
-            + (&shift_dense_poly(&concrete_oracles[0], &alphas[0]) * -self.r);
+            + (&shift_dense_poly(&concrete_oracles[0], &alphas[0]) * -self.common_ratio);
 
         let x_poly = DensePolynomial::<F>::from_coefficients_slice(&[F::zero(), F::one()]);
-        for (&pi, &ci) in self.pi_s.iter().zip(self.ci_s.iter()) {
+        for (&pi, &ci) in self
+            .initial_terms_indices
+            .iter()
+            .zip(self.subsequence_lengths.iter())
+        {
             // construct x - y^(pi + ci - 1)
             let stitch_i = &x_poly + &to_poly!(-self.gamma.pow([(pi + ci - 1) as u64]));
             // let stitch_i = x_poly.clone();
@@ -78,22 +84,6 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
 
         let domain_kn = GeneralEvaluationDomain::<F>::new(k * n).unwrap();
 
-        //TODO REMOVE THIS
-        // let mut instantiation_poly = shift_dense_poly(&concrete_oracles[1], &alphas[1])
-        //     + (&shift_dense_poly(&concrete_oracles[0], &alphas[0]) * -self.r);
-
-        // let x_poly = DensePolynomial::<F>::from_coefficients_slice(&[F::zero(), F::one()]);
-        // for (&pi, &ci) in self.pi_s.iter().zip(self.ci_s.iter()) {
-        //     // construct x - y^(pi + ci - 1)
-        //     let stitch_i = &x_poly + &to_poly!(-self.gamma.pow([(pi + ci - 1) as u64]));
-        //     // let stitch_i = x_poly.clone();
-        //     instantiation_poly = &instantiation_poly * &stitch_i;
-        // }
-
-        // println!("DEG: {}", instantiation_poly.degree());
-        /////////
-
-        // let f_evals = domain_kn.coset_fft(concrete_oracles[0].polynomial());
         let f_evals = domain_kn.coset_fft(&shift_dense_poly(
             concrete_oracles[0].polynomial(),
             &alphas[0],
@@ -108,9 +98,13 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
 
         let vo_evals = (0..domain_kn.size())
             .map(|i| {
-                let mut seq_part = f_sh_evals[i] - self.r * f_evals[i];
+                let mut seq_part = f_sh_evals[i] - self.common_ratio * f_evals[i];
 
-                for (&pi, &ci) in self.pi_s.iter().zip(self.ci_s.iter()) {
+                for (&pi, &ci) in self
+                    .initial_terms_indices
+                    .iter()
+                    .zip(self.subsequence_lengths.iter())
+                {
                     // construct x - y^(pi + ci - 1)
                     let stitch_i = x_evals[i] - self.gamma.pow([(pi + ci - 1) as u64]);
                     // let stitch_i = domain.element(i);
@@ -134,8 +128,12 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
         }
 
         // evals = [shifted_f, f]
-        let mut eval = evals[1] - self.r * evals[0];
-        for (&pi, &ci) in self.pi_s.iter().zip(self.ci_s.iter()) {
+        let mut eval = evals[1] - self.common_ratio * evals[0];
+        for (&pi, &ci) in self
+            .initial_terms_indices
+            .iter()
+            .zip(self.subsequence_lengths.iter())
+        {
             // construct x - y^(pi + ci - 1)
             let stitch_i = point - self.gamma.pow([(pi + ci - 1) as u64]);
             eval *= stitch_i;
@@ -152,13 +150,9 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
     }
 
     fn degree_bound(&self, domain_size: usize) -> usize {
-        let n = self.ci_s.len();
+        let n = self.subsequence_lengths.len();
         domain_size + 1 + n
     }
-
-    // fn compute_scaling_factor(&self, _domain: &GeneralEvaluationDomain<F>) -> usize {
-    //     2
-    // }
 
     fn name(&self) -> String {
         String::from("geo_seq")

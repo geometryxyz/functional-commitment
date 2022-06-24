@@ -43,7 +43,7 @@ mod test {
 
         let (f_commit, _) = PC::commit(&ck, &[f.clone()], Some(&mut rng)).unwrap();
 
-        let proof = NonZeroOverK::<F, PC, Blake2s>::prove(&ck, &domain, f, &mut rng).unwrap();
+        let proof = NonZeroOverK::<F, PC, Blake2s>::prove(&ck, &domain, &f, &mut rng).unwrap();
 
         assert_eq!(
             true,
@@ -71,7 +71,7 @@ mod test {
         let (ck, _) = PC::trim(&pp, max_degree, 0, None).unwrap();
 
         // This proof cannot be generated because there is no inverse of 0
-        let proof = NonZeroOverK::<F, PC, Blake2s>::prove(&ck, &domain, f, &mut rng);
+        let proof = NonZeroOverK::<F, PC, Blake2s>::prove(&ck, &domain, &f, &mut rng);
 
         assert!(proof.is_err());
 
@@ -127,7 +127,7 @@ mod test {
 
         let (f_commit, _) = PC::commit(&ck, &[f.clone()], Some(&mut rng)).unwrap();
 
-        let proof = NonZeroOverK::<F, PC, Blake2s>::prove(&ck, &domain, f, &mut rng).unwrap();
+        let proof = NonZeroOverK::<F, PC, Blake2s>::prove(&ck, &domain, &f, &mut rng).unwrap();
         let is_valid =
             NonZeroOverK::<F, PC, Blake2s>::verify(&vk, &domain, f_commit[0].clone(), proof);
 
