@@ -3,7 +3,9 @@ use crate::to_poly;
 use crate::util::shift_dense_poly;
 use crate::virtual_oracle::VirtualOracle;
 use ark_ff::PrimeField;
-use ark_poly::{univariate::DensePolynomial, UVPolynomial, GeneralEvaluationDomain, EvaluationDomain, Polynomial};
+use ark_poly::{
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
+};
 use ark_poly_commit::LabeledPolynomial;
 use std::iter;
 
@@ -92,9 +94,14 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
         /////////
 
         // let f_evals = domain_kn.coset_fft(concrete_oracles[0].polynomial());
-        let f_evals = domain_kn.coset_fft(&shift_dense_poly(concrete_oracles[0].polynomial(), &alphas[0]));
-        let f_sh_evals = domain_kn.coset_fft(&shift_dense_poly(concrete_oracles[1].polynomial(), &alphas[1]));
-
+        let f_evals = domain_kn.coset_fft(&shift_dense_poly(
+            concrete_oracles[0].polynomial(),
+            &alphas[0],
+        ));
+        let f_sh_evals = domain_kn.coset_fft(&shift_dense_poly(
+            concrete_oracles[1].polynomial(),
+            &alphas[1],
+        ));
 
         let x_poly = DensePolynomial::<F>::from_coefficients_slice(&[F::zero(), F::one()]);
         let x_evals = domain_kn.coset_fft(&x_poly);
@@ -111,7 +118,6 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
                 }
 
                 seq_part
-
             })
             .collect::<Vec<_>>();
 
@@ -163,13 +169,16 @@ impl<F: PrimeField> VirtualOracle<F> for GeoSequenceVO<F> {
 mod test {
 
     use super::{GeoSequenceVO, VirtualOracle};
-    use crate::{label_polynomial, util::{generate_sequence, compute_vanishing_poly_over_coset}};
-    use ark_bn254::Fr;
-    use ark_poly::{
-        univariate::{DensePolynomial, DenseOrSparsePolynomial}, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
-        UVPolynomial,
+    use crate::{
+        label_polynomial,
+        util::{compute_vanishing_poly_over_coset, generate_sequence},
     };
+    use ark_bn254::Fr;
     use ark_ff::{Field, Zero};
+    use ark_poly::{
+        univariate::{DenseOrSparsePolynomial, DensePolynomial},
+        EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial,
+    };
 
     /// @param a_s The initial value of each sequence
 
@@ -212,7 +221,7 @@ mod test {
             .instantiate_in_evals_form(
                 &[label_polynomial!(f), label_polynomial!(f)],
                 &[Fr::from(1u64), domain.element(1)],
-                &domain
+                &domain,
             )
             .unwrap();
 
@@ -227,7 +236,6 @@ mod test {
         let quotient =
             DensePolynomial::from_coefficients_slice(&domain_kn.coset_ifft(&quotient_evals));
 
-        
         let geo_seq_vo_coeffs = geo_seq_vo
             .instantiate_in_coeffs_form(
                 &[label_polynomial!(f), label_polynomial!(f)],

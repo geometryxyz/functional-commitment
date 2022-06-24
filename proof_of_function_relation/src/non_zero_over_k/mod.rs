@@ -2,7 +2,7 @@ use crate::non_zero_over_k::proof::Proof;
 use crate::{
     commitment::HomomorphicPolynomialCommitment,
     error::{to_pc_error, Error},
-    virtual_oracle::{inverse_check_oracle::InverseCheckOracle, VirtualOracle},
+    virtual_oracle::inverse_check_oracle::InverseCheckOracle,
     zero_over_k::ZeroOverK,
 };
 use ark_ff::PrimeField;
@@ -31,6 +31,14 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> NonZeroOv
         rng: &mut R,
     ) -> Result<Proof<F, PC>, Error> {
         let f_evals = domain.fft(f.coeffs());
+
+        // Check that all the f_evals are nonzero; otherwise, .inverse() will return None and
+        // .unwrap() will panic
+        for f in f_evals.iter() {
+            if f.inverse().is_none() {
+                return Err(Error::FEvalIsZero);
+            }
+        }
 
         let g_evals = f_evals
             .iter()

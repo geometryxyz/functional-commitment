@@ -1,25 +1,16 @@
 #[cfg(test)]
 mod tests {
-    use crate::virtual_oracle::{geometric_sequence_vo::GeoSequenceVO, VirtualOracle};
     use crate::{
-        commitment::{HomomorphicPolynomialCommitment, KZG10},
-        geo_seq::GeoSeqTest,
-        label_polynomial,
+        commitment::KZG10, error::Error, geo_seq::GeoSeqTest, label_polynomial,
         util::generate_sequence,
-        zero_over_k::ZeroOverK,
     };
     use ark_bn254::{Bn254, Fr};
-    use ark_ff::PrimeField;
     use ark_poly::{
-        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
-        UVPolynomial,
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
     };
-    use ark_poly_commit::{
-        LabeledCommitment, LabeledPolynomial, PCRandomness, PolynomialCommitment,
-    };
+    use ark_poly_commit::PolynomialCommitment;
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
-    use rand::Rng;
 
     type F = Fr;
     type PC = KZG10<Bn254>;
@@ -127,93 +118,122 @@ mod tests {
         );
     }
 
-    //#[test]
-    //fn test_geo_seq() {
-    //let r = F::from(2u64);
-    //let mut a_s = vec![F::from(1u64), F::from(2u64)];
-    //let mut c_s = vec![3, 3];
+    #[test]
+    fn test_geo_seq() {
+        let r = F::from(2u64);
+        let mut a_s = vec![F::from(1u64), F::from(2u64)];
+        let mut c_s = vec![3, 3];
 
-    //let seq = generate_sequence::<Fr>(r, &a_s.as_slice(), &c_s.as_slice());
+        let seq = generate_sequence::<Fr>(r, &a_s.as_slice(), &c_s.as_slice());
 
-    //let m = c_s.iter().sum();
+        let m = c_s.iter().sum();
 
-    //let domain = GeneralEvaluationDomain::<Fr>::new(m).unwrap();
-    //let to_pad = domain.size() - m;
-    //if to_pad > 0 {
-    //a_s.push(Fr::from(0u64));
-    //c_s.push(to_pad);
-    //}
+        let domain = GeneralEvaluationDomain::<Fr>::new(m).unwrap();
+        let to_pad = domain.size() - m;
+        if to_pad > 0 {
+            a_s.push(Fr::from(0u64));
+            c_s.push(to_pad);
+        }
 
-    //let f = DensePolynomial::<Fr>::from_coefficients_slice(&domain.ifft(&seq));
+        let f = DensePolynomial::<Fr>::from_coefficients_slice(&domain.ifft(&seq));
 
-    //let geo_seq_vo = GeoSequenceVO::new(&c_s, domain.element(1), r);
+        let concrete_oracles = [label_polynomial!(f)];
 
-    //let concrete_oracles = [label_polynomial!(f)];
-    //let alphas = [Fr::from(1u64), domain.element(1)];
+        let max_degree: usize = 80;
 
-    //let max_degree: usize = 80;
+        let pp = PC::setup(max_degree, None, &mut thread_rng()).unwrap();
+        let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
 
-    //let pp = PC::setup(max_degree, None, &mut thread_rng()).unwrap();
-    //let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
+        let (concrete_oracle_commitments, concrete_oracle_rands) =
+            PC::commit(&ck, &concrete_oracles, None).unwrap();
 
-    //let (concrete_oracle_commitments, concrete_oracle_rands) =
-    //PC::commit(&ck, &concrete_oracles, None).unwrap();
+        let mut rng = thread_rng();
 
-    //// TODO: pull from dev!
-    //// TODO: implement the following. need to refactor things
-    //// Let's describe how to do a proper back and forth between the prover and verifier
+        let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(
+            &ck,
+            r,
+            &concrete_oracles[0],
+            &concrete_oracle_commitments[0],
+            &concrete_oracle_rands[0],
+            &a_s,
+            &c_s,
+            &domain,
+            &mut rng,
+        );
 
-    //// 1. We have a sequence defined by r, a_s, and c_s
-    //// 2. Both the verifier and prover receive r, a_s, and c_s
-    //// 3. Verifier has oracle access to the function f (i.e. verifier already hold a commitment)
-    ////   - Test generates seq, interpolate the polynomial out of it to get f
-    //// 4. Prover generates the VO. Next, the prover runs zero over k for
-    ////    this VO. The prover sends the following to the verifier:
-    ////    - zero over k proof
-    //// 5. Verifier generates VO (note that it already knows f). Verifier
-    ////    verifies the zero over k proof. It also checks that:
-    ////    - for all i in n, check that f(gamma^p_i) = a_i
+        let is_valid = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::verify(
+            r,
+            &a_s,
+            &c_s,
+            &domain,
+            &concrete_oracle_commitments[0],
+            proof.unwrap(),
+            &vk,
+        );
 
-    //// TODO: implement this after the above! It's necessary to make the proof succinct.
-    //// Verifier emits a query set (for the f_gamma check)
-    //// Prover will evaluate f at those points and return opening proof
-    //// Prover runs zero over k prove
-    //// Verifier runs zero over k verify
-    //// TODO: qn: can this be made noninteractive? I want the prover to be bound to the query
-    //// set that the verifier will emit so that the verifier doesn't need to send anything
-    //// before the prover. It should be as simple as "prover sends proof, verifier verifies
-    //// proof" instead of "verifier emits query set, prover sends proof, verifier verifies
-    //// proof"
+        assert!(is_valid.is_ok());
+    }
 
-    ////
-    //// fn prove(r, a_s, c_s) {
-    ////     generate virtual oracle
-    ////     run zero over k
-    ////     output proof
-    //// }
-    ////
-    //// fn verify(proof, r, a_s, c_s) {
-    ////     generate seq from r, a_s, c_s
-    ////     derive f
-    ////     for all i in n, check that f(gamma^p_i) = a_i
-    ////     (todo: emit a query set)
-    ////     generate virtual oracle
-    ////     verify the zero over k proof
-    //// }
+    #[test]
+    fn test_geo_seq_invalid() {
+        let r = F::from(2u64);
+        let mut a_s = vec![F::from(1u64), F::from(2u64)];
+        let mut c_s = vec![3, 3];
 
-    ////let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(
-    ////&seq,
-    ////r,
-    ////a_s,
-    ////c_s,
-    ////);
+        let seq = generate_sequence::<Fr>(r, &a_s.as_slice(), &c_s.as_slice());
 
-    ////let is_valid = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::verify(
-    ////proof.unwrap(),
-    ////&seq,
-    ////r,
-    ////a_s,
-    ////c_s,
-    ////);
-    //}
+        let m = c_s.iter().sum();
+
+        let domain = GeneralEvaluationDomain::<Fr>::new(m).unwrap();
+        let to_pad = domain.size() - m;
+        if to_pad > 0 {
+            a_s.push(Fr::from(0u64));
+            c_s.push(to_pad);
+        }
+
+        let f = DensePolynomial::<Fr>::from_coefficients_slice(&domain.ifft(&seq));
+
+        let concrete_oracles = [label_polynomial!(f)];
+
+        let max_degree: usize = 80;
+
+        let pp = PC::setup(max_degree, None, &mut thread_rng()).unwrap();
+        let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
+
+        let (concrete_oracle_commitments, concrete_oracle_rands) =
+            PC::commit(&ck, &concrete_oracles, None).unwrap();
+
+        let mut rng = thread_rng();
+
+        let r_invalid = F::from(9u64);
+
+        let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(
+            &ck,
+            r_invalid, // This will create a proof for an r value which the verifier does not expect
+            &concrete_oracles[0],
+            &concrete_oracle_commitments[0],
+            &concrete_oracle_rands[0],
+            &a_s,
+            &c_s,
+            &domain,
+            &mut rng,
+        );
+
+        let is_valid = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::verify(
+            r,
+            &a_s,
+            &c_s,
+            &domain,
+            &concrete_oracle_commitments[0],
+            proof.unwrap(),
+            &vk,
+        );
+
+        assert_eq!(false, r == r_invalid);
+
+        assert!(is_valid.is_err());
+
+        // Test for a specific error
+        assert_eq!(is_valid.err().unwrap(), Error::Check2Failed);
+    }
 }

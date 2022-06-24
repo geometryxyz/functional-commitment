@@ -7,7 +7,6 @@ use crate::{
     subset_over_k::SubsetOverK,
     t_strictly_lower_triangular_test::proof::Proof,
     util::generate_sequence,
-    virtual_oracle::{inverse_check_oracle::InverseCheckOracle, VirtualOracle},
 };
 use ark_ff::{to_bytes, PrimeField, SquareRootField};
 use ark_marlin::rng::FiatShamirRng;
@@ -52,7 +51,8 @@ where
         fs_rng: &mut FiatShamirRng<D>,
         rng: &mut R,
     ) -> Result<Proof<F, PC>, Error> {
-        fs_rng.absorb(&to_bytes![Self::PROTOCOL_NAME].unwrap());
+        let fs_bytes = &to_bytes![&Self::PROTOCOL_NAME].map_err(|_| Error::ToBytesError)?;
+        fs_rng.absorb(fs_bytes);
 
         let r = domain_h.element(1);
 
@@ -74,7 +74,9 @@ where
         let h = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&seq));
         let h = label_polynomial!(h);
 
-        let (commitment, rands) = PC::commit(&ck, &[h.clone()], None).unwrap();
+        let (commitment, rands) =
+            PC::commit(&ck, &[h.clone()], None).map_err(to_pc_error::<F, PC>)?;
+
         let h_commit = commitment[0].clone();
 
         // Step 2: Geometric sequence test on h

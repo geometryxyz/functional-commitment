@@ -7,7 +7,6 @@ use crate::{
     non_zero_over_k::NonZeroOverK,
     subset_over_k::SubsetOverK,
     to_poly,
-    util::generate_sequence,
     virtual_oracle::{
         product_check_oracle::ProductCheckVO, square_check_oracle::SquareCheckOracle,
     },
@@ -67,7 +66,10 @@ where
         // order of commitments is: s, f_prime, g_prime, s_prime, h
         let (commitments, rands) =
             PC::commit(ck, prover_first_oracles.iter(), None).map_err(to_pc_error::<F, PC>)?;
-        fs_rng.absorb(&to_bytes![Self::PROTOCOL_NAME, commitments].unwrap());
+
+        let fs_bytes =
+            &to_bytes![Self::PROTOCOL_NAME, commitments].map_err(|_| Error::ToBytesError)?;
+        fs_rng.absorb(fs_bytes);
 
         let square_check_vo = SquareCheckOracle::new();
 
@@ -254,7 +256,9 @@ where
             LabeledCommitment::new(String::from("h"), proof.h_commit, None),
         ];
 
-        fs_rng.absorb(&to_bytes![Self::PROTOCOL_NAME, commitments].unwrap());
+        let fs_bytes =
+            &to_bytes![Self::PROTOCOL_NAME, commitments].map_err(|_| Error::ToBytesError)?;
+        fs_rng.absorb(fs_bytes);
 
         let square_check_vo = SquareCheckOracle::new();
 
@@ -291,7 +295,7 @@ where
         )?;
 
         let product_check_vo = ProductCheckVO::new();
-        let mut alphas = [F::one(), F::one(), F::one()];
+        let alphas = [F::one(), F::one(), F::one()];
 
         // Zero over K for f' = (s')*(g')
         ZeroOverK::<F, PC, D>::verify(
@@ -309,7 +313,13 @@ where
 
         // Geometric Sequence Test for h
         let omega: F = domain_h.element(1);
-        let delta = omega.sqrt().unwrap();
+        let delta_r = omega.sqrt();
+        if delta_r.is_none() {
+            return Err(Error::OmegaSqrtError);
+        }
+
+        let delta = delta_r.unwrap();
+
         let mut a_s = vec![F::one()];
         let mut c_s = vec![domain_h.size()];
 
@@ -364,7 +374,7 @@ where
 
         // Non-zero over K for s(X) − 1
         let one_poly = label_polynomial!(to_poly!(F::one()));
-        let (commit_to_one, _) = PC::commit(ck, &[one_poly], None).unwrap();
+        let (commit_to_one, _) = PC::commit(ck, &[one_poly], None).map_err(to_pc_error::<F, PC>)?;
 
         let s_minus_one_commitment = PC::multi_scalar_mul(
             &[commitments[0].clone(), commit_to_one[0].clone()],

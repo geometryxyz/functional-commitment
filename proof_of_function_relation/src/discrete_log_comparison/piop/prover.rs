@@ -4,16 +4,13 @@ use crate::discrete_log_comparison::piop::PIOPforDLComparison;
 use crate::error::Error;
 use crate::label_polynomial;
 use crate::util::*;
-use crate::virtual_oracle::VirtualOracle;
-use ark_ff::{One, PrimeField, SquareRootField, Zero};
+use ark_ff::{PrimeField, SquareRootField};
 use ark_marlin::ahp::prover::ProverMsg;
 use ark_poly::{
-    univariate::{DenseOrSparsePolynomial, DensePolynomial},
-    EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };
 use ark_poly_commit::LabeledPolynomial;
 use ark_std::rand::Rng;
-use std::iter;
 
 pub struct ProverState<'a, F: PrimeField + SquareRootField> {
     domain_k: &'a GeneralEvaluationDomain<F>,
@@ -82,7 +79,7 @@ impl<F: PrimeField + SquareRootField> PIOPforDLComparison<F> {
 
     pub fn prover_first_round<'a, R: Rng>(
         mut state: ProverState<'a, F>,
-        rng: &mut R,
+        _rng: &mut R,
     ) -> Result<(ProverMsg<F>, ProverFirstOracles<F>, ProverState<'a, F>), Error> {
         let m = state.domain_k.size();
         let n = state.domain_h.size();

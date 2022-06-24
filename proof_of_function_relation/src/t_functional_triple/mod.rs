@@ -1,16 +1,9 @@
 use crate::{
-    commitment::HomomorphicPolynomialCommitment,
-    error::{to_pc_error, Error},
-    t_diag::proof::Proof as TDiagProof,
-    t_diag::TDiag,
-    t_functional_triple::proof::Proof,
-    t_strictly_lower_triangular_test::proof::Proof as TSLTProof,
-    t_strictly_lower_triangular_test::TStrictlyLowerTriangular,
+    commitment::HomomorphicPolynomialCommitment, error::Error, t_diag::TDiag,
+    t_functional_triple::proof::Proof, t_strictly_lower_triangular_test::TStrictlyLowerTriangular,
 };
 use ark_marlin::rng::FiatShamirRng;
-use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
-};
+use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain};
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
 use rand::Rng;
 use std::marker::PhantomData;

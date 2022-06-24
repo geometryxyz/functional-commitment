@@ -1,19 +1,15 @@
 use crate::{
     commitment::HomomorphicPolynomialCommitment,
-    discrete_log_comparison::DLComparison,
     error::{to_pc_error, Error},
     geo_seq::GeoSeqTest,
     label_polynomial,
     non_zero_over_k::NonZeroOverK,
-    subset_over_k::SubsetOverK,
     t_diag::proof::Proof,
     util::generate_sequence,
-    virtual_oracle::{add_vo::AddVO, eq_vo::EqVO, prod_vo::ProdVO},
-    virtual_oracle::{inverse_check_oracle::InverseCheckOracle, VirtualOracle},
-    zero_over_k::{proof::Proof as ZeroOverKProof, ZeroOverK},
+    virtual_oracle::{eq_vo::EqVO, prod_vo::ProdVO},
+    zero_over_k::ZeroOverK,
 };
-use ark_ff::{to_bytes, PrimeField, SquareRootField};
-use ark_marlin::rng::FiatShamirRng;
+use ark_ff::{PrimeField, SquareRootField};
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };

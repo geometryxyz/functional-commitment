@@ -2,10 +2,29 @@
 #[allow(dead_code)]
 pub enum Error {
     MaxDegreeExceeded,
-    PCError { error: String },
+
+    // In zero_over_k and geo_seq
+    BatchCheckError,
+
+    // In zero_over_k
     Check1Failed,
     Check2Failed,
-    ProofVerificationError,
+
+    // In non_zero_over_k
+    FEvalIsZero,
+    FPrimeEvalError,
+
+    // In zero_over_k, discrete_log_comparison,
+    ToBytesError,
+
+    // In discrete_log_comparison
+    OmegaSqrtError,
+
+    PCError { error: String },
+
+    // In various protocols
+    FsRngAbsorbError,
+
     InvalidDescriptionError,
     EvaluationError,
     InstantiationError,
