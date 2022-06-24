@@ -3,7 +3,10 @@ use crate::{
     geo_seq::proof::Proof as GeoSeqProof, subset_over_k::proof::Proof as SubsetProof,
 };
 use ark_ff::{PrimeField, SquareRootField};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
+use ark_std::io::{Read, Write};
 
+#[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Proof<F, PC>
 where
     F: PrimeField + SquareRootField,

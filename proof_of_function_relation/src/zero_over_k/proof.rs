@@ -1,7 +1,10 @@
 use crate::commitment::HomomorphicPolynomialCommitment;
 use ark_ff::PrimeField;
 
-#[derive(Clone)]
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
+use ark_std::io::{Read, Write};
+
+#[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Proof<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> {
     // commitments
     pub m_commitments: Vec<PC::Commitment>,

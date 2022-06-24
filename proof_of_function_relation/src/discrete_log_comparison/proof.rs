@@ -5,6 +5,10 @@ use crate::subset_over_k::proof::Proof as SubsetProof;
 use crate::zero_over_k::proof::Proof as ZeroProof;
 use ark_ff::PrimeField;
 
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
+use ark_std::io::{Read, Write};
+
+#[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Proof<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> {
     // Commitments
     pub s_commit: PC::Commitment,
