@@ -54,18 +54,20 @@ pub fn shift_dense_poly<F: Field>(
     DensePolynomial::from_coefficients_vec(coeffs)
 }
 
-pub fn generate_sequence<F: PrimeField>(r: F, a_s: &[F], c_s: &[usize]) -> Vec<F> {
-    assert_eq!(c_s.len(), a_s.len());
+/// Generates the concatenation of geometric sequences that all share a common ratio
+pub fn generate_sequence<F: PrimeField>(
+    common_ratio: F,
+    initial_terms: &[F],
+    subsequence_lengths: &[usize],
+) -> Vec<F> {
+    assert_ne!(initial_terms.len(), 0);
+    assert_eq!(subsequence_lengths.len(), initial_terms.len());
+
     let mut concatenation = Vec::<F>::default();
 
-    for (i, a) in a_s.iter().enumerate() {
-        for j in 0..c_s[i] {
-            // r ** j (is there a pow() library function in Fp256?)
-            let mut r_pow = F::from(1 as u64);
-            for _ in 0..j {
-                r_pow = r_pow * r;
-            }
-            let val = *a * r_pow;
+    for (i, term) in initial_terms.iter().enumerate() {
+        for ratio_power in powers_of(common_ratio).take(subsequence_lengths[i]) {
+            let val = *term * ratio_power;
             concatenation.push(val);
         }
     }
@@ -73,6 +75,7 @@ pub fn generate_sequence<F: PrimeField>(r: F, a_s: &[F], c_s: &[usize]) -> Vec<F
     concatenation
 }
 
+#[allow(dead_code)]
 /// Sample a vector of random elements of type T
 pub fn sample_vector<T: UniformRand, R: Rng>(seed: &mut R, length: usize) -> Vec<T> {
     (0..length)
@@ -101,6 +104,7 @@ pub fn compute_vanishing_poly_over_coset<F: FftField>(
     Evaluations::from_vec_and_domain(v_h, *domain)
 }
 
+#[allow(dead_code)]
 pub fn gen_t_diag_test_polys(
     domain_k: GeneralEvaluationDomain<Fr>,
     domain_h: GeneralEvaluationDomain<Fr>,

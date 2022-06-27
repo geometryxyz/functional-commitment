@@ -34,6 +34,7 @@ where
     PC: HomomorphicPolynomialCommitment<F>,
     D: Digest,
 {
+    #[allow(dead_code)]
     pub const PROTOCOL_NAME: &'static [u8] = b"t-Diagonal Test";
 
     pub fn prove<R: Rng>(
@@ -165,7 +166,7 @@ where
         let val_plus_h2 = val_m.polynomial() + h2.polynomial();
         let val_plus_h2 = label_polynomial!(val_plus_h2);
 
-        let val_plus_h2_proof = NonZeroOverK::<F, PC, D>::prove(ck, domain_k, val_plus_h2, rng)?;
+        let val_plus_h2_proof = NonZeroOverK::<F, PC, D>::prove(ck, domain_k, &val_plus_h2, rng)?;
 
         let proof = Proof {
             h1_commit: h_commitments[0].commitment().clone(),

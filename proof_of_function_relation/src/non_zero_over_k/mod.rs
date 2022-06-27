@@ -1,4 +1,4 @@
-use crate::non_zero_over_k::proof::Proof;
+use crate::non_zero_over_k::{piop::PIOPforNonZeroOverK, proof::Proof};
 use crate::{
     commitment::HomomorphicPolynomialCommitment,
     error::{to_pc_error, Error},
@@ -6,14 +6,13 @@ use crate::{
     zero_over_k::ZeroOverK,
 };
 use ark_ff::PrimeField;
-use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
-};
+use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain};
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use rand::Rng;
 use std::marker::PhantomData;
 
+pub mod piop;
 pub mod proof;
 mod tests;
 
@@ -27,39 +26,33 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> NonZeroOv
     pub fn prove<R: Rng>(
         ck: &PC::CommitterKey,
         domain: &GeneralEvaluationDomain<F>,
-        f: LabeledPolynomial<F, DensePolynomial<F>>,
+        f: &LabeledPolynomial<F, DensePolynomial<F>>,
         rng: &mut R,
     ) -> Result<Proof<F, PC>, Error> {
-        let f_evals = domain.fft(f.coeffs());
+        //-----------------------------------------------
+        // INIT PROVER
+        let prover_initial_state = PIOPforNonZeroOverK::prover_init(domain, f)?;
 
-        // Check that all the f_evals are nonzero; otherwise, .inverse() will return None and
-        // .unwrap() will panic
-        for f in f_evals.iter() {
-            if f.inverse().is_none() {
-                return Err(Error::FEvalIsZero);
-            }
-        }
+        //-----------------------------------------------
+        // FIRST ROUND
+        let (_, prover_first_oracles, _prover_state) =
+            PIOPforNonZeroOverK::prover_first_round(prover_initial_state, rng)?;
 
-        let g_evals = f_evals
-            .iter()
-            .map(|x| x.inverse().unwrap())
-            .collect::<Vec<_>>();
+        //-----------------------------------------------
+        // RUN SUBPROTOCOLS
+        let g = prover_first_oracles.g;
 
-        let g = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&g_evals));
-        let g = LabeledPolynomial::new(String::from("g"), g.clone(), None, None);
-
-        let concrete_oracles = [f, g];
+        let inverse_check_oracle = InverseCheckOracle {};
+        let concrete_oracles = [f.clone(), g];
         let alphas = vec![F::one(), F::one()];
         let (commitments, rands) =
             PC::commit(ck, &concrete_oracles, None).map_err(to_pc_error::<F, PC>)?;
-
-        let zero_over_k_vo = InverseCheckOracle {};
 
         let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
             &concrete_oracles,
             &commitments,
             &rands,
-            &zero_over_k_vo,
+            &inverse_check_oracle,
             &alphas,
             &domain,
             ck,

@@ -7,6 +7,9 @@ use ark_poly::{
 };
 use ark_poly_commit::LabeledPolynomial;
 
+/// This virtual oracle takes two concrete oracles f and g and computes the virtual oracle:
+/// v(x) = f(x) * g(x) - 1. If this oracle evaluates to 0 at all points of a domain, then
+/// g(x) = (f(x))^{-1} over the chosen domain.
 pub struct InverseCheckOracle {}
 
 impl<F: PrimeField> VirtualOracle<F> for InverseCheckOracle {

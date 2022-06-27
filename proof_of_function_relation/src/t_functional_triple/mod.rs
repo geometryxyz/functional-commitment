@@ -9,14 +9,14 @@ use rand::Rng;
 use std::marker::PhantomData;
 
 use ark_ff::{PrimeField, SquareRootField};
-use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use std::io::{BufReader, BufWriter};
+use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
+use std::io::BufReader;
 
 pub mod proof;
 mod tests;
 
-struct TFT<F: PrimeField + SquareRootField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
+pub struct TFT<F: PrimeField + SquareRootField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
     _digest: PhantomData<D>,
@@ -30,6 +30,7 @@ where
 {
     pub const PROTOCOL_NAME: &'static [u8] = b"t-FT Test";
 
+    // TODO: change to use ark-marlin Index. (wait for a new release?)
     pub fn prove<R: Rng>(
         ck: &PC::CommitterKey,
         t: usize,
@@ -116,7 +117,10 @@ where
         };
 
         let mut writer = Vec::<u8>::new();
-        let _ = proof.serialize(&mut writer).map_err(|_| Error::ProofSerializationError).unwrap();
+        let _ = proof
+            .serialize(&mut writer)
+            .map_err(|_| Error::ProofSerializationError)
+            .unwrap();
 
         Ok(Vec::from(writer.as_slice()))
     }
@@ -137,9 +141,8 @@ where
         proof_bytes: Vec<u8>,
         fs_rng: &mut FiatShamirRng<D>,
     ) -> Result<(), Error> {
-
         let reader = BufReader::new(proof_bytes.as_slice());
-        let proof: Proof::<F, PC> = Proof::<F, PC>::deserialize(reader).unwrap();
+        let proof: Proof<F, PC> = Proof::<F, PC>::deserialize(reader).unwrap();
 
         TStrictlyLowerTriangular::<F, PC, D>::verify(
             vk,

@@ -75,7 +75,7 @@ where
 
         let alphas = [F::one(), F::one()];
 
-        // Zero over K for f = (f')^2
+        // Step 4a: Zero over K for f = (f')^2
         let f_prime_square_proof = ZeroOverK::<F, PC, D>::prove(
             &[f.clone(), prover_first_oracles.f_prime.clone()],
             &[f_commit.clone(), commitments[1].clone()], // f and f'
@@ -87,7 +87,7 @@ where
             rng,
         )?;
 
-        // Zero over K for g = (g')^2
+        // Step 4b: Zero over K for g = (g')^2
         let g_prime_square_proof = ZeroOverK::<F, PC, D>::prove(
             &[g.clone(), prover_first_oracles.g_prime.clone()],
             &[g_commit.clone(), commitments[2].clone()], // g and g'
@@ -99,7 +99,7 @@ where
             rng,
         )?;
 
-        // Zero over K for s = (s')^2
+        // Step 4c: Zero over K for s = (s')^2
         let s_prime_square_proof = ZeroOverK::<F, PC, D>::prove(
             &[
                 prover_first_oracles.s.clone(),
@@ -122,7 +122,7 @@ where
         //     assert_eq!(eval, F::zero());
         // }
 
-        // Zero over K for f' = (s')*(g')
+        // Step 4d: Zero over K for f' = (s')*(g')
         let product_check_vo = ProductCheckVO::new();
         let alphas = [F::one(), F::one(), F::one()];
         let f_prime_product_proof = ZeroOverK::<F, PC, D>::prove(
@@ -148,6 +148,7 @@ where
             rng,
         )?;
 
+        // Step 5: Geometric sequence test on h
         let delta = prover_state
             .delta
             .expect("Delta should be computed in the prover's first round");
@@ -170,47 +171,35 @@ where
             rng,
         )?;
 
-        // Subset over K for f'
+        // Step 6a: Subset over K for f'
         let f_prime_subset_proof = SubsetOverK::<F, PC, D>::prove();
 
-        // Subset over K for g'
+        // Step 6b: Subset over K for g'
         let g_prime_subset_proof = SubsetOverK::<F, PC, D>::prove();
 
-        // Subset over K for s'
+        // Step 6c: Subset over K for s'
         let s_prime_subset_proof = SubsetOverK::<F, PC, D>::prove();
 
-        // Non-zero over K for f′
-        let nzk_f_prime_proof = NonZeroOverK::<F, PC, D>::prove(
-            ck,
-            domain_k,
-            prover_first_oracles.f_prime.clone(),
-            rng,
-        )?;
+        // Step 7a: Non-zero over K for f′
+        let nzk_f_prime_proof =
+            NonZeroOverK::<F, PC, D>::prove(ck, domain_k, &prover_first_oracles.f_prime, rng)?;
 
-        // Non-zero over K for g′
-        let nzk_g_prime_proof = NonZeroOverK::<F, PC, D>::prove(
-            ck,
-            domain_k,
-            prover_first_oracles.g_prime.clone(),
-            rng,
-        )?;
+        // Step 7b: Non-zero over K for g′
+        let nzk_g_prime_proof =
+            NonZeroOverK::<F, PC, D>::prove(ck, domain_k, &prover_first_oracles.g_prime, rng)?;
 
-        // Non-zero over K for s′
-        let nzk_s_prime_proof = NonZeroOverK::<F, PC, D>::prove(
-            ck,
-            domain_k,
-            prover_first_oracles.s_prime.clone(),
-            rng,
-        )?;
+        // Step 7c: Non-zero over K for s′
+        let nzk_s_prime_proof =
+            NonZeroOverK::<F, PC, D>::prove(ck, domain_k, &prover_first_oracles.s_prime, rng)?;
 
-        // Non-zero over K for s(X) − 1
+        // Step 7d: Non-zero over K for s(X) − 1
         // it's important to note that verifier will derive S(x) - 1 commitment on it's own side
         // we can use msm from our HomomorphicPolynomial trait and generator from ck
         let one_poly = label_polynomial!(to_poly!(F::one()));
         let s_minus_one = prover_first_oracles.s.polynomial() - one_poly.polynomial();
         let s_minus_one = label_polynomial!(s_minus_one);
         let nzk_s_minus_one_proof =
-            NonZeroOverK::<F, PC, D>::prove(ck, domain_k, s_minus_one.clone(), rng)?;
+            NonZeroOverK::<F, PC, D>::prove(ck, domain_k, &s_minus_one, rng)?;
 
         let proof = Proof {
             // Commitments

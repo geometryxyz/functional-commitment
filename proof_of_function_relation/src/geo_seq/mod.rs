@@ -173,6 +173,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTes
         Ok(())
     }
 
+    #[allow(dead_code)]
     /// Inefficiently verify that the sequence is valid
     pub fn naive_verify(seq: &Vec<F>, r: F, a_s: &[F], c_s: &[usize]) -> bool {
         if a_s.len() != c_s.len() {
