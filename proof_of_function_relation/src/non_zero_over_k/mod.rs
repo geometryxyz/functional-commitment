@@ -1,6 +1,6 @@
 use crate::non_zero_over_k::{piop::PIOPforNonZeroOverK, proof::Proof};
 use crate::{
-    commitment::HomomorphicPolynomialCommitment,
+    commitment::AdditivelyHomomorphicPCS,
     error::{to_pc_error, Error},
     virtual_oracle::inverse_check_oracle::InverseCheckOracle,
     zero_over_k::ZeroOverK,
@@ -16,13 +16,13 @@ pub mod piop;
 pub mod proof;
 mod tests;
 
-pub struct NonZeroOverK<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
+pub struct NonZeroOverK<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
     _digest: PhantomData<D>,
 }
 
-impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> NonZeroOverK<F, PC, D> {
+impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> NonZeroOverK<F, PC, D> {
     pub fn prove<R: Rng>(
         ck: &PC::CommitterKey,
         domain: &GeneralEvaluationDomain<F>,
@@ -42,7 +42,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> NonZeroOv
         // RUN SUBPROTOCOLS
         let g = prover_first_oracles.g;
 
-        let inverse_check_oracle = InverseCheckOracle {};
+        let inverse_check_oracle = InverseCheckOracle::new();
         let concrete_oracles = [f.clone(), g];
         let alphas = vec![F::one(), F::one()];
         let (commitments, rands) =
@@ -77,7 +77,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> NonZeroOv
         let g_commit = LabeledCommitment::new(String::from("g"), proof.g_commit.clone(), None);
 
         let concrete_oracles_commitments = [f_commit, g_commit];
-        let zero_over_k_vo = InverseCheckOracle {};
+        let zero_over_k_vo = InverseCheckOracle::new();
         let alphas = vec![F::one(), F::one()];
 
         ZeroOverK::<F, PC, D>::verify(

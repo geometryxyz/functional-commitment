@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use crate::error::Error;
 use crate::to_poly;
 use crate::virtual_oracle::VirtualOracle;
@@ -10,9 +12,19 @@ use ark_poly_commit::LabeledPolynomial;
 /// This virtual oracle takes two concrete oracles f and g and computes the virtual oracle:
 /// v(x) = f(x) * g(x) - 1. If this oracle evaluates to 0 at all points of a domain, then
 /// g(x) = (f(x))^{-1} over the chosen domain.
-pub struct InverseCheckOracle {}
+pub struct InverseCheckOracle<F: PrimeField> {
+    _field: PhantomData<F>,
+}
 
-impl<F: PrimeField> VirtualOracle<F> for InverseCheckOracle {
+impl<F: PrimeField> InverseCheckOracle<F> {
+    pub fn new() -> Self {
+        Self {
+            _field: PhantomData,
+        }
+    }
+}
+
+impl<F: PrimeField> VirtualOracle<F> for InverseCheckOracle<F> {
     /// abstract function which will return instantiation of virtual oracle from concrete oracles and shifting factors
     fn instantiate_in_coeffs_form(
         &self,
@@ -111,7 +123,7 @@ mod test {
         let f = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&f_evals));
         let g = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&g_evals));
 
-        let inverse_check_vo = InverseCheckOracle {};
+        let inverse_check_vo = InverseCheckOracle::new();
 
         let instantiated_poly = inverse_check_vo
             .instantiate_in_coeffs_form(

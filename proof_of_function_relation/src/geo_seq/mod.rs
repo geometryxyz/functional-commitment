@@ -1,4 +1,4 @@
-use crate::commitment::HomomorphicPolynomialCommitment;
+use crate::commitment::AdditivelyHomomorphicPCS;
 use crate::error::{to_pc_error, Error};
 use crate::geo_seq::proof::Proof;
 use crate::virtual_oracle::geometric_sequence_vo::GeoSequenceVO;
@@ -15,13 +15,13 @@ use rand_core::OsRng;
 pub mod proof;
 mod tests;
 
-pub struct GeoSeqTest<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
+pub struct GeoSeqTest<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
     _digest: PhantomData<D>,
 }
 
-impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> GeoSeqTest<F, PC, D> {
+impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC, D> {
     pub const PROTOCOL_NAME: &'static [u8] = b"Geometric Sequence Test";
     // TODO: for both prove() and verify:
     // TODO: degree bounds!

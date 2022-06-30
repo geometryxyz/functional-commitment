@@ -1,5 +1,5 @@
 use crate::{
-    commitment::HomomorphicPolynomialCommitment,
+    commitment::AdditivelyHomomorphicPCS,
     error::{to_pc_error, Error},
     geo_seq::GeoSeqTest,
     label_polynomial,
@@ -18,11 +18,13 @@ use digest::Digest; // Note that in the latest Marlin commit, Digest has been re
 use rand::Rng;
 use std::marker::PhantomData;
 
+use self::piop::PIOPforTDiagTest;
+
+pub mod piop;
 pub mod proof;
 mod tests;
 
-pub struct TDiag<F: PrimeField + SquareRootField, PC: HomomorphicPolynomialCommitment<F>, D: Digest>
-{
+pub struct TDiag<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
     _digest: PhantomData<D>,
@@ -31,7 +33,7 @@ pub struct TDiag<F: PrimeField + SquareRootField, PC: HomomorphicPolynomialCommi
 impl<F, PC, D> TDiag<F, PC, D>
 where
     F: PrimeField + SquareRootField,
-    PC: HomomorphicPolynomialCommitment<F>,
+    PC: AdditivelyHomomorphicPCS<F>,
     D: Digest,
 {
     #[allow(dead_code)]
@@ -121,8 +123,10 @@ where
         let h = label_polynomial!(h);
         let alphas = vec![F::one(), F::one()];
 
-        let h_commitment = PC::multi_scalar_mul(&h_commitments, &alphas);
-        let h_commitment = LabeledCommitment::new(String::from("h"), h_commitment, None);
+        let h_commitment = PC::get_commitments_lc(
+            &h_commitments,
+            &PIOPforTDiagTest::generate_h_linear_combination(),
+        )?;
 
         // Step 4b: Zero over K for h = rowM
         let eq_vo = EqVO::new();
@@ -242,17 +246,16 @@ where
 
         // Step 4a: Verifier derives a commitment to h = h1 + h2
         let alphas = [F::one(), F::one()];
-        let h_commit = PC::multi_scalar_mul(h_commitments.as_slice(), &[F::one(), F::one()]);
+        let h_commit = PC::get_commitments_lc(
+            &h_commitments,
+            &PIOPforTDiagTest::generate_h_linear_combination(),
+        )?;
 
         // Step 4b: Zero over K for h = rowM
         let eq_vo = EqVO::new();
         ZeroOverK::<F, PC, D>::verify(
             proof.h_eq_row_m,
-            vec![
-                LabeledCommitment::new(String::from("h"), h_commit.clone(), None),
-                row_m_commitment.clone(),
-            ]
-            .as_slice(),
+            vec![h_commit.clone(), row_m_commitment.clone()].as_slice(),
             &eq_vo,
             domain_k,
             &alphas,
@@ -281,13 +284,15 @@ where
         )?;
 
         // Step 6: Non-zero over K for valM + h2 != 0
-        let v = vec![val_m_commitment.clone(), h_commitments[1].clone()];
-        let v_commit = PC::multi_scalar_mul(v.as_slice(), &[F::one(), F::one()]);
+        let val_plus_h2_commit = PC::get_commitments_lc(
+            &[val_m_commitment.clone(), h_commitments[1].clone()],
+            &PIOPforTDiagTest::generate_valM_plus_h2_linear_combination(val_m_commitment.label()),
+        )?;
 
         NonZeroOverK::<F, PC, D>::verify(
             vk,
             domain_k,
-            LabeledCommitment::new(String::from("v"), v_commit.clone(), None),
+            val_plus_h2_commit,
             proof.val_plus_h2_proof,
         )?;
 

@@ -3,7 +3,7 @@ use ark_ff::PrimeField;
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
 };
-use ark_poly_commit::LabeledPolynomial;
+use ark_poly_commit::{LabeledPolynomial, PolynomialLabel};
 
 pub mod add_vo;
 pub mod eq_vo;
@@ -14,6 +14,14 @@ pub mod product_check_oracle;
 pub mod square_check_oracle;
 
 pub trait VirtualOracle<F: PrimeField> {
+    fn get_h_labels(&self, concrete_oracle_labels: &[PolynomialLabel]) -> Vec<PolynomialLabel> {
+        let mut h_labels = Vec::with_capacity(self.num_of_oracles());
+        for concrete_oracle_index in self.mapping_vector() {
+            h_labels.push(concrete_oracle_labels[concrete_oracle_index].clone());
+        }
+
+        h_labels
+    }
     /// returns instantiation of virtual oracle from concrete oracles and shifting factors
     fn instantiate_in_coeffs_form(
         &self,
@@ -34,7 +42,7 @@ pub trait VirtualOracle<F: PrimeField> {
     fn query(&self, evals: &[F], point: F) -> Result<F, Error>;
 
     /// each new (f, alpha) pair should be mapped to new h (new concrete oracle)
-    /// this function provides mapping from concrete oracle inidices to h indices
+    /// this function provides mapping from concrete oracle indices to h indices
     fn mapping_vector(&self) -> Vec<usize>;
 
     fn num_of_oracles(&self) -> usize;

@@ -1,5 +1,5 @@
 use crate::{
-    commitment::HomomorphicPolynomialCommitment,
+    commitment::AdditivelyHomomorphicPCS,
     discrete_log_comparison::{piop::PIOPforDLComparison, proof::Proof},
     error::{to_pc_error, Error},
     geo_seq::GeoSeqTest,
@@ -26,11 +26,8 @@ pub mod piop;
 pub mod proof;
 mod tests;
 
-pub struct DLComparison<
-    F: PrimeField + SquareRootField,
-    PC: HomomorphicPolynomialCommitment<F>,
-    D: Digest,
-> {
+pub struct DLComparison<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>, D: Digest>
+{
     _field: PhantomData<F>,
     _polynomial_commitment_scheme: PhantomData<PC>,
     _digest: PhantomData<D>,
@@ -39,7 +36,7 @@ pub struct DLComparison<
 impl<F, PC, D> DLComparison<F, PC, D>
 where
     F: PrimeField + SquareRootField,
-    PC: HomomorphicPolynomialCommitment<F>,
+    PC: AdditivelyHomomorphicPCS<F>,
     D: Digest,
 {
     pub const PROTOCOL_NAME: &'static [u8] = b"Discrete-log Comparison";
@@ -362,15 +359,18 @@ where
         )?;
 
         // Non-zero over K for s(X) − 1
-        let one_poly = label_polynomial!(to_poly!(F::one()));
+        let one_poly = LabeledPolynomial::new(
+            String::from("one_poly"),
+            DensePolynomial::from_coefficients_slice(&[F::one()]),
+            None,
+            None,
+        );
         let (commit_to_one, _) = PC::commit(ck, &[one_poly], None).map_err(to_pc_error::<F, PC>)?;
 
-        let s_minus_one_commitment = PC::multi_scalar_mul(
+        let s_minus_one_commitment = PC::get_commitments_lc(
             &[commitments[0].clone(), commit_to_one[0].clone()],
-            &[F::one(), -F::one()],
-        );
-        let s_minus_one_commitment =
-            LabeledCommitment::new(String::from("s_minus_one"), s_minus_one_commitment, None);
+            &PIOPforDLComparison::generate_s_minus_one_linear_combination(),
+        )?;
 
         NonZeroOverK::<F, PC, D>::verify(
             &vk,

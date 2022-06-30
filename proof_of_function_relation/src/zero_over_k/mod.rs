@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::commitment::HomomorphicPolynomialCommitment;
+use crate::commitment::AdditivelyHomomorphicPCS;
 use crate::error::{to_pc_error, Error};
 use crate::util::powers_of;
 use crate::virtual_oracle::{EvaluationsProvider, VirtualOracle};
@@ -22,19 +22,19 @@ mod piop;
 pub mod proof;
 mod tests;
 
-pub struct ZeroOverK<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
+pub struct ZeroOverK<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> {
     _field: PhantomData<F>,
     _polynomial_commitment_scheme: PhantomData<PC>,
     _digest: PhantomData<D>,
 }
 
-impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK<F, PC, D> {
+impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> ZeroOverK<F, PC, D> {
     pub const PROTOCOL_NAME: &'static [u8] = b"Zero Over K";
 
     pub fn prove<R: Rng, VO: VirtualOracle<F>>(
         concrete_oracles: &[LabeledPolynomial<F, DensePolynomial<F>>],
         concrete_oracle_commitments: &[LabeledCommitment<PC::Commitment>],
-        _concrete_oracle_commit_rands: &[PC::Randomness],
+        concrete_oracle_commit_rands: &[PC::Randomness],
         virtual_oracle: &VO,
         alphas: &Vec<F>,
         domain: &GeneralEvaluationDomain<F>,
@@ -60,11 +60,11 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         let q_1 = prover_first_oracles.q_1.clone();
 
         // commit to the random polynomials
-        let (r_commitments, _) =
+        let (r_commitments, r_rands) =
             PC::commit(ck, random_polynomials.iter(), None).map_err(to_pc_error::<F, PC>)?;
 
         // commit to the masking polynomials
-        let (m_commitments, _m_rands) =
+        let (m_commitments, m_rands) =
             PC::commit(ck, masking_polynomials.iter(), None).map_err(to_pc_error::<F, PC>)?;
 
         // commit to q_1
@@ -136,32 +136,49 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             .map_err(|_| Error::ToBytesError)?;
         fs_rng.absorb(fs_bytes);
 
-        let q2_commit = PC::multi_scalar_mul(
-            &r_commitments,
-            powers_of(verifier_first_msg.c)
-                .take(random_polynomials.len())
-                .collect::<Vec<_>>()
-                .as_slice(),
-        );
-        let q2_commit = LabeledCommitment::new(String::from("q_2"), q2_commit, None);
+        // Use commitments to all the random polynomials to compute a commitment to q2
+        let q2_linear_combination =
+            PIOPforZeroOverK::generate_q2_linear_combination(virtual_oracle, verifier_first_msg.c);
+
+        let (q2_commit, _q2_rand) =
+            PC::get_commitments_lc_with_rands(&r_commitments, &r_rands, &q2_linear_combination)?;
 
         let fs2hs = virtual_oracle.mapping_vector();
         let mut h_commitments = Vec::with_capacity(virtual_oracle.num_of_oracles());
+        let mut h_rands = Vec::with_capacity(virtual_oracle.num_of_oracles());
         for concrete_oracle_index in fs2hs {
-            h_commitments.push(concrete_oracle_commitments[concrete_oracle_index].clone())
+            h_commitments.push(concrete_oracle_commitments[concrete_oracle_index].clone());
+            h_rands.push(concrete_oracle_commit_rands[concrete_oracle_index].clone());
         }
 
-        let h_prime_commitments = h_commitments
+        // Use commitments to each h and each m to homomorphically derive commitments to each h_prime
+        let concrete_oracle_labels: Vec<_> =
+            concrete_oracles.iter().map(|f| f.label().clone()).collect();
+
+        let h_prime_lcs = PIOPforZeroOverK::generate_h_prime_linear_combinations(
+            virtual_oracle,
+            &concrete_oracle_labels,
+        );
+
+        let h_and_m_commitments: Vec<_> = h_commitments
             .iter()
-            .zip(m_commitments.iter())
-            .enumerate()
-            .map(|(i, (h_commitment, m))| {
-                let c =
-                    PC::multi_scalar_mul(&[h_commitment.clone(), m.clone()], &[F::one(), F::one()]);
-                // In order to work with batched version of PC, commitment labels must be same as poly labels
-                LabeledCommitment::new(format!("h_prime_{}", i), c, None)
-            })
-            .collect::<Vec<_>>();
+            .cloned()
+            .chain(m_commitments.iter().cloned())
+            .collect();
+        let h_and_m_rands: Vec<_> = h_rands
+            .iter()
+            .cloned()
+            .chain(m_rands.iter().cloned())
+            .collect();
+
+        let mut h_prime_commitments = Vec::new();
+        let mut h_prime_rands = Vec::new();
+        for lc in h_prime_lcs {
+            let (comm, rand) =
+                PC::get_commitments_lc_with_rands(&h_and_m_commitments, &h_and_m_rands, &lc)?;
+            h_prime_commitments.push(comm);
+            h_prime_rands.push(rand);
+        }
 
         let fs_bytes =
             &to_bytes![h_prime_commitments, q2_commit].map_err(|_| Error::ToBytesError)?;
@@ -277,30 +294,31 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         }
 
         // derive commitment to h_prime through additive homomorphism
-        let h_prime_commitments = h_commitments
+        let h_and_m_commitments: Vec<_> = h_commitments
             .iter()
-            .zip(m_commitments.iter())
-            .enumerate()
-            .map(|(i, (h_commitment, m_commitment))| {
-                let c = PC::multi_scalar_mul(
-                    &[h_commitment.clone(), m_commitment.clone()],
-                    &[F::one(), F::one()],
-                );
-                LabeledCommitment::new(format!("h_prime_{}", i), c, None)
-            })
-            .collect::<Vec<_>>();
+            .cloned()
+            .chain(m_commitments.iter().cloned())
+            .collect();
 
-        // derive commitment to q2 through additive homomorphism
-        let q2_commit = PC::multi_scalar_mul(
-            &r_commitments,
-            powers_of(verifier_first_msg.c)
-                .take(h_prime_commitments.len())
-                .collect::<Vec<_>>()
-                .as_slice(),
+        let concrete_oracle_labels: Vec<_> = concrete_oracle_commitments
+            .iter()
+            .map(|f| f.label().clone())
+            .collect();
+        let h_prime_lcs = PIOPforZeroOverK::generate_h_prime_linear_combinations(
+            virtual_oracle,
+            &concrete_oracle_labels,
         );
+        let h_prime_commitments = h_prime_lcs
+            .iter()
+            .map(|lc| PC::get_commitments_lc(&h_and_m_commitments, lc))
+            .collect::<Result<Vec<_>, _>>()?;
 
         let q1_commit = LabeledCommitment::new(String::from("q_1"), proof.q1_commit, None);
-        let q2_commit = LabeledCommitment::new(String::from("q_2"), q2_commit, None);
+
+        // derive commitment to q2 through additive homomorphism
+        let q2_linear_combination =
+            PIOPforZeroOverK::generate_q2_linear_combination(virtual_oracle, verifier_first_msg.c);
+        let q2_commit = PC::get_commitments_lc(&r_commitments, &q2_linear_combination)?;
 
         let fs_bytes =
             &to_bytes![h_prime_commitments, q2_commit].map_err(|_| Error::ToBytesError)?;

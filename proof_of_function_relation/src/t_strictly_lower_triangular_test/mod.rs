@@ -1,5 +1,5 @@
 use crate::{
-    commitment::HomomorphicPolynomialCommitment,
+    commitment::AdditivelyHomomorphicPCS,
     discrete_log_comparison::DLComparison,
     error::{to_pc_error, Error},
     geo_seq::GeoSeqTest,
@@ -23,7 +23,7 @@ mod tests;
 
 pub struct TStrictlyLowerTriangular<
     F: PrimeField + SquareRootField,
-    PC: HomomorphicPolynomialCommitment<F>,
+    PC: AdditivelyHomomorphicPCS<F>,
     D: Digest,
 > {
     _field: PhantomData<F>,
@@ -34,7 +34,7 @@ pub struct TStrictlyLowerTriangular<
 impl<F, PC, D> TStrictlyLowerTriangular<F, PC, D>
 where
     F: PrimeField + SquareRootField,
-    PC: HomomorphicPolynomialCommitment<F>,
+    PC: AdditivelyHomomorphicPCS<F>,
     D: Digest,
 {
     pub const PROTOCOL_NAME: &'static [u8] = b"t-Strictly Lower Triangular Test";

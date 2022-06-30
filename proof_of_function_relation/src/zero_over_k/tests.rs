@@ -66,7 +66,14 @@ mod test {
             .map_err(to_pc_error::<F, PC>)
             .unwrap();
 
-        let zero_over_k_vo = InverseCheckOracle {};
+        let zero_over_k_vo = InverseCheckOracle::new();
+
+        // let concrete_oracle_labels: Vec<_> =
+        //     concrete_oracles.iter().map(|f| f.label().clone()).collect();
+        // zero_over_k_vo
+        //     .get_h_labels(&concrete_oracle_labels)
+        //     .iter()
+        //     .for_each(|label| println!("{label}"));
 
         let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
             &concrete_oracles,
@@ -79,7 +86,7 @@ mod test {
             &mut rng,
         );
 
-        assert!(zero_over_k_proof.is_ok());
+        // assert!(zero_over_k_proof.is_ok());
 
         let is_valid = ZeroOverK::<F, PC, D>::verify(
             zero_over_k_proof.unwrap(),

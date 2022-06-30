@@ -1,5 +1,5 @@
 use crate::{
-    commitment::HomomorphicPolynomialCommitment, error::Error, t_diag::TDiag,
+    commitment::AdditivelyHomomorphicPCS, error::Error, t_diag::TDiag,
     t_functional_triple::proof::Proof, t_strictly_lower_triangular_test::TStrictlyLowerTriangular,
 };
 use ark_marlin::rng::FiatShamirRng;
@@ -16,7 +16,7 @@ use std::io::BufReader;
 pub mod proof;
 mod tests;
 
-pub struct TFT<F: PrimeField + SquareRootField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
+pub struct TFT<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
     _digest: PhantomData<D>,
@@ -25,7 +25,7 @@ pub struct TFT<F: PrimeField + SquareRootField, PC: HomomorphicPolynomialCommitm
 impl<F, PC, D> TFT<F, PC, D>
 where
     F: PrimeField + SquareRootField,
-    PC: HomomorphicPolynomialCommitment<F>,
+    PC: AdditivelyHomomorphicPCS<F>,
     D: Digest,
 {
     pub const PROTOCOL_NAME: &'static [u8] = b"t-FT Test";

@@ -114,7 +114,7 @@ mod test {
         let concrete_oracles = [a, b];
         let alphas = vec![F::one(), F::one()];
 
-        let zero_over_k_vo = InverseCheckOracle {};
+        let zero_over_k_vo = InverseCheckOracle::new();
 
         let f = zero_over_k_vo
             .instantiate_in_coeffs_form(&concrete_oracles, alphas.as_slice())
