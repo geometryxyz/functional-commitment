@@ -5,15 +5,16 @@ use ark_poly::{
 };
 use ark_poly_commit::{LabeledPolynomial, PolynomialLabel};
 
-pub mod add_vo;
-pub mod eq_vo;
-pub mod geometric_sequence_vo;
+// pub mod add_vo;
+// pub mod eq_vo;
+// pub mod geometric_sequence_vo;
 pub mod inverse_check_oracle;
 pub mod prod_vo;
-pub mod product_check_oracle;
-pub mod square_check_oracle;
+// pub mod product_check_oracle;
+// pub mod square_check_oracle;
 
 pub trait VirtualOracle<F: PrimeField> {
+    /// Returns the list of concrete oracle labels ordered according to the mapping vector
     fn get_h_labels(&self, concrete_oracle_labels: &[PolynomialLabel]) -> Vec<PolynomialLabel> {
         let mut h_labels = Vec::with_capacity(self.num_of_oracles());
         for concrete_oracle_index in self.mapping_vector() {

@@ -36,6 +36,17 @@ macro_rules! label_polynomial {
     };
 }
 
+/// Extract the labels from a list of labeled elements
+#[macro_export]
+macro_rules! get_labels {
+    ($vector:expr) => {
+        $vector
+            .iter()
+            .map(|f| f.label().clone())
+            .collect::<Vec<_>>()
+    };
+}
+
 pub fn shift_dense_poly<F: Field>(
     p: &DensePolynomial<F>,
     shifting_factor: &F,
@@ -83,6 +94,14 @@ pub fn sample_vector<T: UniformRand, R: Rng>(seed: &mut R, length: usize) -> Vec
         .iter()
         .map(|_| T::rand(seed))
         .collect::<Vec<_>>()
+}
+
+/// Sample a random polynomial of a defined degree
+pub fn random_deg_n_polynomial<F: Field, R: Rng>(
+    degree: usize,
+    seed: &mut R,
+) -> DensePolynomial<F> {
+    DensePolynomial::from_coefficients_vec(sample_vector(seed, degree))
 }
 
 pub fn compute_vanishing_poly_over_coset<F: FftField>(

@@ -52,6 +52,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> NonZeroOverK<F, 
             &concrete_oracles,
             &commitments,
             &rands,
+            f.degree_bound(),
             &inverse_check_oracle,
             &alphas,
             &domain,
@@ -76,13 +77,14 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> NonZeroOverK<F, 
         //TODO check g bound
         let g_commit = LabeledCommitment::new(String::from("g"), proof.g_commit.clone(), None);
 
-        let concrete_oracles_commitments = [f_commit, g_commit];
+        let concrete_oracles_commitments = [f_commit.clone(), g_commit];
         let zero_over_k_vo = InverseCheckOracle::new();
         let alphas = vec![F::one(), F::one()];
 
         ZeroOverK::<F, PC, D>::verify(
             proof.zero_over_k_proof,
             &concrete_oracles_commitments,
+            f_commit.degree_bound(),
             &zero_over_k_vo,
             &domain,
             &alphas,

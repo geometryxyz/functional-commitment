@@ -68,8 +68,8 @@ impl<F: PrimeField> VirtualOracle<F> for ProdVO {
         Vec::from([0, 1])
     }
 
-    fn degree_bound(&self, domai_size: usize) -> usize {
-        2 * domai_size + 2
+    fn degree_bound(&self, domain_size: usize) -> usize {
+        2 * domain_size + 2
     }
 
     fn name(&self) -> String {

@@ -39,6 +39,9 @@ pub enum Error {
     /// A commitment could not be found when evaluating a linear combination
     MissingCommitment(String),
     InputLengthError(String),
+    MismatchedDegreeBounds(String),
+
+    UnsupportedDegree(String),
 }
 
 /// Convert an ark_poly_commit error

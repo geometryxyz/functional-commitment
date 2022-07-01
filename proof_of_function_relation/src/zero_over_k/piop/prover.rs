@@ -15,6 +15,8 @@ use std::iter;
 pub struct ProverState<'a, F: PrimeField, VO: VirtualOracle<F>> {
     all_concrete_oracles: &'a [LabeledPolynomial<F>],
 
+    maximum_oracle_degree_bound: Option<usize>,
+
     alphas: &'a Vec<F>,
 
     pub virtual_oracle: &'a VO, // TODO: made public for debugging. Private later
@@ -72,11 +74,13 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
     pub fn prover_init<'a>(
         domain: &'a GeneralEvaluationDomain<F>,
         all_concrete_oracles: &'a [LabeledPolynomial<F>],
+        maximum_oracle_degree_bound: Option<usize>,
         virtual_oracle: &'a VO,
         alphas: &'a Vec<F>,
     ) -> Result<ProverState<'a, F, VO>, Error> {
         Ok(ProverState {
             all_concrete_oracles,
+            maximum_oracle_degree_bound,
             alphas,
             virtual_oracle,
             domain_k: domain,
@@ -97,8 +101,13 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
         let alphas = state.alphas;
 
         // generate the masking polynomials and keep a record of the random polynomials that were used
-        let (random_polynomials, masking_polynomials) =
-            compute_maskings(state.virtual_oracle, &domain, &alphas, rng);
+        let (random_polynomials, masking_polynomials) = compute_maskings(
+            state.virtual_oracle,
+            &domain,
+            &alphas,
+            state.maximum_oracle_degree_bound,
+            rng,
+        );
 
         let mapping_vector = state.virtual_oracle.mapping_vector();
         let mut hs = Vec::with_capacity(state.virtual_oracle.num_of_oracles());
@@ -115,8 +124,8 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
                 LabeledPolynomial::new(
                     format!("h_prime_{}", i),
                     oracle.polynomial() + masking_poly.polynomial(),
-                    None,
-                    None,
+                    state.maximum_oracle_degree_bound,
+                    Some(1),
                 )
             })
             .collect::<Vec<_>>();
@@ -208,6 +217,7 @@ fn compute_maskings<R: Rng, F: PrimeField, VO: VirtualOracle<F>>(
     virtual_oracle: &VO,
     domain: &GeneralEvaluationDomain<F>,
     alphas: &[F],
+    masking_bound: Option<usize>,
     rng: &mut R,
 ) -> (Vec<LabeledPolynomial<F>>, Vec<LabeledPolynomial<F>>) {
     let num_of_concrete_oracles = virtual_oracle.num_of_oracles();
@@ -224,13 +234,18 @@ fn compute_maskings<R: Rng, F: PrimeField, VO: VirtualOracle<F>>(
         let vanishing_shifted =
             shift_dense_poly(&domain.vanishing_polynomial().into(), &shifting_factor);
 
-        // random_polynomials.push(LabeledPolynomial::new(format!("r_{}", i), r, Some(2), None));
-        random_polynomials.push(LabeledPolynomial::new(format!("r_{}", i), r, None, None));
+        random_polynomials.push(LabeledPolynomial::new(
+            format!("r_{}", i),
+            r,
+            Some(2),
+            Some(1),
+        ));
+        // random_polynomials.push(LabeledPolynomial::new(format!("r_{}", i), r, None, None));
         masking_polynomials.push(LabeledPolynomial::new(
             format!("m_{}", i),
             &r_shifted * &vanishing_shifted,
-            None,
-            None,
+            masking_bound,
+            Some(1),
         ));
     }
 

@@ -51,12 +51,19 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePo
     ) -> Result<LabeledCommitment<Self::Commitment>, Error> {
         let mut aggregate_commitment = Self::Commitment::empty();
 
-        let max_degree =
-            if let Some(optional_degree) = commitments.iter().map(|c| c.degree_bound()).max() {
-                optional_degree
-            } else {
-                None
-            };
+        let degree_bound = commitments[0].degree_bound();
+        for comm in commitments {
+            if comm.degree_bound() != degree_bound {
+                // Can only accumulate polynomials and commitments that have the same degree bound
+                return Err(Error::MismatchedDegreeBounds(format!(
+                    "{} has degree bound {:?}, but {} has degree bound {:?}",
+                    commitments[0].label(),
+                    degree_bound,
+                    comm.label(),
+                    comm.degree_bound()
+                )));
+            }
+        }
 
         for (coef, term) in lc.iter() {
             let commitment = if let LCTerm::PolyLabel(label) = term {
@@ -79,7 +86,7 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePo
         Ok(LabeledCommitment::new(
             lc.label().clone(),
             aggregate_commitment,
-            max_degree,
+            degree_bound,
         ))
     }
 
@@ -96,12 +103,19 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePo
             )));
         }
 
-        let max_degree =
-            if let Some(optional_degree) = commitments.iter().map(|c| c.degree_bound()).max() {
-                optional_degree
-            } else {
-                None
-            };
+        let degree_bound = commitments[0].degree_bound();
+        for comm in commitments {
+            if comm.degree_bound() != degree_bound {
+                // Can only accumulate polynomials and commitments that have the same degree bound
+                return Err(Error::MismatchedDegreeBounds(format!(
+                    "{} has degree bound {:?}, but {} has degree bound {:?}",
+                    commitments[0].label(),
+                    degree_bound,
+                    comm.label(),
+                    comm.degree_bound()
+                )));
+            }
+        }
 
         let mut aggregate_commitment = Self::Commitment::empty();
         let mut aggregate_randomness = Self::Randomness::empty();
@@ -126,7 +140,7 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePo
         }
 
         Ok((
-            LabeledCommitment::new(lc.label().clone(), aggregate_commitment, max_degree),
+            LabeledCommitment::new(lc.label().clone(), aggregate_commitment, degree_bound),
             aggregate_randomness,
         ))
     }
@@ -135,14 +149,12 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePo
 #[cfg(test)]
 mod test {
     use crate::commitment::{AdditivelyHomomorphicPCS, KZG10};
+    use crate::util::random_deg_n_polynomial;
     use ark_bn254::{Bn254, Fr};
     use ark_ff::One;
     use ark_ff::UniformRand;
-    use ark_poly::{
-        univariate::DensePolynomial, EvaluationDomain, Evaluations, GeneralEvaluationDomain,
-    };
+    use ark_poly::univariate::DensePolynomial;
     use ark_poly_commit::LinearCombination;
-    use ark_poly_commit::QuerySet;
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_std::rand::thread_rng;
     use rand_core::OsRng;
@@ -150,43 +162,13 @@ mod test {
     type F = Fr;
     type PC = KZG10<Bn254>;
 
-    fn generate_test_polynomials_with_degree_bounds() -> (
-        GeneralEvaluationDomain<F>,
-        LabeledPolynomial<F, DensePolynomial<F>>,
-        LabeledPolynomial<F, DensePolynomial<F>>,
-        LabeledPolynomial<F, DensePolynomial<F>>,
-    ) {
-        let n = 4;
-        let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();
-
-        //test oracle to be zero at roots of unity
-        let a_evals = vec![F::from(2u64), F::from(4u64)];
-        let a_poly = Evaluations::from_vec_and_domain(a_evals, domain).interpolate();
-        let a_poly = LabeledPolynomial::new(String::from("a"), a_poly, Some(4), Some(1));
-
-        let b_evals = vec![
-            F::from(5u64),
-            F::from(4 as u64),
-            F::from(6 as u64),
-            F::from(8 as u64),
-        ];
-        let b_poly = Evaluations::from_vec_and_domain(b_evals, domain).interpolate();
-        let b_poly = LabeledPolynomial::new(String::from("b"), b_poly, Some(4), Some(1));
-
-        let a_plus_2b_poly = a_poly.polynomial().clone() + (b_poly.polynomial() * F::from(2u64));
-        let a_plus_2b_poly =
-            LabeledPolynomial::new(String::from("a_plus_2b"), a_plus_2b_poly, Some(4), Some(1));
-
-        (domain, a_poly, b_poly, a_plus_2b_poly)
-    }
-
     #[test]
     fn test_aggregate_comm_with_rand() {
         // Parameters
         let rng = &mut thread_rng();
         let maximum_degree: usize = 16;
         let hiding_bound = 1;
-        let enforced_degree_bounds = [4];
+        let enforced_degree_bounds = [10];
 
         // Setup the commitment scheme
         let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
@@ -199,9 +181,16 @@ mod test {
         .unwrap();
 
         // Define polynomials and a linear combination
-        let (_domain, a_poly, b_poly, a_plus_2b_poly) =
-            generate_test_polynomials_with_degree_bounds();
-        let polynomials = vec![a_poly, b_poly];
+        let a_unlabeled: DensePolynomial<F> = random_deg_n_polynomial(7, rng);
+        let a_poly = LabeledPolynomial::new(String::from("a"), a_unlabeled, Some(10), Some(1));
+
+        let b_unlabeled: DensePolynomial<F> = random_deg_n_polynomial(5, rng);
+        let b_poly = LabeledPolynomial::new(String::from("b"), b_unlabeled, Some(10), Some(1));
+
+        let a_plus_2b_poly = a_poly.polynomial().clone() + (b_poly.polynomial() * F::from(2u64));
+        let a_plus_2b_poly =
+            LabeledPolynomial::new(String::from("a_plus_2b"), a_plus_2b_poly, Some(10), Some(1));
+        let polynomials = vec![a_poly.clone(), b_poly.clone()];
         let linear_combination =
             LinearCombination::new("a_plus_b", vec![(F::one(), "a"), (F::from(2u64), "b")]);
 
@@ -212,20 +201,19 @@ mod test {
 
         // Derive evaluation point and generate a query set
         let evaluation_point = Fr::rand(rng);
-        let mut query_set = QuerySet::new();
-        query_set.insert((
-            linear_combination.label().clone(),
-            (String::from("challenge"), evaluation_point),
-        ));
 
         // Evaluation Phase, here we only output the evaluation of the linear combination
         let manual_eval = a_plus_2b_poly.evaluate(&evaluation_point);
+
+        // println!("{} eval at {} is {}", a_poly.label(), evaluation_point, a_poly.evaluate(&evaluation_point));
+        // println!("{} eval at {} is {}", b_poly.label(), evaluation_point, b_poly.evaluate(&evaluation_point));
+        // println!("{} eval at {} is {}", a_plus_2b_poly.label(), evaluation_point, a_plus_2b_poly.evaluate(&evaluation_point));
 
         // Opening phase
         let opening_challenge = F::rand(rng);
         let lc_opening_proof = PC::open(
             &ck,
-            &polynomials,
+            &[a_plus_2b_poly],
             &[test_commitment.clone()],
             &evaluation_point,
             opening_challenge,
@@ -235,18 +223,17 @@ mod test {
         .unwrap();
 
         // Verify
-        assert_eq!(
-            true,
-            PC::check(
-                &vk,
-                &[test_commitment],
-                &evaluation_point,
-                vec!(manual_eval),
-                &lc_opening_proof,
-                opening_challenge,
-                Some(rng)
-            )
-            .is_ok()
+        let res = PC::check(
+            &vk,
+            &[test_commitment],
+            &evaluation_point,
+            vec![manual_eval],
+            &lc_opening_proof,
+            opening_challenge,
+            Some(rng),
         )
+        .unwrap();
+
+        assert_eq!(true, res)
     }
 }
