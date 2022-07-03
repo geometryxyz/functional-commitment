@@ -1,5 +1,6 @@
 [workspace]
 
 members = [
-    "proof_of_function_relation"
+    "proof_of_function_relation",
+    "ac2tft"
 ]
