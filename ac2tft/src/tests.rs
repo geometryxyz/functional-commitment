@@ -18,25 +18,26 @@ mod tests {
     use std::collections::BTreeMap;
     use ark_bn254::Fr;
     use crate::{GateType, GateInput, Gate, empty_matrix};
+    use crate::error::Error;
 
     type F = Fr;
 
-    //#[test]
-    //fn test_gate_formatting() {
-        //// g0: (1, 1, +)
-        //let gate = Gate {
-            //left: GateInput::Constant(F::from(1u64)),
-            //right: GateInput::Constant(F::from(1u64)),
-            //symbol: GateType::Add,
-            //label: String::from("g0"),
-        //};
+    #[test]
+    fn test_gate_formatting() {
+        // g0: (1, 1, +)
+        let gate = Gate {
+            left: GateInput::Constant(F::from(1u64)),
+            right: GateInput::Constant(F::from(1u64)),
+            symbol: GateType::Add,
+            label: String::from("g0"),
+        };
 
-        //assert_eq!(
-            //format!("{}", gate),
-            //"g0: (Fp256 \"(0000000000000000000000000000000000000000000000000000000000000001)\", \
-            //Fp256 \"(0000000000000000000000000000000000000000000000000000000000000001)\", +)"
-        //);
-    //}
+        assert_eq!(
+            format!("{}", gate),
+            "g0: (Fp256 \"(0000000000000000000000000000000000000000000000000000000000000001)\", \
+            Fp256 \"(0000000000000000000000000000000000000000000000000000000000000001)\", +)"
+        );
+    }
 
     fn sample_gates_0() -> Vec<Gate<F>> {
         // Encodes x^3 + 2x + 5
@@ -91,25 +92,25 @@ mod tests {
         return vec![g1, g2, g3, g4, g5];
     }
 
-    //#[test]
-    //fn test_gate_input_eq() {
-        //let gates = sample_gates_0();
-        //let g1 = &gates[0];
-        //let g2 = &gates[1];
-        //let g3 = &gates[2];
-        //assert_eq!(g1.left, g1.right);
-        //assert_eq!(g1.left, g2.right);
-        //assert_eq!(g3.right, GateInput::Constant(F::from(2u64)));
-    //}
+    #[test]
+    fn test_gate_input_eq() {
+        let gates = sample_gates_0();
+        let g1 = &gates[0];
+        let g2 = &gates[1];
+        let g3 = &gates[2];
+        assert_eq!(g1.left, g1.right);
+        assert_eq!(g1.left, g2.right);
+        assert_eq!(g3.right, GateInput::Constant(F::from(2u64)));
+    }
 
-    //#[test]
-    //fn test_into_gate() {
-        //let gates = sample_gates_0();
-        //let g1 = &gates[0];
-        //let g2 = &gates[1];
-        //assert_eq!(g2.left.into_gate().unwrap(), *g1);
-        //assert_eq!(g2.right.into_gate(), Err(Error::GateInputNotGate));
-    //}
+    #[test]
+    fn test_into_gate() {
+        let gates = sample_gates_0();
+        let g1 = &gates[0];
+        let g2 = &gates[1];
+        assert_eq!(g2.left.into_gate().unwrap(), *g1);
+        assert_eq!(g2.right.into_gate(), Err(Error::GateInputNotGate));
+    }
 
     #[test]
     fn test_gates_to_matrices() {
