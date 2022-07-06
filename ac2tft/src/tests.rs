@@ -1,11 +1,42 @@
+//#[cfg(test)]
+//mod tests {
+    //use proof_of_function_relation::{
+        //commitment::KZG10, 
+    //};
+    //use ark_bn254::{Bn254, Fr};
+    //use ark_ff::to_bytes;
+    //use ark_marlin::rng::{ FiatShamirRng };
+    //use ark_poly::{
+        //univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
+    //};
+    //use ark_poly_commit::PolynomialCommitment;
+    //use ark_std::rand::{ thread_rng};
+    //use blake2::Blake2s;
+
+    //type F = Fr;
+    //type PC = KZG10<Bn254>;
+    //type D = Blake2s;
+
+    //#[test]
+    //fn test() {
+    ////TODO: find a fix
+        //let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
+    //}
+//}
+
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use ark_relations::r1cs::Matrix;
-    use ark_poly::univariate::DensePolynomial;
-    use ark_marlin::ahp::indexer::{
+    use ark_poly::{
+        univariate::DensePolynomial
+    };
+
+    use ark_bn254::Fr;
+
+    use ark_marlin_fork::ahp::indexer::{
         sum_matrices
     };
-    use ark_bn254::Fr;
+
     use crate::{GateType, GateInput, Gate, gates_to_sparse_matrices, sparse_matrices_to_polys};
     use crate::error::Error;
 
@@ -28,19 +59,17 @@ mod tests {
         );
     }
 
-    fn sample_gates_0() -> Vec<Gate<F>> {
+    pub fn sample_gates_0() -> Vec<Gate<F>> {
         // Encodes x^3 + 2x + 5
-        /*
-            g0: (x, x, *)
-            g1: (g0, x, *)
-            g2: (x, 2, *)
-            g3: (g1, g2, +)
-            g4: (g3, 5, +)
+        // g0: (x, x, *)
+        // g1: (g0, x, *)
+        // g2: (x, 2, *)
+        // g3: (g1, g2, +)
+        // g4: (g3, 5, +)
 
-            s: [*, *, *, +, +]
-            l: [x, g0, g1, g3]
-            r: [x, 2, g2, 5]
-        */
+        // s: [*, *, *, +, +]
+        // l: [x, g0, g1, g3]
+        // r: [x, 2, g2, 5]
 
         let g0 = Gate::<Fr> {
             left: GateInput::Input(String::from("x")),
@@ -101,7 +130,7 @@ mod tests {
     }
 
     #[test]
-    fn test_gates_to_matrices() {
+    fn test_gates_to_matrices_0() {
         let gates = sample_gates_0();
 
         let (matrix_a, matrix_b, matrix_c) = gates_to_sparse_matrices(gates);

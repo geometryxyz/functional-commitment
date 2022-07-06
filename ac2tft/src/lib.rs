@@ -1,19 +1,15 @@
+pub mod example_circuits;
+
 mod tests;
 mod error;
 
 use std::fmt;
 use std::collections::BTreeMap;
 use ark_ff::PrimeField;
-use ark_relations::r1cs::{
-    Matrix,
-    SynthesisError,
-};
+use ark_relations::r1cs::{ Matrix, SynthesisError };
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
-use ark_marlin::ahp::indexer::{
-    sum_matrices
-};
-
-use ark_marlin::ahp::constraint_systems::{
+use ark_marlin_fork::ahp::indexer::sum_matrices;
+use ark_marlin_fork::ahp::constraint_systems::{
     num_non_zero,
     arithmetize_matrix,
     MatrixArithmetization,
@@ -181,17 +177,17 @@ pub fn sparse_matrices_to_polys<F: PrimeField>(
     c: Matrix<F>,
     num_constraints: usize,
     num_formatted_input_variables: usize,
-    ) -> MatrixArithmetization<F> {
+) -> MatrixArithmetization<F> {
     let mut a = a.clone();
     let mut b = b.clone();
     let mut c = c.clone();
 
     let joint_matrix = sum_matrices(&a, &b, &c);
-    let num_non_zero_val = num_non_zero(&joint_matrix);
+    let num_non_zero_vals = num_non_zero(&joint_matrix);
 
     let domain_h = GeneralEvaluationDomain::<F>::new(num_constraints)
         .ok_or(SynthesisError::PolynomialDegreeTooLarge).unwrap();
-    let domain_k = GeneralEvaluationDomain::<F>::new(num_non_zero_val)
+    let domain_k = GeneralEvaluationDomain::<F>::new(num_non_zero_vals)
         .ok_or(SynthesisError::PolynomialDegreeTooLarge).unwrap();
     let x_domain = GeneralEvaluationDomain::<F>::new(num_formatted_input_variables)
         .ok_or(SynthesisError::PolynomialDegreeTooLarge).unwrap();
@@ -204,7 +200,7 @@ pub fn sparse_matrices_to_polys<F: PrimeField>(
         domain_k,
         domain_h,
         x_domain,
-        );
+    );
 
     joint_arith
 }
