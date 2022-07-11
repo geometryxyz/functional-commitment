@@ -6,14 +6,7 @@ mod error;
 use std::fmt;
 use std::collections::BTreeMap;
 use ark_ff::PrimeField;
-use ark_relations::r1cs::{ Matrix, SynthesisError };
-use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
-use ark_marlin_fork::ahp::indexer::sum_matrices;
-use ark_marlin_fork::ahp::constraint_systems::{
-    num_non_zero,
-    arithmetize_matrix,
-    MatrixArithmetization,
-};
+use ark_relations::r1cs::Matrix;
 
 /// A compiler from arithmetic gates to t-FT sparse matrices, which can be converted into
 /// polynomicals using Marlin's `arithmetize_matrix()` function.
@@ -170,38 +163,3 @@ pub fn gates_to_sparse_matrices<F: PrimeField>(
 
     (matrix_a, matrix_b, matrix_c)
 }
-
-pub fn sparse_matrices_to_polys<F: PrimeField>(
-    a: Matrix<F>,
-    b: Matrix<F>,
-    c: Matrix<F>,
-    num_constraints: usize,
-    num_formatted_input_variables: usize,
-) -> MatrixArithmetization<F> {
-    let mut a = a.clone();
-    let mut b = b.clone();
-    let mut c = c.clone();
-
-    let joint_matrix = sum_matrices(&a, &b, &c);
-    let num_non_zero_vals = num_non_zero(&joint_matrix);
-
-    let domain_h = GeneralEvaluationDomain::<F>::new(num_constraints)
-        .ok_or(SynthesisError::PolynomialDegreeTooLarge).unwrap();
-    let domain_k = GeneralEvaluationDomain::<F>::new(num_non_zero_vals)
-        .ok_or(SynthesisError::PolynomialDegreeTooLarge).unwrap();
-    let x_domain = GeneralEvaluationDomain::<F>::new(num_formatted_input_variables)
-        .ok_or(SynthesisError::PolynomialDegreeTooLarge).unwrap();
-
-    let joint_arith = arithmetize_matrix(
-        &joint_matrix,
-        &mut a,
-        &mut b,
-        &mut c,
-        domain_k,
-        domain_h,
-        x_domain,
-    );
-
-    joint_arith
-}
-

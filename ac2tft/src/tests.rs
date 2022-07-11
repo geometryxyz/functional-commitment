@@ -1,43 +1,9 @@
-//#[cfg(test)]
-//mod tests {
-    //use proof_of_function_relation::{
-        //commitment::KZG10, 
-    //};
-    //use ark_bn254::{Bn254, Fr};
-    //use ark_ff::to_bytes;
-    //use ark_marlin::rng::{ FiatShamirRng };
-    //use ark_poly::{
-        //univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
-    //};
-    //use ark_poly_commit::PolynomialCommitment;
-    //use ark_std::rand::{ thread_rng};
-    //use blake2::Blake2s;
-
-    //type F = Fr;
-    //type PC = KZG10<Bn254>;
-    //type D = Blake2s;
-
-    //#[test]
-    //fn test() {
-    ////TODO: find a fix
-        //let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
-    //}
-//}
-
 #[cfg(test)]
 pub mod tests {
     use ark_relations::r1cs::Matrix;
-    use ark_poly::{
-        univariate::DensePolynomial
-    };
-
+    use ark_poly::univariate::DensePolynomial;
     use ark_bn254::Fr;
-
-    use ark_marlin_fork::ahp::indexer::{
-        sum_matrices
-    };
-
-    use crate::{GateType, GateInput, Gate, gates_to_sparse_matrices, sparse_matrices_to_polys};
+    use crate::{GateType, GateInput, Gate};
     use crate::error::Error;
 
     type F = Fr;
@@ -127,42 +93,6 @@ pub mod tests {
         let g1 = &gates[1];
         assert_eq!(g1.left.into_gate().unwrap(), *g0);
         assert_eq!(g1.right.into_gate(), Err(Error::GateInputNotGate));
-    }
-
-    #[test]
-    fn test_gates_to_matrices_0() {
-        let gates = sample_gates_0();
-
-        let (matrix_a, matrix_b, matrix_c) = gates_to_sparse_matrices(gates);
-
-        print_matrix("matrix a", matrix_a.clone());
-        print_matrix("matrix b", matrix_b.clone());
-        print_matrix("matrix c", matrix_c.clone());
-
-        let joint_arith = sparse_matrices_to_polys(
-            matrix_a.clone(),
-            matrix_b.clone(),
-            matrix_c.clone(),
-            100,
-            0,
-        );
-
-        let joint_matrix = sum_matrices(
-            &matrix_a,
-            &matrix_b,
-            &matrix_c,
-        );
-        print_joint_matrix("joint matrix", joint_matrix);
-        print_polynomial("row", joint_arith.row.polynomial());
-        print_polynomial("col", joint_arith.col.polynomial());
-        print_polynomial("row_col", joint_arith.row_col.polynomial());
-        print_polynomial("val_a", joint_arith.val_a.polynomial());
-        print_polynomial("val_b", joint_arith.val_b.polynomial());
-        print_polynomial("val_c", joint_arith.val_c.polynomial());
-
-        // TODO:
-        // Apply t_slt test on matrix_a, matrix b
-        // Apply t_diag test on matrix_c
     }
 
     fn print_matrix(

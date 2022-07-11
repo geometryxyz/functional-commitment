@@ -85,11 +85,23 @@ where
         )?;
 
         // Step 3: Subset over K between row_M and h
+        //
+        // Comment added during Marlin experiments; not sure if it still applies: "Step 3: In
+        // transposed Matrix, we should check that col_M is subset of h"
         let subset_proof = SubsetOverK::<F, PC, D>::prove();
 
         // Step 4: Discrete Log Comparison between row_M and col_M
         let dl_proof = DLComparison::<F, PC, D>::prove(
-            ck, domain_k, domain_h, row_poly, col_poly, row_commit, col_commit, fs_rng, rng,
+            //ck, domain_k, domain_h, row_poly, col_poly, row_commit, col_commit, fs_rng, rng,
+            ck,
+            domain_k,
+            domain_h,
+            row_poly,
+            col_poly,
+            row_commit,
+            col_commit,
+            fs_rng,
+            rng,
         )?;
 
         let proof = Proof {

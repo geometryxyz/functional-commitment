@@ -4,8 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-#ark-marlin = "0.3.0"
-ark-marlin-fork = { package = "ark-marlin", git = "https://github.com/geometryresearch/marlin.git" }
 ark-bls12-381 = "0.3.0"
 ark-ff = "0.3.0"
 ark-bn254 = "0.3.0"
