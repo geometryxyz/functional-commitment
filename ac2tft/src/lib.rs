@@ -95,13 +95,15 @@ pub fn empty_matrix<F: PrimeField>(
     matrix
 }
 
+pub type SparseMatrices<F> = (
+    Matrix<F>,
+    Matrix<F>,
+    Matrix<F>,
+);
+
 pub fn gates_to_sparse_matrices<F: PrimeField>(
     gates: Vec<Gate<F>>,
-) -> (
-    Matrix<F>,
-    Matrix<F>,
-    Matrix<F>,
-) {
+) -> SparseMatrices<F> {
     let mut left_input_map = BTreeMap::<GateInput<F>, usize>::new();
     let mut right_input_map = BTreeMap::<GateInput<F>, usize>::new();
 

@@ -1,8 +1,16 @@
 #[cfg(test)]
 pub mod tests {
+    use holographic_lincheck::matrix::MatrixIndexer;
     use ark_poly::univariate::DensePolynomial;
-    use ark_bn254::Fr;
-    use ark_ff::Field;
+    use ark_poly::{
+        EvaluationDomain,
+        GeneralEvaluationDomain,
+    };
+    use ark_poly_commit::PolynomialCommitment;
+    use ark_bn254::{Bn254, Fr};
+    use ark_ff::{Field, to_bytes};
+    use ark_std::rand::thread_rng;
+    use ark_marlin::rng::FiatShamirRng;
     use ark_relations::{
         lc,
         r1cs::{
@@ -17,10 +25,18 @@ pub mod tests {
         },
     };
     //use ark_marlin::constraint_systems::make_matrices_square_for_indexer;
-    use crate::{GateType, GateInput, Gate, gates_to_sparse_matrices};
+    use blake2::Blake2s;
+    use crate::{SparseMatrices, GateType, GateInput, Gate, gates_to_sparse_matrices};
     use crate::error::Error;
+    use proof_of_function_relation::commitment::KZG10;
+    use proof_of_function_relation::t_strictly_lower_triangular_test::TStrictlyLowerTriangular;
+    use proof_of_function_relation::t_strictly_lower_triangular_test::proof::Proof as TSltProof;
+    use proof_of_function_relation::t_diag::TDiag;
+    use proof_of_function_relation::t_diag::proof::Proof as TDiagProof;
 
     type F = Fr;
+    type PC = KZG10<Bn254>;
+    type D = Blake2s;
 
     #[test]
     fn test_gate_formatting() {
@@ -199,15 +215,142 @@ pub mod tests {
 
         let constraint_matrices: ConstraintMatrices<Fr> = pcs.to_matrices().unwrap();
 
-        print_matrix("sample_circuit_0 matrix a", constraint_matrices.a);
-        print_matrix("sample_circuit_0 matrix b", constraint_matrices.b);
-        print_matrix("sample_circuit_0 matrix c", constraint_matrices.c);
+        //print_matrix("sample_circuit_0 matrix a", constraint_matrices.a);
+        //print_matrix("sample_circuit_0 matrix b", constraint_matrices.b);
+        //print_matrix("sample_circuit_0 matrix c", constraint_matrices.c);
 
+        //let gates = sample_gates_0();
+        //let matrices = gates_to_sparse_matrices(gates);
+        //print_matrix("sample_gates_0 matrix a", matrices.0);
+        //print_matrix("sample_gates_0 matrix b", matrices.1);
+        //print_matrix("sample_gates_0 matrix c", matrices.2);
+    }
+
+    #[test]
+    pub fn test_sample_gates_0_to_polys() {
         let gates = sample_gates_0();
         let matrices = gates_to_sparse_matrices(gates);
-        print_matrix("sample_gates_0 matrix a", matrices.0);
-        print_matrix("sample_gates_0 matrix b", matrices.1);
-        print_matrix("sample_gates_0 matrix c", matrices.2);
+
+        //print_polynomial("gates_matrix_a rows", &result.row_poly);
+        //print_polynomial("gates_matrix_a cols", &result.col_poly);
+        //print_polynomial("gates_matrix_a vals", &result.vals_poly);
+        //print_polynomial("gates_matrix_a row_col", &result.row_col_poly);
+        
+        let num_constraints = matrices.0.len();
+
+        // TODO: this may be wrong, but setting the size of domain_h to num_constraints and
+        // domain_k to t causes an error in DLComparision
+        let domain_h = GeneralEvaluationDomain::<F>::new(num_constraints).unwrap();
+        let domain_k = GeneralEvaluationDomain::<F>::new(num_constraints).unwrap();
+        let indexed_a = MatrixIndexer::index(&domain_k, &domain_h, &matrices.0);
+        do_t_slt_proof(indexed_a, domain_k, domain_h, calc_top_non_zero(matrices.0));
+
+        let num_constraints = matrices.1.len();
+        let domain_h = GeneralEvaluationDomain::<F>::new(num_constraints).unwrap();
+        let domain_k = GeneralEvaluationDomain::<F>::new(num_constraints).unwrap();
+        let indexed_b = MatrixIndexer::index(&domain_k, &domain_h, &matrices.1);
+        do_t_slt_proof(indexed_b, domain_k, domain_h, calc_top_non_zero(matrices.1));
+
+        // TODO: note that t-diag fails
+        //let num_constraints = matrices.2.len();
+        //let domain_h = GeneralEvaluationDomain::<F>::new(num_constraints).unwrap();
+        //let domain_k = GeneralEvaluationDomain::<F>::new(num_constraints).unwrap();
+        //let indexed_c = MatrixIndexer::index(&domain_k, &domain_h, &matrices.2);
+        //do_t_diag_proof(indexed_c, domain_k, domain_h, calc_top_non_zero(matrices.2));
+    }
+
+    pub fn calc_top_non_zero(
+        matrix: Matrix<F>
+    ) -> usize {
+        let mut t = 0;
+        for row in matrix.iter() {
+            if row.len() == 0 {
+                t += 1;
+            } else {
+                break
+            }
+        }
+        t
+    }
+
+    pub fn do_t_slt_proof(
+        indexed: MatrixIndexer<F>,
+        domain_k: GeneralEvaluationDomain<F>,
+        domain_h: GeneralEvaluationDomain<F>,
+        t: usize,
+    ) -> TSltProof<F, PC> {
+        let row_poly = indexed.row_poly;
+        let col_poly = indexed.col_poly;
+
+        let mut rng = thread_rng();
+        let max_degree = 20;
+        let pp = PC::setup(max_degree, None, &mut rng).unwrap();
+        let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
+        let (commitments, _) =
+            PC::commit(&ck, &[row_poly.clone(), col_poly.clone()], Some(&mut rng)).unwrap();
+
+        let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
+
+        let proof = TStrictlyLowerTriangular::<F, PC, D>::prove(
+            &ck,
+            t,
+            &domain_k,
+            &domain_h,
+
+            &col_poly,
+            &row_poly,
+            &commitments[1].clone(),
+            &commitments[0].clone(),
+
+            //&row_poly,
+            //&col_poly,
+            //&commitments[0].clone(),
+            //&commitments[1].clone(),
+
+            &mut fs_rng,
+            &mut rng,
+        ).unwrap();
+
+        proof
+    }
+
+    pub fn do_t_diag_proof(
+        indexed: MatrixIndexer<F>,
+        domain_k: GeneralEvaluationDomain<F>,
+        domain_h: GeneralEvaluationDomain<F>,
+        t: usize,
+    ) -> TDiagProof<F, PC> {
+        let row_poly = indexed.row_poly;
+        let col_poly = indexed.col_poly;
+        let val_poly = indexed.vals_poly;
+
+        let mut rng = thread_rng();
+        let max_degree = 20;
+        let pp = PC::setup(max_degree, None, &mut rng).unwrap();
+        let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
+        let (commitments, rands) =
+            PC::commit(&ck, &[row_poly.clone(), col_poly.clone()], Some(&mut rng)).unwrap();
+
+        let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
+        let proof = TDiag::<F, PC, D>::prove(
+            &ck,
+            t,
+            &row_poly,
+            &col_poly,
+            &val_poly,
+            &commitments[0],
+            &commitments[1],
+            &commitments[2],
+            &rands[0],
+            &rands[1],
+            &rands[2],
+            &domain_k,
+            &domain_h,
+            &mut rng,
+        )
+        .unwrap();
+
+        proof
     }
 
     fn print_matrix(
