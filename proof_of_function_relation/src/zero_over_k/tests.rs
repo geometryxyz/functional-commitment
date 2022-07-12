@@ -3,21 +3,19 @@ mod test {
     use crate::{
         commitment::KZG10,
         error::{to_pc_error, Error},
-        label_polynomial,
         util::random_deg_n_polynomial,
         virtual_oracle::inverse_check_oracle::InverseCheckOracle,
         virtual_oracle::prod_vo::ProdVO,
-        virtual_oracle::VirtualOracle,
         zero_over_k::ZeroOverK,
     };
     use ark_bn254::{Bn254, Fr};
+    use ark_ff::Field;
     use ark_ff::One;
-    use ark_ff::{Field, UniformRand};
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, Evaluations, GeneralEvaluationDomain,
-        Polynomial, UVPolynomial,
+        UVPolynomial,
     };
-    use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
+    use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PolynomialCommitment};
     use ark_std::{rand::thread_rng, test_rng};
     use blake2::Blake2s;
 
@@ -31,28 +29,32 @@ mod test {
 
     #[test]
     fn test_zero_over_k_inverse_check_oracle() {
-        let n = 8;
+        let m = 8;
         let rng = &mut test_rng();
-        let domain_k = GeneralEvaluationDomain::<F>::new(n).unwrap();
-
-        let hiding_bound = Some(1);
-        let degree_bound = 14;
+        let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
 
         let max_degree = 20;
         let max_hiding = 1;
-        let pp = PC::setup(max_degree, None, rng).unwrap();
 
-        let (ck, vk) = PC::trim(&pp, max_degree, max_hiding, Some(&[2, degree_bound])).unwrap();
+        let enforced_hiding_bound = Some(1);
+        let enforced_degree_bound = 14;
+
+        let pp = PC::setup(max_degree, None, rng).unwrap();
+        let (ck, vk) = PC::trim(
+            &pp,
+            max_degree,
+            max_hiding,
+            Some(&[2, enforced_degree_bound]),
+        )
+        .unwrap();
 
         // Step 1: choose a random polynomial
         let f_unlabeled: DensePolynomial<F> = random_deg_n_polynomial(7, rng);
-        // let f_unlabeled =
-        // DensePolynomial::<F>::from_coefficients_vec(vec![F::from(5), F::from(2), F::from(3)]);
         let f = LabeledPolynomial::new(
             String::from("f"),
             f_unlabeled,
-            Some(degree_bound),
-            hiding_bound,
+            Some(enforced_degree_bound),
+            enforced_hiding_bound,
         );
 
         // Step 2: evaluate it
@@ -71,103 +73,39 @@ mod test {
         let g = LabeledPolynomial::new(
             String::from("g"),
             g.clone(),
-            Some(degree_bound),
-            hiding_bound,
+            Some(enforced_degree_bound),
+            enforced_hiding_bound,
         );
 
-        // // PRINT G AND ITS DEGREE
-        // println!("{:?}", g);
-        // println!("degree of g: {}", g.degree());
-
-        // // CHECK THAT G INDEED EVALUATES TO THE DESIRED VALUES
-        // let g_evals = g.evaluate_over_domain_by_ref(domain_k);
-        // g_evals
-        //     .evals
-        //     .iter()
-        //     .zip(desired_g_evals.evals.iter())
-        //     .for_each(|(&have, &want)| assert_eq!(have, want));
-
-        // // CHECK THAT EVALUATE_OVER_DOMAIN DOES THE SAME AS EVALUATING AT EACH POINT
-        // let g_manual_evals: Vec<_> = (0..n)
-        //     .map(|index| g.evaluate(&domain_k.element(index)))
-        //     .collect();
-        // println!("mega dummy check");
-        // g_manual_evals
-        //     .iter()
-        //     .zip(g_evals.evals.iter())
-        //     .for_each(|(&manual, &g)| {
-        //         assert_eq!(manual, g);
-        //         println!("{}, {}", manual, g)
-        //     });
-
-        // // CHECK THAT THE PRODUCT OF EVALUATIONS OF F WITH EVALUATIONS OF G IS STILL ONE
-        // let product_of_the_evaluations: Vec<_> = f
-        //     .evaluate_over_domain_by_ref(domain_k)
-        //     .evals
-        //     .iter()
-        //     .zip(g.evaluate_over_domain_by_ref(domain_k).evals.iter())
-        //     .map(|(&f_eval, g_eval)| f_eval * g_eval)
-        //     .collect();
-        // println!("PRODUCT OF THE EVALUATIONS");
-        // product_of_the_evaluations
-        //     .iter()
-        //     .for_each(|&p| println!("{p}"));
-
-        // Step 5: Manually compute the product polynomial of f and g
-        let f_times_g = LabeledPolynomial::new(
-            String::from("f_times_g"),
-            f.polynomial() * g.polynomial(),
-            None,
-            hiding_bound,
-        );
-
-        // // CHECK THAT THE EVALUTION OF THE PRODUCT MATCHES THE PRODUCT OF THE EVALUATIONS
-        // let evaluations_of_product_poly = f_times_g.evaluate_over_domain_by_ref(domain_k);
-        // let products_of_poly_evaluations: Vec<_> = f
-        //     .evaluate_over_domain_by_ref(domain_k)
-        //     .evals
-        //     .iter()
-        //     .zip(g.evaluate_over_domain_by_ref(domain_k).evals.iter())
-        //     .map(|(&f_eval, &g_eval)| f_eval * g_eval)
-        //     .collect();
-
-        // evaluations_of_product_poly
-        //     .evals
-        //     .iter()
-        //     .zip(products_of_poly_evaluations.iter())
-        //     .for_each(|(eval_of_prod, prod_of_evals)| println!("{eval_of_prod}, {prod_of_evals}"));
-
+        // Step 5: commit to the concrete oracles
         let concrete_oracles = [f, g];
-        let alphas = vec![F::one(), F::one()];
         let (commitments, rands) = PC::commit(&ck, &concrete_oracles, Some(rng))
             .map_err(to_pc_error::<F, PC>)
             .unwrap();
 
-        let zero_over_k_vo = InverseCheckOracle::new();
+        // Step 6: Derive the desired virtual oracle
+        let alphas = vec![F::one(), F::one()];
+        let inverse_check_oracle = InverseCheckOracle::new();
 
-        let sanity_check = zero_over_k_vo
-            .instantiate_in_coeffs_form(&concrete_oracles, &alphas)
-            .unwrap();
-        let check_evals = sanity_check.evaluate_over_domain(domain_k);
-        check_evals.evals.iter().for_each(|eval| println!("{eval}"));
-
+        // Step 7: prove
         let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
             &concrete_oracles,
             &commitments,
             &rands,
-            Some(degree_bound),
-            &zero_over_k_vo,
+            Some(enforced_degree_bound),
+            &inverse_check_oracle,
             &alphas,
             &domain_k,
             &ck,
             rng,
         );
 
+        // Step 8: verify
         let is_valid = ZeroOverK::<F, PC, D>::verify(
             zero_over_k_proof.unwrap(),
             &commitments,
-            Some(degree_bound),
-            &zero_over_k_vo,
+            Some(enforced_degree_bound),
+            &inverse_check_oracle,
             &domain_k,
             &alphas,
             &vk,
@@ -177,16 +115,19 @@ mod test {
     }
 
     #[test]
-    fn test_zero_over_k_prod_vo() {
-        let n = 8;
+    fn test_error_on_invalid_proof() {
+        let m = 8;
         let rng = &mut thread_rng();
-        let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();
+        let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
 
         let max_degree = 20;
-        let degree_bound = 14;
-        let hiding_bound = Some(1);
+        let max_hiding = 1;
+
+        let enforced_hiding_bound = Some(1);
+        let enforced_degree_bound = 14;
+
         let pp = PC::setup(max_degree, None, rng).unwrap();
-        let (ck, vk) = PC::trim(&pp, max_degree, 1, Some(&[2, 14])).unwrap();
+        let (ck, vk) = PC::trim(&pp, max_degree, max_hiding, Some(&[2, 14])).unwrap();
 
         let f_evals: Vec<F> = vec![
             F::from(1u64),
@@ -199,8 +140,13 @@ mod test {
             F::from(8u64),
         ];
 
-        let f = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&f_evals));
-        let f = LabeledPolynomial::new(String::from("g"), f, Some(degree_bound), hiding_bound);
+        let f = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&f_evals));
+        let f = LabeledPolynomial::new(
+            String::from("g"),
+            f,
+            Some(enforced_degree_bound),
+            enforced_hiding_bound,
+        );
 
         let g_evals: Vec<F> = vec![
             F::from(1u64),
@@ -213,12 +159,12 @@ mod test {
             F::from(8u64),
         ];
 
-        let g = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&g_evals));
+        let g = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&g_evals));
         let g = LabeledPolynomial::new(
             String::from("g"),
             g.clone(),
-            Some(degree_bound),
-            hiding_bound,
+            Some(enforced_degree_bound),
+            enforced_hiding_bound,
         );
 
         let concrete_oracles = [f, g];
@@ -233,28 +179,127 @@ mod test {
             &concrete_oracles,
             &commitments,
             &rands,
-            Some(degree_bound),
+            Some(enforced_degree_bound),
             &zero_over_k_vo,
             &alphas,
-            &domain,
+            &domain_k,
             &ck,
             rng,
         )
         .unwrap();
 
-        let is_valid = ZeroOverK::<F, PC, D>::verify(
+        let res = ZeroOverK::<F, PC, D>::verify(
             zero_over_k_proof,
             &commitments,
-            Some(degree_bound),
+            Some(enforced_degree_bound),
             &zero_over_k_vo,
-            &domain,
+            &domain_k,
             &alphas,
             &vk,
         );
 
-        assert!(is_valid.is_err());
+        assert!(res.is_err());
 
         // Test for a specific error
-        assert_eq!(is_valid.err().unwrap(), Error::Check2Failed);
+        assert_eq!(res.unwrap_err(), Error::Check2Failed);
+    }
+
+    #[test]
+    fn test_degree_bound_not_respected() {
+        let m = 8;
+        let rng = &mut test_rng();
+        let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
+
+        let max_degree = 20;
+        let max_hiding = 1;
+
+        let enforced_hiding_bound = Some(1);
+        let prover_degree_bound = 15;
+        let verifier_degree_bound = 14;
+
+        let pp = PC::setup(max_degree, None, rng).unwrap();
+        let (ck, vk) = PC::trim(
+            &pp,
+            max_degree,
+            max_hiding,
+            Some(&[2, verifier_degree_bound, prover_degree_bound]),
+        )
+        .unwrap();
+
+        // Step 1: choose a random polynomial
+        let f_unlabeled: DensePolynomial<F> = random_deg_n_polynomial(7, rng);
+        let f = LabeledPolynomial::new(
+            String::from("f"),
+            f_unlabeled,
+            Some(prover_degree_bound),
+            enforced_hiding_bound,
+        );
+
+        // Step 2: evaluate it
+        let f_evals = f.evaluate_over_domain_by_ref(domain_k);
+
+        // Step 3: find the inverse at each of these points
+        let desired_g_evals = f_evals
+            .evals
+            .iter()
+            .map(|&x| x.inverse().unwrap())
+            .collect::<Vec<_>>();
+        let desired_g_evals = Evaluations::from_vec_and_domain(desired_g_evals, domain_k);
+
+        // Step 4: interpolate a polynomial from the inverses
+        let g = desired_g_evals.clone().interpolate();
+        let g = LabeledPolynomial::new(
+            String::from("g"),
+            g.clone(),
+            Some(prover_degree_bound),
+            enforced_hiding_bound,
+        );
+
+        // Step 5: commit to the concrete oracles
+        let concrete_oracles = [f, g];
+        let (commitments, rands) = PC::commit(&ck, &concrete_oracles, Some(rng))
+            .map_err(to_pc_error::<F, PC>)
+            .unwrap();
+
+        // Step 6: Derive the desired virtual oracle
+        let alphas = vec![F::one(), F::one()];
+        let inverse_check_oracle = InverseCheckOracle::new();
+
+        // Step 7: prove
+        let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
+            &concrete_oracles,
+            &commitments,
+            &rands,
+            Some(prover_degree_bound),
+            &inverse_check_oracle,
+            &alphas,
+            &domain_k,
+            &ck,
+            rng,
+        )
+        .unwrap();
+
+        // Step 8: verify
+        let verifier_commitments: Vec<LabeledCommitment<_>> = commitments
+            .iter()
+            .map(|c| {
+                let label = c.label().clone();
+                let comm = c.commitment().clone();
+                LabeledCommitment::new(label, comm, Some(verifier_degree_bound))
+            })
+            .collect();
+        let res = ZeroOverK::<F, PC, D>::verify(
+            zero_over_k_proof,
+            &verifier_commitments,
+            Some(verifier_degree_bound),
+            &inverse_check_oracle,
+            &domain_k,
+            &alphas,
+            &vk,
+        );
+
+        assert!(res.is_err());
+
+        assert_eq!(res.unwrap_err(), Error::BatchCheckError);
     }
 }
