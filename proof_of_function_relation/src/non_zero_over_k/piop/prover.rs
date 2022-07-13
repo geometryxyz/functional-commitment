@@ -60,7 +60,12 @@ impl<F: PrimeField + FftField> PIOPforNonZeroOverK<F> {
             .collect::<Vec<_>>();
 
         let g = DensePolynomial::<F>::from_coefficients_slice(&state.domain_k.ifft(&g_evals));
-        let g = LabeledPolynomial::new(String::from("g"), g.clone(), None, None);
+        let g = LabeledPolynomial::new(
+            String::from("g"),
+            g.clone(),
+            state.f.degree_bound(),
+            Some(1),
+        );
 
         // create ProverFirstOracles struct
         let prover_oracles = ProverFirstOracles { g };
