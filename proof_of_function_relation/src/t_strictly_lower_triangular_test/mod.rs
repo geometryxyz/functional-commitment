@@ -3,7 +3,6 @@ use crate::{
     discrete_log_comparison::DLComparison,
     error::{to_pc_error, Error},
     geo_seq::GeoSeqTest,
-    label_polynomial,
     subset_over_k::SubsetOverK,
     t_strictly_lower_triangular_test::proof::Proof,
     util::generate_sequence,
@@ -45,9 +44,12 @@ where
         domain_k: &GeneralEvaluationDomain<F>,
         domain_h: &GeneralEvaluationDomain<F>,
         row_poly: &LabeledPolynomial<F, DensePolynomial<F>>,
-        col_poly: &LabeledPolynomial<F, DensePolynomial<F>>,
         row_commit: &LabeledCommitment<PC::Commitment>,
+        row_random: &PC::Randomness,
+        col_poly: &LabeledPolynomial<F, DensePolynomial<F>>,
         col_commit: &LabeledCommitment<PC::Commitment>,
+        col_random: &PC::Randomness,
+        enforced_degree_bound: Option<usize>,
         fs_rng: &mut FiatShamirRng<D>,
         rng: &mut R,
     ) -> Result<Proof<F, PC>, Error> {
@@ -72,10 +74,10 @@ where
 
         let seq = generate_sequence::<F>(r, &a_s.as_slice(), &c_s.as_slice());
         let h = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&seq));
-        let h = label_polynomial!(h);
+        let h = LabeledPolynomial::new(String::from("h"), h, enforced_degree_bound, Some(1));
 
         let (commitment, rands) =
-            PC::commit(&ck, &[h.clone()], None).map_err(to_pc_error::<F, PC>)?;
+            PC::commit(&ck, &[h.clone()], Some(rng)).map_err(to_pc_error::<F, PC>)?;
 
         let h_commit = commitment[0].clone();
 
@@ -89,7 +91,18 @@ where
 
         // Step 4: Discrete Log Comparison between row_M and col_M
         let dl_proof = DLComparison::<F, PC, D>::prove(
-            ck, domain_k, domain_h, row_poly, col_poly, row_commit, col_commit, fs_rng, rng,
+            ck,
+            domain_k,
+            domain_h,
+            row_poly,
+            row_commit,
+            row_random,
+            col_poly,
+            col_commit,
+            col_random,
+            enforced_degree_bound,
+            fs_rng,
+            rng,
         )?;
 
         let proof = Proof {
@@ -110,9 +123,22 @@ where
         domain_h: &GeneralEvaluationDomain<F>,
         row_commit: &LabeledCommitment<PC::Commitment>,
         col_commit: &LabeledCommitment<PC::Commitment>,
+        enforced_degree_bound: Option<usize>,
         proof: Proof<F, PC>,
         fs_rng: &mut FiatShamirRng<D>,
     ) -> Result<(), Error> {
+        // re-label the oracle commitments with the enforced degree bound
+        let row_commit = LabeledCommitment::new(
+            row_commit.label().clone(),
+            row_commit.commitment().clone(),
+            enforced_degree_bound,
+        );
+        let col_commit = LabeledCommitment::new(
+            col_commit.label().clone(),
+            col_commit.commitment().clone(),
+            enforced_degree_bound,
+        );
+
         // Step 2: Geometric sequence test on h
         let mut a_s = vec![domain_h.element(t)];
         let mut c_s = vec![domain_h.size() - t];
@@ -123,7 +149,8 @@ where
             c_s.push(to_pad);
         }
 
-        let h_commit = LabeledCommitment::new(String::from("h"), proof.h_commit, None);
+        let h_commit =
+            LabeledCommitment::new(String::from("h"), proof.h_commit, enforced_degree_bound);
 
         GeoSeqTest::<F, PC, D>::verify(
             domain_h.element(1),
@@ -131,6 +158,7 @@ where
             &c_s,
             domain_k,
             &h_commit,
+            enforced_degree_bound,
             proof.geo_seq_proof,
             vk,
         )?;
@@ -144,8 +172,9 @@ where
             ck,
             domain_k,
             domain_h,
-            row_commit,
-            col_commit,
+            &row_commit,
+            &col_commit,
+            enforced_degree_bound,
             proof.dl_proof,
             fs_rng,
         )?;

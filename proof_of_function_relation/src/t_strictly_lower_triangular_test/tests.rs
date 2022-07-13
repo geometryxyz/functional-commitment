@@ -1,8 +1,7 @@
 #[cfg(test)]
 mod test {
     use crate::{
-        commitment::KZG10, error::Error, label_polynomial,
-        t_strictly_lower_triangular_test::TStrictlyLowerTriangular,
+        commitment::KZG10, error::Error, t_strictly_lower_triangular_test::TStrictlyLowerTriangular,
     };
 
     use ark_bn254::{Bn254, Fr};
@@ -11,7 +10,7 @@ mod test {
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
     };
-    use ark_poly_commit::PolynomialCommitment;
+    use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
 
@@ -46,12 +45,15 @@ mod test {
         // i.e. the position of the non-zero elements are:
         // (2, 0), (2, 1), (3, 1), (3, 2)
 
-        let mut rng = thread_rng();
+        let rng = &mut thread_rng();
         let m = 6;
         let n = 4;
 
         let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
         let domain_h = GeneralEvaluationDomain::<F>::new(n).unwrap();
+
+        let enforced_degree_bound = domain_k.size() + 1;
+        let enforced_hiding_bound = 1;
 
         let _gamma = domain_k.element(1);
 
@@ -74,15 +76,31 @@ mod test {
         let row_poly = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&row_m_evals));
         let col_poly = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&col_m_evals));
 
-        let row_poly = label_polynomial!(row_poly);
-        let col_poly = label_polynomial!(col_poly);
+        let row_poly = LabeledPolynomial::new(
+            String::from("row_poly"),
+            row_poly,
+            Some(enforced_degree_bound),
+            Some(enforced_hiding_bound),
+        );
+        let col_poly = LabeledPolynomial::new(
+            String::from("col_poly"),
+            col_poly,
+            Some(enforced_degree_bound),
+            Some(enforced_hiding_bound),
+        );
 
         let max_degree = 20;
-        let pp = PC::setup(max_degree, None, &mut rng).unwrap();
-        let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
+        let pp = PC::setup(max_degree, None, rng).unwrap();
+        let (ck, vk) = PC::trim(
+            &pp,
+            max_degree,
+            enforced_hiding_bound,
+            Some(&[2, enforced_degree_bound]),
+        )
+        .unwrap();
 
-        let (commitments, _) =
-            PC::commit(&ck, &[row_poly.clone(), col_poly.clone()], Some(&mut rng)).unwrap();
+        let (commitments, rands) =
+            PC::commit(&ck, &[row_poly.clone(), col_poly.clone()], Some(rng)).unwrap();
 
         let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
 
@@ -92,11 +110,14 @@ mod test {
             &domain_k,
             &domain_h,
             &row_poly,
-            &col_poly,
             &commitments[0].clone(),
+            &rands[0].clone(),
+            &col_poly,
             &commitments[1].clone(),
+            &rands[1].clone(),
+            Some(enforced_degree_bound),
             &mut fs_rng,
-            &mut rng,
+            rng,
         )
         .unwrap();
 
@@ -111,6 +132,7 @@ mod test {
                 &domain_h,
                 &commitments[0].clone(),
                 &commitments[1].clone(),
+                Some(enforced_degree_bound),
                 proof,
                 &mut fs_rng,
             )
@@ -143,13 +165,16 @@ mod test {
         // row_m_evals   =  w^2    w^2       w^3       w^3      w^2      w^3      w^3     w^3
         // col_m_evals   =  w^0    w^1       w^1       w^2      w^2      w^2      w^2     w^2
 
-        let mut rng = thread_rng();
+        let rng = &mut thread_rng();
 
         let m = 6;
         let n = 4;
 
         let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
         let domain_h = GeneralEvaluationDomain::<F>::new(n).unwrap();
+
+        let enforced_degree_bound = domain_k.size() + 1;
+        let enforced_hiding_bound = 1;
 
         let _gamma = domain_k.element(1);
 
@@ -170,14 +195,30 @@ mod test {
         let col_poly = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&col_m_evals));
 
         let max_degree = 20;
-        let pp = PC::setup(max_degree, None, &mut rng).unwrap();
-        let (ck, _) = PC::trim(&pp, max_degree, 0, None).unwrap();
+        let pp = PC::setup(max_degree, None, rng).unwrap();
+        let (ck, _) = PC::trim(
+            &pp,
+            max_degree,
+            enforced_hiding_bound,
+            Some(&[2, enforced_degree_bound]),
+        )
+        .unwrap();
 
-        let row_poly = label_polynomial!(row_poly);
-        let col_poly = label_polynomial!(col_poly);
+        let row_poly = LabeledPolynomial::new(
+            String::from("row_poly"),
+            row_poly,
+            Some(enforced_degree_bound),
+            Some(enforced_hiding_bound),
+        );
+        let col_poly = LabeledPolynomial::new(
+            String::from("col_poly"),
+            col_poly,
+            Some(enforced_degree_bound),
+            Some(enforced_hiding_bound),
+        );
 
-        let (commitments, _) =
-            PC::commit(&ck, &[row_poly.clone(), col_poly.clone()], Some(&mut rng)).unwrap();
+        let (commitments, rands) =
+            PC::commit(&ck, &[row_poly.clone(), col_poly.clone()], Some(rng)).unwrap();
 
         let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
 
@@ -187,15 +228,117 @@ mod test {
             &domain_k,
             &domain_h,
             &row_poly,
-            &col_poly,
             &commitments[0].clone(),
+            &rands[0].clone(),
+            &col_poly,
             &commitments[1].clone(),
+            &rands[1].clone(),
+            Some(enforced_degree_bound),
             &mut fs_rng,
-            &mut rng,
+            rng,
         );
 
         // Test for a specific error
         assert_eq!(proof.err().unwrap(), Error::FEvalIsZero);
+    }
+
+    #[test]
+    fn test_reject_wrong_degree() {
+        let rng = &mut thread_rng();
+        let m = 6;
+        let n = 4;
+
+        let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
+        let domain_h = GeneralEvaluationDomain::<F>::new(n).unwrap();
+
+        let enforced_degree_bound = domain_k.size() - 1;
+        let other_degree_bound = domain_k.size() + 1;
+        let enforced_hiding_bound = 1;
+
+        let _gamma = domain_k.element(1);
+
+        let omega_0 = domain_h.element(0);
+        let omega_1 = domain_h.element(1);
+        let omega_2 = domain_h.element(2);
+        let omega_3 = domain_h.element(3);
+
+        let row_m_evals = vec![
+            omega_2, omega_2, omega_3, omega_3, omega_3, omega_3, omega_3, omega_3,
+        ];
+        let col_m_evals = vec![
+            omega_0, omega_1, omega_2, omega_2, omega_2, omega_2, omega_2,
+            omega_2,
+            // or should it be:
+            //omega_0, omega_0, omega_0, omega_1, omega_1, omega_1, omega_1, omega_1,
+        ];
+
+        let t = 2;
+        let row_poly = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&row_m_evals));
+        let col_poly = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&col_m_evals));
+
+        let row_poly = LabeledPolynomial::new(
+            String::from("row_poly"),
+            row_poly,
+            Some(other_degree_bound),
+            Some(enforced_hiding_bound),
+        );
+        let col_poly = LabeledPolynomial::new(
+            String::from("col_poly"),
+            col_poly,
+            Some(other_degree_bound),
+            Some(enforced_hiding_bound),
+        );
+
+        let max_degree = 20;
+        let pp = PC::setup(max_degree, None, rng).unwrap();
+        let (ck, vk) = PC::trim(
+            &pp,
+            max_degree,
+            enforced_hiding_bound,
+            Some(&[2, enforced_degree_bound, other_degree_bound]),
+        )
+        .unwrap();
+
+        let (commitments, rands) =
+            PC::commit(&ck, &[row_poly.clone(), col_poly.clone()], Some(rng)).unwrap();
+
+        let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
+
+        let proof = TStrictlyLowerTriangular::<F, PC, D>::prove(
+            &ck,
+            t,
+            &domain_k,
+            &domain_h,
+            &row_poly,
+            &commitments[0].clone(),
+            &rands[0].clone(),
+            &col_poly,
+            &commitments[1].clone(),
+            &rands[1].clone(),
+            Some(other_degree_bound),
+            &mut fs_rng,
+            rng,
+        )
+        .unwrap();
+
+        let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
+
+        let res = TStrictlyLowerTriangular::<F, PC, D>::verify(
+            &vk,
+            &ck,
+            t,
+            &domain_k,
+            &domain_h,
+            &commitments[0].clone(),
+            &commitments[1].clone(),
+            Some(enforced_degree_bound),
+            proof,
+            &mut fs_rng,
+        );
+
+        assert!(res.is_err());
+
+        assert_eq!(res.err().unwrap(), Error::BatchCheckError)
     }
 
     #[test]
@@ -223,13 +366,16 @@ mod test {
         // row_m_evals   =  w^1    w^2       w^2       w^3      w^3      w^3      w^3     w^3
         // col_m_evals   =  w^0    w^0       w^1       w^1      w^1      w^1      w^1     w^1
 
-        let mut rng = thread_rng();
+        let rng = &mut thread_rng();
 
         let m = 6;
         let n = 4;
 
         let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
         let domain_h = GeneralEvaluationDomain::<F>::new(n).unwrap();
+
+        let enforced_degree_bound = domain_k.size() + 1;
+        let enforced_hiding_bound = 1;
 
         let _gamma = domain_k.element(1);
 
@@ -250,14 +396,30 @@ mod test {
         let col_poly = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&col_m_evals));
 
         let max_degree = 20;
-        let pp = PC::setup(max_degree, None, &mut rng).unwrap();
-        let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
+        let pp = PC::setup(max_degree, None, rng).unwrap();
+        let (ck, vk) = PC::trim(
+            &pp,
+            max_degree,
+            enforced_hiding_bound,
+            Some(&[2, enforced_degree_bound]),
+        )
+        .unwrap();
 
-        let row_poly = label_polynomial!(row_poly);
-        let col_poly = label_polynomial!(col_poly);
+        let row_poly = LabeledPolynomial::new(
+            String::from("row_poly"),
+            row_poly,
+            Some(enforced_degree_bound),
+            Some(enforced_hiding_bound),
+        );
+        let col_poly = LabeledPolynomial::new(
+            String::from("col_poly"),
+            col_poly,
+            Some(enforced_degree_bound),
+            Some(enforced_hiding_bound),
+        );
 
-        let (commitments, _) =
-            PC::commit(&ck, &[row_poly.clone(), col_poly.clone()], Some(&mut rng)).unwrap();
+        let (commitments, rands) =
+            PC::commit(&ck, &[row_poly.clone(), col_poly.clone()], Some(rng)).unwrap();
 
         let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
 
@@ -267,11 +429,14 @@ mod test {
             &domain_k,
             &domain_h,
             &row_poly,
-            &col_poly,
             &commitments[0].clone(),
+            &rands[0].clone(),
+            &col_poly,
             &commitments[1].clone(),
+            &rands[1].clone(),
+            Some(enforced_degree_bound),
             &mut fs_rng,
-            &mut rng,
+            rng,
         )
         .unwrap();
 
@@ -286,6 +451,7 @@ mod test {
                 &domain_h,
                 &commitments[0].clone(),
                 &commitments[1].clone(),
+                Some(enforced_degree_bound),
                 proof,
                 &mut fs_rng,
             )
