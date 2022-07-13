@@ -1,14 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use crate::{
-        commitment::KZG10, error::Error, geo_seq::GeoSeqTest, label_polynomial,
-        util::generate_sequence,
-    };
+    use crate::{commitment::KZG10, error::Error, geo_seq::GeoSeqTest, util::generate_sequence};
     use ark_bn254::{Bn254, Fr};
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
     };
-    use ark_poly_commit::PolynomialCommitment;
+    use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
 
@@ -18,10 +15,10 @@ mod tests {
     /// Test that geometric_sequence() works correctly
     #[test]
     fn test_generate_sequence_0() {
-        let r = F::from(2u64);
-        let a_s = &[F::from(1u64), F::from(2u64)];
-        let c_s = &[3, 3];
-        let seq = generate_sequence(r, a_s, c_s);
+        let common_ratio = F::from(2u64);
+        let sequence_initial_values = &[F::from(1u64), F::from(2u64)];
+        let sequence_lengths = &[3, 3];
+        let seq = generate_sequence(common_ratio, sequence_initial_values, sequence_lengths);
 
         let expected = [1, 2, 4, 2, 4, 8]
             .iter()
@@ -33,17 +30,20 @@ mod tests {
         }
 
         assert!(GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::naive_verify(
-            &seq, r, a_s, c_s
+            &seq,
+            common_ratio,
+            sequence_initial_values,
+            sequence_lengths
         ));
     }
 
     #[test]
     fn test_generate_sequence_1() {
-        let r = F::from(1u64);
-        let a_s = &[F::from(1u64), F::from(1u64)];
-        let c_s = &[1, 1];
+        let common_ratio = F::from(1u64);
+        let sequence_initial_values = &[F::from(1u64), F::from(1u64)];
+        let sequence_lengths = &[1, 1];
 
-        let seq = generate_sequence(r, a_s, c_s);
+        let seq = generate_sequence(common_ratio, sequence_initial_values, sequence_lengths);
         let expected = [1, 1]
             .iter()
             .map(|x| F::from(*x as u64))
@@ -53,187 +53,279 @@ mod tests {
             assert_eq!(&expected[i], s);
         }
         assert!(GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::naive_verify(
-            &seq, r, a_s, c_s
+            &seq,
+            common_ratio,
+            sequence_initial_values,
+            sequence_lengths
         ));
     }
 
     #[test]
-    fn test_zero_over_k_for_geo_seq() {
-        let max_degree: usize = 80;
+    fn test_geo_seq() {
+        let rng = &mut thread_rng();
 
-        let pp = PC::setup(max_degree, None, &mut thread_rng()).unwrap();
-        let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
-
-        let mut rng = thread_rng();
-        let r = Fr::from(2u64);
-        let mut a_s = vec![
+        // define a sequence
+        let common_ratio = Fr::from(9u64);
+        let mut sequence_initial_values = vec![
             Fr::from(2u64),
             Fr::from(5u64),
             Fr::from(7u64),
             Fr::from(11u64),
         ];
-        let mut c_s = vec![5, 3, 10, 30];
-        let m = c_s.iter().sum();
+        let mut sequence_lengths = vec![5, 3, 10, 30];
 
-        let domain = GeneralEvaluationDomain::<Fr>::new(m).unwrap();
-        let to_pad = domain.size() - m;
+        // choose an appropriate domain for our sequence
+        let m = sequence_lengths.iter().sum();
+        let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
+
+        // pad sequence to fit the domain
+        let to_pad = domain_k.size() - m;
         if to_pad > 0 {
-            a_s.push(Fr::from(0u64));
-            c_s.push(to_pad);
+            sequence_initial_values.push(Fr::from(0u64));
+            sequence_lengths.push(to_pad);
         }
 
-        let seq = generate_sequence::<F>(r, &a_s.as_slice(), &c_s.as_slice());
+        // generate the sequence
+        let seq = generate_sequence::<F>(
+            common_ratio,
+            &sequence_initial_values.as_slice(),
+            &sequence_lengths.as_slice(),
+        );
 
-        // Generate f() such that f(w^n) = a_i*r^n
-        let f = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&seq));
-        let f = label_polynomial!(f);
+        // Setup our polynomial commitment scheme
+        let max_degree = 80;
+        let max_hiding = 1;
 
-        let (commitment, rands) = PC::commit(&ck, &[f.clone()], None).unwrap();
+        let enforced_hiding_bound = Some(1);
+        let enforced_degree_bound = domain_k.size() + 1; // masking polynomials in zero over k have degree |K|+1 by definition
 
-        let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(
-            &ck,
-            r,
-            &f,
-            &commitment[0].clone(),
-            &rands[0].clone(),
-            &mut a_s,
-            &mut c_s,
-            &domain,
-            &mut rng,
+        let pp = PC::setup(max_degree, None, rng).unwrap();
+        let (ck, vk) = PC::trim(
+            &pp,
+            max_degree,
+            max_hiding,
+            Some(&[2, enforced_degree_bound]),
         )
         .unwrap();
 
-        assert_eq!(
-            true,
-            GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::verify(
-                r,
-                &mut a_s,
-                &mut c_s,
-                &domain,
-                &commitment[0].clone(),
-                proof,
-                &vk,
-            )
-            .is_ok()
+        // Generate a polynomial from the sequence defined above
+        let f = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&seq));
+        let f = LabeledPolynomial::new(
+            String::from("f"),
+            f,
+            Some(enforced_degree_bound),
+            enforced_hiding_bound,
         );
-    }
 
-    #[test]
-    fn test_geo_seq() {
-        let r = F::from(2u64);
-        let mut a_s = vec![F::from(1u64), F::from(2u64)];
-        let mut c_s = vec![3, 3];
-
-        let seq = generate_sequence::<Fr>(r, &a_s.as_slice(), &c_s.as_slice());
-
-        let m = c_s.iter().sum();
-
-        let domain = GeneralEvaluationDomain::<Fr>::new(m).unwrap();
-        let to_pad = domain.size() - m;
-        if to_pad > 0 {
-            a_s.push(Fr::from(0u64));
-            c_s.push(to_pad);
-        }
-
-        let f = DensePolynomial::<Fr>::from_coefficients_slice(&domain.ifft(&seq));
-
-        let concrete_oracles = [label_polynomial!(f)];
-
-        let max_degree: usize = 80;
-
-        let pp = PC::setup(max_degree, None, &mut thread_rng()).unwrap();
-        let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
-
-        let (concrete_oracle_commitments, concrete_oracle_rands) =
-            PC::commit(&ck, &concrete_oracles, None).unwrap();
-
-        let mut rng = thread_rng();
+        let (commitment, rands) = PC::commit(&ck, &[f.clone()], Some(rng)).unwrap();
 
         let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(
             &ck,
-            r,
-            &concrete_oracles[0],
-            &concrete_oracle_commitments[0],
-            &concrete_oracle_rands[0],
-            &a_s,
-            &c_s,
-            &domain,
-            &mut rng,
-        );
+            common_ratio,
+            &f,
+            &commitment[0].clone(),
+            &rands[0].clone(),
+            &mut sequence_initial_values,
+            &mut sequence_lengths,
+            &domain_k,
+            rng,
+        )
+        .unwrap();
 
-        let is_valid = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::verify(
-            r,
-            &a_s,
-            &c_s,
-            &domain,
-            &concrete_oracle_commitments[0],
-            proof.unwrap(),
+        let res = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::verify(
+            common_ratio,
+            &sequence_initial_values,
+            &sequence_lengths,
+            &domain_k,
+            &commitment[0],
+            Some(enforced_degree_bound),
+            proof,
             &vk,
-        );
+        )
+        .unwrap();
 
-        assert!(is_valid.is_ok());
+        assert_eq!((), res)
     }
 
     #[test]
     fn test_geo_seq_invalid() {
-        let r = F::from(2u64);
-        let mut a_s = vec![F::from(1u64), F::from(2u64)];
-        let mut c_s = vec![3, 3];
+        let rng = &mut thread_rng();
 
-        let seq = generate_sequence::<Fr>(r, &a_s.as_slice(), &c_s.as_slice());
+        // define a sequence
+        let common_ratio = Fr::from(9u64);
+        let mut sequence_initial_values = vec![
+            Fr::from(2u64),
+            Fr::from(5u64),
+            Fr::from(7u64),
+            Fr::from(11u64),
+        ];
+        let mut sequence_lengths = vec![5, 3, 10, 30];
 
-        let m = c_s.iter().sum();
+        // choose an appropriate domain for our sequence
+        let m = sequence_lengths.iter().sum();
+        let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
 
-        let domain = GeneralEvaluationDomain::<Fr>::new(m).unwrap();
-        let to_pad = domain.size() - m;
+        // pad sequence to fit the domain
+        let to_pad = domain_k.size() - m;
         if to_pad > 0 {
-            a_s.push(Fr::from(0u64));
-            c_s.push(to_pad);
+            sequence_initial_values.push(Fr::from(0u64));
+            sequence_lengths.push(to_pad);
         }
 
-        let f = DensePolynomial::<Fr>::from_coefficients_slice(&domain.ifft(&seq));
+        // generate the sequence
+        let seq = generate_sequence::<F>(
+            common_ratio,
+            &sequence_initial_values.as_slice(),
+            &sequence_lengths.as_slice(),
+        );
 
-        let concrete_oracles = [label_polynomial!(f)];
+        // Setup our polynomial commitment scheme
+        let max_degree = 129;
+        let max_hiding = 1;
 
-        let max_degree: usize = 80;
+        let enforced_hiding_bound = Some(1);
+        let enforced_degree_bound = domain_k.size() + 1; // masking polynomials in zero over k have degree |K|+1 by definition
 
-        let pp = PC::setup(max_degree, None, &mut thread_rng()).unwrap();
-        let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
+        let pp = PC::setup(max_degree, None, rng).unwrap();
+        let (ck, vk) = PC::trim(
+            &pp,
+            max_degree,
+            max_hiding,
+            Some(&[2, enforced_degree_bound]),
+        )
+        .unwrap();
 
-        let (concrete_oracle_commitments, concrete_oracle_rands) =
-            PC::commit(&ck, &concrete_oracles, None).unwrap();
+        // Generate a polynomial from the sequence defined above
+        let f = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&seq));
+        let f = LabeledPolynomial::new(
+            String::from("f"),
+            f,
+            Some(enforced_degree_bound),
+            enforced_hiding_bound,
+        );
 
-        let mut rng = thread_rng();
+        let (commitment, rands) = PC::commit(&ck, &[f.clone()], Some(rng)).unwrap();
 
-        let r_invalid = F::from(9u64);
+        let wrong_common_ratio = Fr::from(2u64);
 
         let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(
             &ck,
-            r_invalid, // This will create a proof for an r value which the verifier does not expect
-            &concrete_oracles[0],
-            &concrete_oracle_commitments[0],
-            &concrete_oracle_rands[0],
-            &a_s,
-            &c_s,
-            &domain,
-            &mut rng,
-        );
+            wrong_common_ratio,
+            &f,
+            &commitment[0].clone(),
+            &rands[0].clone(),
+            &mut sequence_initial_values,
+            &mut sequence_lengths,
+            &domain_k,
+            rng,
+        )
+        .unwrap();
 
-        let is_valid = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::verify(
-            r,
-            &a_s,
-            &c_s,
-            &domain,
-            &concrete_oracle_commitments[0],
-            proof.unwrap(),
+        let res = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::verify(
+            common_ratio,
+            &sequence_initial_values,
+            &sequence_lengths,
+            &domain_k,
+            &commitment[0],
+            Some(enforced_degree_bound),
+            proof,
             &vk,
         );
 
-        assert_eq!(false, r == r_invalid);
+        assert!(common_ratio != wrong_common_ratio);
 
-        assert!(is_valid.is_err());
+        assert!(res.is_err());
 
         // Test for a specific error
-        assert_eq!(is_valid.err().unwrap(), Error::Check2Failed);
+        assert_eq!(res.err().unwrap(), Error::Check2Failed);
+    }
+
+    #[test]
+    fn test_reject_wrong_degree() {
+        let rng = &mut thread_rng();
+
+        // define a sequence
+        let common_ratio = Fr::from(9u64);
+        let mut sequence_initial_values = vec![
+            Fr::from(2u64),
+            Fr::from(5u64),
+            Fr::from(7u64),
+            Fr::from(11u64),
+        ];
+        let mut sequence_lengths = vec![5, 3, 10, 30];
+
+        // choose an appropriate domain for our sequence
+        let m = sequence_lengths.iter().sum();
+        let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
+
+        // pad sequence to fit the domain
+        let to_pad = domain_k.size() - m;
+        if to_pad > 0 {
+            sequence_initial_values.push(Fr::from(0u64));
+            sequence_lengths.push(to_pad);
+        }
+
+        // generate the sequence
+        let seq = generate_sequence::<F>(
+            common_ratio,
+            &sequence_initial_values.as_slice(),
+            &sequence_lengths.as_slice(),
+        );
+
+        // Setup our polynomial commitment scheme
+        let max_degree = 80;
+        let max_hiding = 1;
+
+        let enforced_hiding_bound = Some(1);
+        let enforced_degree_bound = domain_k.size() + 1; // masking polynomials in zero over k have degree |K|+1 by definition
+        let other_degree = max_degree;
+
+        let pp = PC::setup(max_degree, None, rng).unwrap();
+        let (ck, vk) = PC::trim(
+            &pp,
+            max_degree,
+            max_hiding,
+            Some(&[2, enforced_degree_bound, other_degree]),
+        )
+        .unwrap();
+
+        // Generate a polynomial from the sequence defined above
+        let f = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&seq));
+        let f = LabeledPolynomial::new(
+            String::from("f"),
+            f,
+            Some(other_degree),
+            enforced_hiding_bound,
+        );
+
+        let (commitment, rands) = PC::commit(&ck, &[f.clone()], Some(rng)).unwrap();
+
+        let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(
+            &ck,
+            common_ratio,
+            &f,
+            &commitment[0].clone(),
+            &rands[0].clone(),
+            &mut sequence_initial_values,
+            &mut sequence_lengths,
+            &domain_k,
+            rng,
+        )
+        .unwrap();
+
+        let res = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::verify(
+            common_ratio,
+            &sequence_initial_values,
+            &sequence_lengths,
+            &domain_k,
+            &commitment[0],
+            Some(enforced_degree_bound),
+            proof,
+            &vk,
+        );
+
+        assert!(res.is_err());
+
+        assert_eq!(res.err().unwrap(), Error::BatchCheckError);
     }
 }

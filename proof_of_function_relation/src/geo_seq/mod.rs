@@ -30,25 +30,28 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
     // TODO: verifier should check that the size of the sequence is correct given the domain
     pub fn prove<R: Rng>(
         ck: &PC::CommitterKey,
-        r: F,
+        common_ratio: F,
         f: &LabeledPolynomial<F, DensePolynomial<F>>,
         f_commit: &LabeledCommitment<PC::Commitment>,
         f_rand: &PC::Randomness,
-        a_s: &Vec<F>,
-        c_s: &Vec<usize>,
+        sequence_initial_values: &Vec<F>,
+        sequence_lengths: &Vec<usize>,
         domain: &GeneralEvaluationDomain<F>,
         rng: &mut R,
     ) -> Result<Proof<F, PC>, Error> {
         // Generate the GeoSequenceVO virtual oracle
-        let geo_seq_vo = GeoSequenceVO::new(&c_s, domain.element(1), r);
+        let geo_seq_vo = GeoSequenceVO::new(&sequence_lengths, domain.element(1), common_ratio);
 
         let alphas = [F::from(1u64), domain.element(1)];
 
         let fs_bytes = &to_bytes![
             &Self::PROTOCOL_NAME,
-            a_s,
-            c_s.iter().map(|&x| x as u64).collect::<Vec<_>>(),
-            r,
+            sequence_initial_values,
+            sequence_lengths
+                .iter()
+                .map(|&x| x as u64)
+                .collect::<Vec<_>>(),
+            common_ratio,
             &[f_commit.clone()].to_vec(),
             &alphas.to_vec()
         ]
@@ -56,8 +59,8 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
         let mut fs_rng = FiatShamirRng::<D>::from_seed(fs_bytes);
 
         let mut query_set = QuerySet::new();
-        let pi_s = geo_seq_vo.get_pi_s();
-        for (i, &pi) in pi_s.iter().enumerate() {
+        let sequence_starting_indices = geo_seq_vo.get_pi_s();
+        for (i, &pi) in sequence_starting_indices.iter().enumerate() {
             query_set.insert((
                 f.label().clone(),
                 (
@@ -83,6 +86,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
             &[f.clone()],
             &[f_commit.clone()],
             &[f_rand.clone()],
+            f.degree_bound(),
             &geo_seq_vo,
             &alphas.to_vec(),
             &domain,
@@ -98,30 +102,40 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
     }
 
     pub fn verify(
-        r: F,
-        a_s: &Vec<F>,
-        c_s: &Vec<usize>,
+        common_ratio: F,
+        sequence_initial_values: &Vec<F>,
+        sequence_lengths: &Vec<usize>,
         domain: &GeneralEvaluationDomain<F>,
         f_commit: &LabeledCommitment<PC::Commitment>,
+        enforced_degree_bound: Option<usize>,
         proof: Proof<F, PC>,
         vk: &PC::VerifierKey,
     ) -> Result<(), Error> {
+        let bounded_f_commit = LabeledCommitment::new(
+            f_commit.label().clone(),
+            f_commit.commitment().clone(),
+            enforced_degree_bound,
+        );
+
         let alphas = [F::from(1u64), domain.element(1)];
-        let geo_seq_vo = GeoSequenceVO::new(&c_s, domain.element(1), r);
+        let geo_seq_vo = GeoSequenceVO::new(&sequence_lengths, domain.element(1), common_ratio);
 
         // Test that for all i in n, check that f(gamma^p_i) = a_i
-        let pi_s = geo_seq_vo.get_pi_s();
-        let points = pi_s
+        let sequence_starting_indices = geo_seq_vo.get_pi_s();
+        let points = sequence_starting_indices
             .iter()
             .map(|&pi| domain.element(1).pow([pi as u64]))
             .collect::<Vec<_>>();
 
         let fs_bytes = &to_bytes![
             &Self::PROTOCOL_NAME,
-            a_s,
-            c_s.iter().map(|&x| x as u64).collect::<Vec<_>>(),
-            r,
-            &[&f_commit].to_vec(),
+            sequence_initial_values,
+            sequence_lengths
+                .iter()
+                .map(|&x| x as u64)
+                .collect::<Vec<_>>(),
+            common_ratio,
+            &[&bounded_f_commit].to_vec(),
             &alphas.to_vec()
         ]
         .map_err(|_| Error::ToBytesError)?;
@@ -130,19 +144,19 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
         let mut query_set = QuerySet::new();
         for (i, &point_i) in points.iter().enumerate() {
             query_set.insert((
-                f_commit.label().clone(),
+                bounded_f_commit.label().clone(),
                 (format!("gamma_pi_{}", i), point_i),
             ));
         }
         let mut evaluations = ark_poly_commit::Evaluations::new();
-        for (&point_i, &a_i) in points.iter().zip(a_s.iter()) {
-            evaluations.insert((f_commit.label().clone(), point_i), a_i);
+        for (&point_i, &a_i) in points.iter().zip(sequence_initial_values.iter()) {
+            evaluations.insert((bounded_f_commit.label().clone(), point_i), a_i);
         }
 
         let separation_challenge = F::rand(&mut fs_rng);
         match PC::batch_check(
             vk,
-            &[f_commit.clone()],
+            &[bounded_f_commit.clone()],
             &query_set,
             &evaluations,
             &proof.opening_proof,
@@ -163,7 +177,8 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
         // TODO: raise a different error?
         ZeroOverK::<F, PC, D>::verify(
             proof.z_proof,
-            &[f_commit.clone()],
+            &[bounded_f_commit.clone()],
+            enforced_degree_bound,
             &geo_seq_vo,
             &domain,
             &alphas,
