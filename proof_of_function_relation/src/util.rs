@@ -1,4 +1,3 @@
-use ark_bn254::Fr;
 use ark_ff::{FftField, Field, PrimeField};
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, Evaluations, GeneralEvaluationDomain,
@@ -124,10 +123,12 @@ pub fn compute_vanishing_poly_over_coset<F: FftField>(
 }
 
 #[allow(dead_code)]
-pub fn gen_t_diag_test_polys(
-    domain_k: GeneralEvaluationDomain<Fr>,
-    domain_h: GeneralEvaluationDomain<Fr>,
-) -> Vec<LabeledPolynomial<Fr, DensePolynomial<Fr>>> {
+pub fn gen_t_diag_test_polys<F: FftField>(
+    domain_k: GeneralEvaluationDomain<F>,
+    domain_h: GeneralEvaluationDomain<F>,
+    degree_bound: Option<usize>,
+    hiding_bound: Option<usize>,
+) -> Vec<LabeledPolynomial<F, DensePolynomial<F>>> {
     // M indices
     /*
     00, 01, 02, 03
@@ -206,32 +207,67 @@ pub fn gen_t_diag_test_polys(
     ];
 
     let val_c_evals = vec![
-        Fr::from(2u64),
-        Fr::from(2u64),
-        Fr::from(0u64),
-        Fr::from(0u64),
-        Fr::from(0u64),
-        Fr::from(0u64),
-        Fr::from(0u64),
-        Fr::from(0u64),
+        F::from(2u64),
+        F::from(2u64),
+        F::from(0u64),
+        F::from(0u64),
+        F::from(0u64),
+        F::from(0u64),
+        F::from(0u64),
+        F::from(0u64),
     ];
 
-    let row_a_poly = DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&row_a_evals));
-    let col_a_poly = DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&col_a_evals));
-    let row_a_poly = label_polynomial!(row_a_poly);
-    let col_a_poly = label_polynomial!(col_a_poly);
+    let row_a_poly = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&row_a_evals));
+    let col_a_poly = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&col_a_evals));
+    let row_a_poly = LabeledPolynomial::new(
+        String::from("row_a_poly"),
+        row_a_poly,
+        degree_bound,
+        hiding_bound,
+    );
+    let col_a_poly = LabeledPolynomial::new(
+        String::from("col_a_poly"),
+        col_a_poly,
+        degree_bound,
+        hiding_bound,
+    );
 
-    let row_b_poly = DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&row_b_evals));
-    let col_b_poly = DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&col_b_evals));
-    let row_b_poly = label_polynomial!(row_b_poly);
-    let col_b_poly = label_polynomial!(col_b_poly);
+    let row_b_poly = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&row_b_evals));
+    let col_b_poly = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&col_b_evals));
+    let row_b_poly = LabeledPolynomial::new(
+        String::from("row_b_poly"),
+        row_b_poly,
+        degree_bound,
+        hiding_bound,
+    );
+    let col_b_poly = LabeledPolynomial::new(
+        String::from("col_b_poly"),
+        col_b_poly,
+        degree_bound,
+        hiding_bound,
+    );
 
-    let row_c_poly = DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&row_c_evals));
-    let col_c_poly = DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&col_c_evals));
-    let val_c_poly = DensePolynomial::<Fr>::from_coefficients_slice(&domain_k.ifft(&val_c_evals));
-    let row_c_poly = label_polynomial!(row_c_poly);
-    let col_c_poly = label_polynomial!(col_c_poly);
-    let val_c_poly = label_polynomial!(val_c_poly);
+    let row_c_poly = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&row_c_evals));
+    let col_c_poly = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&col_c_evals));
+    let val_c_poly = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&val_c_evals));
+    let row_c_poly = LabeledPolynomial::new(
+        String::from("row_c_poly"),
+        row_c_poly,
+        degree_bound,
+        hiding_bound,
+    );
+    let col_c_poly = LabeledPolynomial::new(
+        String::from("col_c_poly"),
+        col_c_poly,
+        degree_bound,
+        hiding_bound,
+    );
+    let val_c_poly = LabeledPolynomial::new(
+        String::from("val_c_poly"),
+        val_c_poly,
+        degree_bound,
+        hiding_bound,
+    );
 
     vec![
         row_a_poly, col_a_poly, row_b_poly, col_b_poly, row_c_poly, col_c_poly, val_c_poly,
