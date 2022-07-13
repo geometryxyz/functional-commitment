@@ -1,5 +1,5 @@
 pub mod commitment;
-// pub mod discrete_log_comparison;
+pub mod discrete_log_comparison;
 pub mod error;
 pub mod geo_seq;
 pub mod non_zero_over_k;

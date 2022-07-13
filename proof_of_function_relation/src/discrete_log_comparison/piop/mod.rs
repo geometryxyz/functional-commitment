@@ -9,10 +9,7 @@ pub struct PIOPforDLComparison<F: PrimeField + SquareRootField> {
 }
 
 impl<F: PrimeField + SquareRootField> PIOPforDLComparison<F> {
-    pub fn generate_s_minus_one_linear_combination() -> LinearCombination<F> {
-        LinearCombination::new(
-            "s_minus_one",
-            vec![(F::one(), "s"), (-F::one(), "one_poly")],
-        )
+    pub fn s_minus_one_linear_combination() -> LinearCombination<F> {
+        LinearCombination::new("s_minus_one", vec![(F::one(), "s"), (-F::one(), "one")])
     }
 }
