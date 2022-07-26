@@ -42,6 +42,10 @@ pub enum Error {
     MismatchedDegreeBounds(String),
 
     UnsupportedDegree(String),
+
+    VOMismatchedVariants,
+    VOFailedToInstantiate,
+    VOFailedToCompute,
 }
 
 /// Convert an ark_poly_commit error
