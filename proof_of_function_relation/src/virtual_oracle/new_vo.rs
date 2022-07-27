@@ -6,19 +6,27 @@ use ark_ff::{FftField, Field};
 use ark_poly::{univariate::DensePolynomial, UVPolynomial};
 use ark_poly_commit::{Evaluations, PolynomialLabel, QuerySet};
 
-pub struct NewVO<F: Field> {
+pub struct NewVO<F, T>
+where
+    F: Field,
+    T: Fn(&[VOTerm<F>]) -> VOTerm<F>,
+{
     mapping_vector: Vec<usize>,
     shifting_coefficients: Vec<F>,
-    combine_function: fn(&[VOTerm<F>]) -> VOTerm<F>,
+    combine_function: T,
     minimum_oracle_length: usize,
 }
 
-impl<F: Field> NewVO<F> {
+impl<F, T> NewVO<F, T>
+where
+    F: Field,
+    T: Fn(&[VOTerm<F>]) -> VOTerm<F>,
+{
     /// Constructor for an input-shifting virtual oracle
     pub fn new(
         mapping_vector: Vec<usize>,
         shifting_coefficients: Vec<F>,
-        combine_function: fn(&[VOTerm<F>]) -> VOTerm<F>,
+        combine_function: T,
     ) -> Result<Self, Error> {
         let number_of_terms = mapping_vector.len();
 
@@ -42,6 +50,20 @@ impl<F: Field> NewVO<F> {
             combine_function,
             minimum_oracle_length,
         })
+    }
+
+    pub fn number_of_internal_terms(&self) -> usize {
+        self.mapping_vector.len()
+    }
+
+    pub fn get_term_labels(
+        &self,
+        concrete_oracle_labels: &[PolynomialLabel],
+    ) -> Vec<PolynomialLabel> {
+        self.mapping_vector
+            .iter()
+            .map(|&mapped_index| concrete_oracle_labels[mapped_index].clone())
+            .collect()
     }
 
     /// Returns the polynomial that results from the combination of the given concrete oracles
@@ -213,10 +235,14 @@ impl<F: FftField> Div for VOTerm<F> {
         match self {
             Self::Evaluation(eval) => match rhs {
                 Self::Evaluation(rhs_eval) => Self::Evaluation(eval / rhs_eval),
-                Self::Polynomial(rhs_poly) => Self::Polynomial(&DensePolynomial::from_coefficients_slice(&[eval]) / &rhs_poly),
+                Self::Polynomial(rhs_poly) => {
+                    Self::Polynomial(&DensePolynomial::from_coefficients_slice(&[eval]) / &rhs_poly)
+                }
             },
             Self::Polynomial(poly) => match rhs {
-                Self::Evaluation(rhs_eval) => Self::Polynomial(&poly / &DensePolynomial::from_coefficients_slice(&[rhs_eval])),
+                Self::Evaluation(rhs_eval) => {
+                    Self::Polynomial(&poly / &DensePolynomial::from_coefficients_slice(&[rhs_eval]))
+                }
                 Self::Polynomial(rhs_poly) => Self::Polynomial(&poly / &rhs_poly),
             },
         }
@@ -235,7 +261,7 @@ mod test {
     use crate::util::sample_vector;
     use crate::{error::Error, util::shift_dense_poly, vo_constant};
     use ark_bn254::Fr;
-    use ark_ff::{One, UniformRand, Zero};
+    use ark_ff::{One, UniformRand};
     use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
     use ark_poly_commit::{evaluate_query_set, LabeledPolynomial};
     use rand::thread_rng;
@@ -257,6 +283,13 @@ mod test {
             + vo_constant!(F::from(2u64)) * concrete_terms[1].clone()
             + vo_constant!(F::from(3u64)) * concrete_terms[2].clone()
     }
+
+    // /// Term 0 is f(x)
+    // /// Term 1 is shifted f(x)
+    // /// Terms 2-N are the [x - gamma] polynomials
+    // pub fn geo_seq_test(terms: &[VOTerm<F>]) -> VOTerm<F> {
+
+    // }
 
     #[test]
     fn test_add_oracle() {
@@ -281,16 +314,6 @@ mod test {
         // Check that we get the right polynomial
         let sum = add_oracle.compute_polynomial(concrete_oracles).unwrap();
         assert_eq!(expected, sum);
-
-        // // Check that we combine evaluations correctly
-        // let eval_point = F::rand(rng);
-        // let sum_from_vo_evals = add_oracle
-        //     .evaluate_from_concrete_evals(&[
-        //         shifted_c.evaluate(&eval_point),
-        //         shifted_a.evaluate(&eval_point),
-        //     ])
-        //     .unwrap();
-        // assert_eq!(expected.evaluate(&eval_point), sum_from_vo_evals)
     }
 
     #[test]
@@ -314,16 +337,6 @@ mod test {
         // Check that we get the right polynomial
         let prod = mul_oracle.compute_polynomial(concrete_oracles).unwrap();
         assert_eq!(expected, prod);
-
-        // // Check that we combine evaluations correctly
-        // let eval_point = F::rand(rng);
-        // let prod_from_vo_evals = mul_oracle
-        //     .evaluate_from_concrete_evals(&[
-        //         shifted_c.evaluate(&eval_point),
-        //         shifted_a.evaluate(&eval_point),
-        //     ])
-        //     .unwrap();
-        // assert_eq!(expected.evaluate(&eval_point), prod_from_vo_evals)
     }
 
     #[test]
