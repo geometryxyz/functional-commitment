@@ -1,4 +1,4 @@
-use std::{ops::Add, ops::Mul};
+use std::ops::{Add, Div, Mul, Sub};
 
 use crate::error::Error;
 use crate::util::shift_dense_poly;
@@ -148,14 +148,14 @@ pub enum VOTerm<F: Field> {
 }
 
 impl<F: Field> Add for VOTerm<F> {
-    type Output = VOTerm<F>;
+    type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
         match self {
             Self::Evaluation(eval) => match rhs {
                 Self::Evaluation(rhs_eval) => Self::Evaluation(eval + rhs_eval),
                 Self::Polynomial(rhs_poly) => {
-                    Self::Polynomial(rhs_poly + DensePolynomial::from_coefficients_slice(&[eval]))
+                    Self::Polynomial(DensePolynomial::from_coefficients_slice(&[eval]) + rhs_poly)
                 }
             },
             Self::Polynomial(poly) => match rhs {
@@ -168,8 +168,29 @@ impl<F: Field> Add for VOTerm<F> {
     }
 }
 
+impl<F: Field> Sub for VOTerm<F> {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        match self {
+            Self::Evaluation(eval) => match rhs {
+                Self::Evaluation(rhs_eval) => Self::Evaluation(eval - rhs_eval),
+                Self::Polynomial(rhs_poly) => {
+                    Self::Polynomial(&DensePolynomial::from_coefficients_slice(&[eval]) - &rhs_poly)
+                }
+            },
+            Self::Polynomial(poly) => match rhs {
+                Self::Evaluation(rhs_eval) => {
+                    Self::Polynomial(&poly - &DensePolynomial::from_coefficients_slice(&[rhs_eval]))
+                }
+                Self::Polynomial(rhs_poly) => Self::Polynomial(&poly - &rhs_poly),
+            },
+        }
+    }
+}
+
 impl<F: FftField> Mul for VOTerm<F> {
-    type Output = VOTerm<F>;
+    type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
         match self {
@@ -180,6 +201,23 @@ impl<F: FftField> Mul for VOTerm<F> {
             Self::Polynomial(poly) => match rhs {
                 Self::Evaluation(rhs_eval) => Self::Polynomial(&poly * rhs_eval),
                 Self::Polynomial(rhs_poly) => Self::Polynomial(&poly * &rhs_poly),
+            },
+        }
+    }
+}
+
+impl<F: FftField> Div for VOTerm<F> {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        match self {
+            Self::Evaluation(eval) => match rhs {
+                Self::Evaluation(rhs_eval) => Self::Evaluation(eval / rhs_eval),
+                Self::Polynomial(rhs_poly) => Self::Polynomial(&DensePolynomial::from_coefficients_slice(&[eval]) / &rhs_poly),
+            },
+            Self::Polynomial(poly) => match rhs {
+                Self::Evaluation(rhs_eval) => Self::Polynomial(&poly / &DensePolynomial::from_coefficients_slice(&[rhs_eval])),
+                Self::Polynomial(rhs_poly) => Self::Polynomial(&poly / &rhs_poly),
             },
         }
     }
@@ -333,7 +371,7 @@ mod test {
             .iter()
             .map(|oracle| oracle.label().clone())
             .collect();
-            let oracle_polys: Vec<_> = concrete_oracles
+        let oracle_polys: Vec<_> = concrete_oracles
             .iter()
             .map(|oracle| oracle.polynomial().clone())
             .collect();
@@ -349,8 +387,13 @@ mod test {
 
         let evals = evaluate_query_set(concrete_oracles.iter(), &query_set);
 
-        let evaluated = add_oracle.evaluate_from_concrete_evals(&oracle_labels, &eval_point.1, &evals).unwrap();
-        let eval_from_poly = add_oracle.compute_polynomial(&oracle_polys).unwrap().evaluate(&eval_point.1);
+        let evaluated = add_oracle
+            .evaluate_from_concrete_evals(&oracle_labels, &eval_point.1, &evals)
+            .unwrap();
+        let eval_from_poly = add_oracle
+            .compute_polynomial(&oracle_polys)
+            .unwrap()
+            .evaluate(&eval_point.1);
 
         assert_eq!(evaluated, eval_from_poly)
     }
