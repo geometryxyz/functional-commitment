@@ -5,8 +5,8 @@ use ark_ff::Field;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::{Evaluations, PolynomialLabel, QuerySet};
 
+pub mod presets;
 mod tests;
-pub mod useful_vo_functions;
 pub mod vo_term;
 
 pub struct NewVO<F, T>

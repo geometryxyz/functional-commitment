@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod test {
+    use crate::geometric_seq_check;
     use crate::util::sample_vector;
     use crate::virtual_oracle::geometric_sequence_vo::GeoSequenceVO;
     use crate::virtual_oracle::VirtualOracle;
@@ -48,12 +49,8 @@ mod test {
         let two_constant_poly = DensePolynomial::from_coefficients_vec(vec![F::from(2u64)]);
         let expected = &shifted_c + &(&two_constant_poly * &shifted_a);
 
-        let add_oracle = NewVO::new(
-            mapping_vector,
-            shifting_coefficients,
-            Box::new(simple_addition),
-        )
-        .unwrap();
+        let add_oracle =
+            NewVO::new(mapping_vector, shifting_coefficients, simple_addition).unwrap();
 
         // Check that we get the right polynomial
         let sum = add_oracle.compute_polynomial(concrete_oracles).unwrap();
@@ -76,8 +73,7 @@ mod test {
         let shifted_a = shift_dense_poly(&a_poly, &shifting_coefficients[1]);
         let expected = &shifted_c * &shifted_a;
 
-        let mul_oracle =
-            NewVO::new(mapping_vector, shifting_coefficients, Box::new(simple_mul)).unwrap();
+        let mul_oracle = NewVO::new(mapping_vector, shifting_coefficients, simple_mul).unwrap();
 
         // Check that we get the right polynomial
         let prod = mul_oracle.compute_polynomial(concrete_oracles).unwrap();
@@ -89,12 +85,7 @@ mod test {
         // mapping vector expects there to be a concrete oracle with index 1; effectively expected at last 2 concrete oracles
         let mapping_vector = vec![1];
         let shift_coefficients = vec![F::one()];
-        let add_oracle = NewVO::new(
-            mapping_vector,
-            shift_coefficients,
-            Box::new(simple_addition),
-        )
-        .unwrap();
+        let add_oracle = NewVO::new(mapping_vector, shift_coefficients, simple_addition).unwrap();
 
         // We only provide one concrete oracle
         let err_poly = add_oracle.compute_polynomial(&vec![DensePolynomial::<F>::default()]);
@@ -142,12 +133,8 @@ mod test {
         let shifting_coefficients: Vec<F> = sample_vector(rng, 3);
         let mapping_vector = vec![2, 2, 0];
 
-        let add_oracle = NewVO::new(
-            mapping_vector,
-            shifting_coefficients,
-            Box::new(harder_addition),
-        )
-        .unwrap();
+        let add_oracle =
+            NewVO::new(mapping_vector, shifting_coefficients, harder_addition).unwrap();
 
         let eval_point = (String::from("beta"), F::rand(rng));
         let query_set = add_oracle.query(&oracle_labels, &eval_point).unwrap();
@@ -191,30 +178,10 @@ mod test {
         let seq = generate_sequence::<Fr>(common_ratio, &initial_values, &sequence_lengths);
         let f = DensePolynomial::<Fr>::from_coefficients_slice(&domain.ifft(&seq));
 
-        // expected terms are terms[0] = x, terms[1] = f(x), terms[2] = f(gamma*x)
-        let vo_eval_function = |terms: &[VOTerm<F>]| {
-            // construct (f(gamma * x) - r * f(x))
-            let check_next_term = terms[2].clone() - vo_constant!(common_ratio) * terms[1].clone();
-
-            let mut evaluation_function = check_next_term;
-            let mut starting_index = 0;
-            // construct each stitch and multiply to the final polynomial
-            sequence_lengths.iter().for_each(|sequence_length| {
-                let stitch = terms[0].clone()
-                    - vo_constant!(domain
-                        .element(1)
-                        .pow([(starting_index + sequence_length - 1) as u64]));
-                starting_index += sequence_length;
-                evaluation_function = evaluation_function.clone() * stitch;
-            });
-
-            evaluation_function
-        };
-
         let new_geo_vo = NewVO::new(
             vec![0, 1, 1],
             vec![F::one(), F::one(), domain.element(1)],
-            Box::new(vo_eval_function),
+            geometric_seq_check!(common_ratio, sequence_lengths, domain),
         )
         .unwrap();
 
