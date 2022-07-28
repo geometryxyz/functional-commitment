@@ -259,12 +259,18 @@ macro_rules! vo_constant {
 #[cfg(test)]
 mod test {
     use crate::util::sample_vector;
-    use crate::{error::Error, util::shift_dense_poly, vo_constant};
+    use crate::virtual_oracle::geometric_sequence_vo::GeoSequenceVO;
+    use crate::virtual_oracle::VirtualOracle;
+    use crate::{error::Error, util::generate_sequence, util::shift_dense_poly, vo_constant};
     use ark_bn254::Fr;
-    use ark_ff::{One, UniformRand};
-    use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
+    use ark_ff::{Field, One, UniformRand, Zero};
+    use ark_poly::{
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
+        UVPolynomial,
+    };
     use ark_poly_commit::{evaluate_query_set, LabeledPolynomial};
     use rand::thread_rng;
+    use std::iter;
 
     use super::{NewVO, VOTerm};
 
@@ -283,13 +289,6 @@ mod test {
             + vo_constant!(F::from(2u64)) * concrete_terms[1].clone()
             + vo_constant!(F::from(3u64)) * concrete_terms[2].clone()
     }
-
-    // /// Term 0 is f(x)
-    // /// Term 1 is shifted f(x)
-    // /// Terms 2-N are the [x - gamma] polynomials
-    // pub fn geo_seq_test(terms: &[VOTerm<F>]) -> VOTerm<F> {
-
-    // }
 
     #[test]
     fn test_add_oracle() {
@@ -409,5 +408,77 @@ mod test {
             .evaluate(&eval_point.1);
 
         assert_eq!(evaluated, eval_from_poly)
+    }
+
+    #[test]
+    fn test_geo_seq() {
+        let rng = &mut thread_rng();
+
+        let common_ratio = Fr::rand(rng);
+        let mut initial_values = vec![
+            Fr::from(2u64),
+            Fr::from(5u64),
+            Fr::from(7u64),
+            Fr::from(11u64),
+        ];
+        let mut sequence_lengths = vec![5, 3, 10, 30];
+
+        let m = sequence_lengths.iter().sum();
+
+        let domain = GeneralEvaluationDomain::<Fr>::new(m).unwrap();
+
+        let to_pad = domain.size() - m;
+        if to_pad > 0 {
+            initial_values.push(Fr::from(0u64));
+            sequence_lengths.push(to_pad);
+        }
+
+        let seq = generate_sequence::<Fr>(common_ratio, &initial_values, &sequence_lengths);
+        let f = DensePolynomial::<Fr>::from_coefficients_slice(&domain.ifft(&seq));
+
+        // expected terms are terms[0] = x, terms[1] = f(x), terms[2] = f(gamma*x)
+        let vo_eval_function = |terms: &[VOTerm<F>]| {
+            // construct (f(gamma * x) - r * f(x))
+            let check_next_term = terms[2].clone() - vo_constant!(common_ratio) * terms[1].clone();
+
+            let mut evaluation_function = check_next_term;
+            let mut starting_index = 0;
+            // construct each stitch and multiply to the final polynomial
+            sequence_lengths.iter().for_each(|sequence_length| {
+                let stitch = terms[0].clone()
+                    - vo_constant!(domain
+                        .element(1)
+                        .pow([(starting_index + sequence_length - 1) as u64]));
+                starting_index += sequence_length;
+                evaluation_function = evaluation_function.clone() * stitch;
+            });
+
+            evaluation_function
+        };
+
+        let new_geo_vo = NewVO::new(
+            vec![0, 1, 1],
+            vec![F::one(), F::one(), domain.element(1)],
+            &vo_eval_function,
+        )
+        .unwrap();
+
+        let x_poly = DensePolynomial::<F>::from_coefficients_slice(&[F::zero(), F::one()]);
+        let concrete_oracles = &[x_poly.clone(), f.clone()];
+        let new_poly = new_geo_vo.compute_polynomial(concrete_oracles).unwrap();
+
+        let old_vo = GeoSequenceVO::new(&sequence_lengths, domain.element(1), common_ratio);
+
+
+        let labeled_f = LabeledPolynomial::new(String::from("f"), f, None, None);
+        let old_poly = old_vo
+            .instantiate_in_coeffs_form(
+                &[labeled_f.clone(), labeled_f.clone()],
+                &[F::one(), domain.element(1)],
+            )
+            .unwrap();
+
+        assert_eq!(old_poly, new_poly)
+
     }
 }
