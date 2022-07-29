@@ -3,20 +3,28 @@ mod test {
     use crate::geometric_seq_check;
     use crate::util::sample_vector;
     use crate::virtual_oracle::geometric_sequence_vo::GeoSequenceVO;
+    use crate::virtual_oracle::new_vo::presets;
     use crate::virtual_oracle::VirtualOracle;
+    use crate::{
+        commitment::KZG10, error::to_pc_error, util::random_deg_n_polynomial,
+        virtual_oracle::inverse_check_oracle::InverseCheckOracle, zero_over_k::ZeroOverK,
+    };
     use crate::{error::Error, util::generate_sequence, util::shift_dense_poly, vo_constant};
-    use ark_bn254::Fr;
+    use ark_bn254::{Bn254, Fr};
     use ark_ff::{Field, One, UniformRand, Zero};
     use ark_poly::{
-        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
-        UVPolynomial,
+        univariate::DensePolynomial, EvaluationDomain, Evaluations, GeneralEvaluationDomain,
+        Polynomial, UVPolynomial,
     };
-    use ark_poly_commit::{evaluate_query_set, LabeledPolynomial};
-    use rand::thread_rng;
+    use ark_poly_commit::{evaluate_query_set, LabeledPolynomial, PolynomialCommitment};
+    use ark_std::{rand::thread_rng, test_rng};
+    use blake2::Blake2s;
 
     use super::super::{NewVO, VOTerm};
 
     type F = Fr;
+    type PC = KZG10<Bn254>;
+    type D = Blake2s;
 
     pub fn simple_addition(concrete_terms: &[VOTerm<F>]) -> VOTerm<F> {
         concrete_terms[0].clone() + vo_constant!(F::from(2u64)) * concrete_terms[1].clone()
@@ -50,7 +58,7 @@ mod test {
         let expected = &shifted_c + &(&two_constant_poly * &shifted_a);
 
         let add_oracle =
-            NewVO::new(mapping_vector, shifting_coefficients, simple_addition).unwrap();
+            NewVO::new(&mapping_vector, &shifting_coefficients, simple_addition).unwrap();
 
         // Check that we get the right polynomial
         let sum = add_oracle.compute_polynomial(concrete_oracles).unwrap();
@@ -73,7 +81,7 @@ mod test {
         let shifted_a = shift_dense_poly(&a_poly, &shifting_coefficients[1]);
         let expected = &shifted_c * &shifted_a;
 
-        let mul_oracle = NewVO::new(mapping_vector, shifting_coefficients, simple_mul).unwrap();
+        let mul_oracle = NewVO::new(&mapping_vector, &shifting_coefficients, simple_mul).unwrap();
 
         // Check that we get the right polynomial
         let prod = mul_oracle.compute_polynomial(concrete_oracles).unwrap();
@@ -85,7 +93,7 @@ mod test {
         // mapping vector expects there to be a concrete oracle with index 1; effectively expected at last 2 concrete oracles
         let mapping_vector = vec![1];
         let shift_coefficients = vec![F::one()];
-        let add_oracle = NewVO::new(mapping_vector, shift_coefficients, simple_addition).unwrap();
+        let add_oracle = NewVO::new(&mapping_vector, &shift_coefficients, simple_addition).unwrap();
 
         // We only provide one concrete oracle
         let err_poly = add_oracle.compute_polynomial(&vec![DensePolynomial::<F>::default()]);
@@ -134,7 +142,7 @@ mod test {
         let mapping_vector = vec![2, 2, 0];
 
         let add_oracle =
-            NewVO::new(mapping_vector, shifting_coefficients, harder_addition).unwrap();
+            NewVO::new(&mapping_vector, &shifting_coefficients, harder_addition).unwrap();
 
         let eval_point = (String::from("beta"), F::rand(rng));
         let query_set = add_oracle.query(&oracle_labels, &eval_point).unwrap();
@@ -179,8 +187,8 @@ mod test {
         let f = DensePolynomial::<Fr>::from_coefficients_slice(&domain.ifft(&seq));
 
         let new_geo_vo = NewVO::new(
-            vec![0, 1, 1],
-            vec![F::one(), F::one(), domain.element(1)],
+            &vec![0, 1, 1],
+            &vec![F::one(), F::one(), domain.element(1)],
             geometric_seq_check!(common_ratio, sequence_lengths, domain),
         )
         .unwrap();
@@ -200,5 +208,93 @@ mod test {
             .unwrap();
 
         assert_eq!(old_poly, new_poly)
+    }
+
+    #[test]
+    fn test_zero_over_k_inverse_check_oracle() {
+        let m = 8;
+        let rng = &mut test_rng();
+        let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
+
+        let max_degree = 20;
+        let max_hiding = 1;
+
+        let enforced_hiding_bound = Some(1);
+        let enforced_degree_bound = 14;
+
+        let pp = PC::setup(max_degree, None, rng).unwrap();
+        let (ck, vk) = PC::trim(
+            &pp,
+            max_degree,
+            max_hiding,
+            Some(&[2, enforced_degree_bound]),
+        )
+        .unwrap();
+
+        // Step 1: choose a random polynomial
+        let f_unlabeled: DensePolynomial<F> = random_deg_n_polynomial(7, rng);
+        let f = LabeledPolynomial::new(
+            String::from("f"),
+            f_unlabeled,
+            Some(enforced_degree_bound),
+            enforced_hiding_bound,
+        );
+
+        // Step 2: evaluate it
+        let f_evals = f.evaluate_over_domain_by_ref(domain_k);
+
+        // Step 3: find the inverse at each of these points
+        let desired_g_evals = f_evals
+            .evals
+            .iter()
+            .map(|&x| x.inverse().unwrap())
+            .collect::<Vec<_>>();
+        let desired_g_evals = Evaluations::from_vec_and_domain(desired_g_evals, domain_k);
+
+        // Step 4: interpolate a polynomial from the inverses
+        let g = desired_g_evals.clone().interpolate();
+        let g = LabeledPolynomial::new(
+            String::from("g"),
+            g.clone(),
+            Some(enforced_degree_bound),
+            enforced_hiding_bound,
+        );
+
+        // Step 5: commit to the concrete oracles
+        let concrete_oracles = [f, g];
+        let (commitments, rands) = PC::commit(&ck, &concrete_oracles, Some(rng))
+            .map_err(to_pc_error::<F, PC>)
+            .unwrap();
+
+        // Step 6: Derive the desired virtual oracle
+        let alphas = vec![F::one(), F::one()];
+        let inverse_check_oracle =
+            NewVO::new(&vec![0, 1], &alphas.clone(), presets::inverse_check).unwrap();
+
+        // Step 7: prove
+        let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
+            &concrete_oracles,
+            &commitments,
+            &rands,
+            Some(enforced_degree_bound),
+            &inverse_check_oracle,
+            &alphas,
+            &domain_k,
+            &ck,
+            rng,
+        );
+
+        // Step 8: verify
+        let is_valid = ZeroOverK::<F, PC, D>::verify(
+            zero_over_k_proof.unwrap(),
+            &commitments,
+            Some(enforced_degree_bound),
+            &inverse_check_oracle,
+            &domain_k,
+            &alphas,
+            &vk,
+        );
+
+        assert!(is_valid.is_ok());
     }
 }

@@ -1,13 +1,17 @@
 use crate::error::Error;
 use crate::util::shift_dense_poly;
 use crate::virtual_oracle::new_vo::vo_term::VOTerm;
-use ark_ff::Field;
-use ark_poly::univariate::DensePolynomial;
+use ark_ff::{FftField, Field, PrimeField};
+use ark_poly::{univariate::DensePolynomial, EvaluationDomain};
 use ark_poly_commit::{Evaluations, PolynomialLabel, QuerySet};
+
+use super::VirtualOracle;
 
 pub mod presets;
 mod tests;
 pub mod vo_term;
+
+pub type EvalFunction<F> = Box<dyn Fn(&[VOTerm<F>]) -> VOTerm<F>>;
 
 pub struct NewVO<F, T>
 where
@@ -27,8 +31,8 @@ where
 {
     /// Constructor for an input-shifting virtual oracle
     pub fn new(
-        mapping_vector: Vec<usize>,
-        shifting_coefficients: Vec<F>,
+        mapping_vector: &Vec<usize>,
+        shifting_coefficients: &Vec<F>,
         combine_function: T,
     ) -> Result<Self, Error> {
         let number_of_terms = mapping_vector.len();
@@ -48,8 +52,8 @@ where
         let minimum_oracle_length = max_index + 1;
 
         Ok(Self {
-            mapping_vector,
-            shifting_coefficients,
+            mapping_vector: mapping_vector.clone(),
+            shifting_coefficients: shifting_coefficients.clone(),
             combine_function,
             minimum_oracle_length,
         })
@@ -162,5 +166,72 @@ where
             )));
         }
         Ok(())
+    }
+}
+
+impl<F, T> VirtualOracle<F> for NewVO<F, T>
+where
+    F: PrimeField,
+    T: Fn(&[VOTerm<F>]) -> VOTerm<F>,
+{
+    fn instantiate_in_coeffs_form(
+        &self,
+        concrete_oracles: &[ark_poly_commit::LabeledPolynomial<F, DensePolynomial<F>>],
+        alphas: &[F],
+    ) -> Result<DensePolynomial<F>, Error> {
+        let oracle_polys: Vec<_> = concrete_oracles
+            .iter()
+            .map(|p| p.polynomial().clone())
+            .collect();
+        self.compute_polynomial(&oracle_polys)
+    }
+
+    fn instantiate_in_evals_form(
+        &self,
+        concrete_oracles: &[ark_poly_commit::LabeledPolynomial<F, DensePolynomial<F>>],
+        alphas: &[F],
+        domain: &ark_poly::GeneralEvaluationDomain<F>,
+    ) -> Result<Vec<F>, Error> {
+        let oracle_polys: Vec<_> = concrete_oracles
+            .iter()
+            .map(|p| p.polynomial().clone())
+            .collect();
+        let poly = self.compute_polynomial(&oracle_polys)?;
+        Ok(domain.fft(&poly.coeffs))
+    }
+
+    fn compute_scaling_factor(&self, _domain: &ark_poly::GeneralEvaluationDomain<F>) -> usize {
+        2
+    }
+
+    fn degree_bound(&self, domain_size: usize) -> usize {
+        domain_size
+    }
+
+    fn get_h_labels(&self, concrete_oracle_labels: &[PolynomialLabel]) -> Vec<PolynomialLabel> {
+        self.get_term_labels(concrete_oracle_labels)
+    }
+
+    fn mapping_vector(&self) -> Vec<usize> {
+        self.mapping_vector.clone()
+    }
+
+    fn name(&self) -> String {
+        String::from("General VO")
+    }
+
+    fn num_of_oracles(&self) -> usize {
+        self.mapping_vector.len()
+    }
+
+    fn query(&self, evals: &[F], point: F) -> Result<F, Error> {
+        let terms: Vec<_> = evals
+            .iter()
+            .map(|e| VOTerm::Evaluation(e.clone()))
+            .collect();
+        match (self.combine_function)(&terms) {
+            VOTerm::Evaluation(res) => Ok(res),
+            VOTerm::Polynomial(_) => Err(Error::VOFailedToCompute),
+        }
     }
 }

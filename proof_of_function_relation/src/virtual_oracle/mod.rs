@@ -14,19 +14,6 @@ pub mod prod_vo;
 pub mod product_check_oracle;
 pub mod square_check_oracle;
 
-// pub trait PolynomialOracle<F, P, PC>: Add + Sized
-// where
-//     F: Field,
-//     P: Polynomial<F>,
-//     PC: PolynomialCommitment<F, P>
-// {
-//     type Polynomial: Polynomial<F>;
-//     type OracleAccess: PCCommitment;
-//     type HidingRandomness: PCRandomness;
-
-//     fn give_access(&self) -> Self::OracleAccess;
-// }
-
 pub trait VirtualOracle<F: PrimeField> {
     /// Returns the list of concrete oracle labels ordered according to the mapping vector
     fn get_h_labels(&self, concrete_oracle_labels: &[PolynomialLabel]) -> Vec<PolynomialLabel> {
