@@ -37,6 +37,9 @@ pub struct ProverState<'a, F: PrimeField, VO: VirtualOracle<F>> {
     q_2: Option<LabeledPolynomial<F>>,
 
     verifier_message: Option<VerifierFirstMsg<F>>,
+
+    // for testing
+    pub f_prime: Option<DensePolynomial<F>>,
 }
 
 /// The first set of prover oracles
@@ -91,6 +94,7 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
             q_1: None,
             q_2: None,
             verifier_message: None,
+            f_prime: None,
         })
     }
 
@@ -184,6 +188,7 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
         state.masking_polynomials = Some(masking_polynomials);
         state.random_polynomials = Some(random_polynomials);
         state.masked_oracles = Some(h_primes);
+        state.f_prime = Some(f_prime);
 
         Ok((msg, oracles, state))
     }

@@ -4,7 +4,7 @@ use ark_ff::{FftField, Field};
 use ark_poly::{univariate::DensePolynomial, UVPolynomial};
 
 /// A term to be manipulated by the virtual oracle's function, this is either a (shifted) polynomial or an evaluation thereof.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum VOTerm<F: Field> {
     Evaluation(F),
     Polynomial(DensePolynomial<F>),

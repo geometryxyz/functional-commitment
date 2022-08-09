@@ -5,7 +5,10 @@ use crate::{
     non_zero_over_k::NonZeroOverK,
     t_diag::proof::Proof,
     util::generate_sequence,
-    virtual_oracle::{eq_vo::EqVO, prod_vo::ProdVO},
+    virtual_oracle::{
+        new_vo::{presets, NewVO},
+        prod_vo::ProdVO,
+    },
     zero_over_k::ZeroOverK,
 };
 use ark_ff::{PrimeField, SquareRootField};
@@ -130,7 +133,7 @@ where
         )?;
 
         // Step 4b: Zero over K for h = rowM
-        let eq_vo = EqVO::new();
+        let eq_vo = NewVO::new(&vec![0, 1], &alphas, presets::equality_check)?;
         let h_eq_row_m = ZeroOverK::<F, PC, D>::prove(
             &[h.clone(), row_m.clone()],
             &[h_commitment.clone(), row_m_commitment.clone()],
@@ -303,7 +306,7 @@ where
         )?;
 
         // Step 4b: Zero over K for h = rowM
-        let eq_vo = EqVO::new();
+        let eq_vo = NewVO::new(&vec![0, 1], &alphas, presets::equality_check)?;
         ZeroOverK::<F, PC, D>::verify(
             proof.h_eq_row_m,
             vec![h_commit.clone(), row_m_commitment.clone()].as_slice(),

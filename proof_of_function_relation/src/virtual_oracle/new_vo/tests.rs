@@ -2,16 +2,15 @@
 mod test {
     use crate::geometric_seq_check;
     use crate::util::sample_vector;
-    use crate::virtual_oracle::geometric_sequence_vo::GeoSequenceVO;
     use crate::virtual_oracle::new_vo::presets;
     use crate::virtual_oracle::VirtualOracle;
     use crate::{
         commitment::KZG10, error::to_pc_error, util::random_deg_n_polynomial,
-        virtual_oracle::inverse_check_oracle::InverseCheckOracle, zero_over_k::ZeroOverK,
+        zero_over_k::ZeroOverK,
     };
     use crate::{error::Error, util::generate_sequence, util::shift_dense_poly, vo_constant};
     use ark_bn254::{Bn254, Fr};
-    use ark_ff::{Field, One, UniformRand, Zero};
+    use ark_ff::{Field, One, UniformRand};
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, Evaluations, GeneralEvaluationDomain,
         Polynomial, UVPolynomial,
@@ -26,18 +25,18 @@ mod test {
     type PC = KZG10<Bn254>;
     type D = Blake2s;
 
-    pub fn simple_addition(concrete_terms: &[VOTerm<F>]) -> VOTerm<F> {
-        concrete_terms[0].clone() + vo_constant!(F::from(2u64)) * concrete_terms[1].clone()
+    pub fn simple_addition(terms: &[VOTerm<F>]) -> VOTerm<F> {
+        terms[1].clone() + vo_constant!(F::from(2u64)) * terms[2].clone()
     }
 
     pub fn simple_mul(concrete_terms: &[VOTerm<F>]) -> VOTerm<F> {
-        concrete_terms[0].clone() * concrete_terms[1].clone()
+        concrete_terms[1].clone() * concrete_terms[2].clone()
     }
 
     pub fn harder_addition(concrete_terms: &[VOTerm<F>]) -> VOTerm<F> {
         concrete_terms[0].clone()
-            + vo_constant!(F::from(2u64)) * concrete_terms[1].clone()
-            + vo_constant!(F::from(3u64)) * concrete_terms[2].clone()
+            + vo_constant!(F::from(2u64)) * concrete_terms[2].clone()
+            + vo_constant!(F::from(3u64)) * concrete_terms[3].clone()
     }
 
     #[test]
@@ -91,7 +90,7 @@ mod test {
     #[test]
     fn test_short_input_vec() {
         // mapping vector expects there to be a concrete oracle with index 1; effectively expected at last 2 concrete oracles
-        let mapping_vector = vec![1];
+        let mapping_vector = vec![2];
         let shift_coefficients = vec![F::one()];
         let add_oracle = NewVO::new(&mapping_vector, &shift_coefficients, simple_addition).unwrap();
 
@@ -145,7 +144,9 @@ mod test {
             NewVO::new(&mapping_vector, &shifting_coefficients, harder_addition).unwrap();
 
         let eval_point = (String::from("beta"), F::rand(rng));
-        let query_set = add_oracle.query(&oracle_labels, &eval_point).unwrap();
+        let query_set = add_oracle
+            .generate_query_set(&oracle_labels, &eval_point)
+            .unwrap();
 
         let evals = evaluate_query_set(concrete_oracles.iter(), &query_set);
 
@@ -161,7 +162,7 @@ mod test {
     }
 
     #[test]
-    fn test_geo_seq() {
+    fn test_geo_seq_vo() {
         let rng = &mut thread_rng();
 
         let common_ratio = Fr::rand(rng);
@@ -185,29 +186,33 @@ mod test {
 
         let seq = generate_sequence::<Fr>(common_ratio, &initial_values, &sequence_lengths);
         let f = DensePolynomial::<Fr>::from_coefficients_slice(&domain.ifft(&seq));
+        let alphas = vec![F::one(), domain.element(1)];
 
         let new_geo_vo = NewVO::new(
-            &vec![0, 1, 1],
-            &vec![F::one(), F::one(), domain.element(1)],
+            &vec![0, 0],
+            &alphas,
             geometric_seq_check!(common_ratio, sequence_lengths, domain),
         )
         .unwrap();
 
-        let x_poly = DensePolynomial::<F>::from_coefficients_slice(&[F::zero(), F::one()]);
-        let concrete_oracles = &[x_poly.clone(), f.clone()];
+        let concrete_oracles = &[f.clone()];
         let new_poly = new_geo_vo.compute_polynomial(concrete_oracles).unwrap();
 
-        let old_vo = GeoSequenceVO::new(&sequence_lengths, domain.element(1), common_ratio);
-
         let labeled_f = LabeledPolynomial::new(String::from("f"), f, None, None);
-        let old_poly = old_vo
-            .instantiate_in_coeffs_form(
-                &[labeled_f.clone(), labeled_f.clone()],
-                &[F::one(), domain.element(1)],
+
+        let eval_point = F::rand(rng);
+        let poly_eval = new_poly.evaluate(&eval_point);
+        let manual_eval = new_geo_vo
+            .query(
+                &[
+                    labeled_f.evaluate(&eval_point),
+                    labeled_f.evaluate(&(eval_point * domain.element(1))),
+                ],
+                eval_point,
             )
             .unwrap();
 
-        assert_eq!(old_poly, new_poly)
+        assert_eq!(poly_eval, manual_eval)
     }
 
     #[test]
@@ -296,5 +301,60 @@ mod test {
         );
 
         assert!(is_valid.is_ok());
+    }
+
+    #[test]
+    fn test_trait() {
+        let rng = &mut thread_rng();
+
+        let common_ratio = Fr::rand(rng);
+        let mut initial_values = vec![
+            Fr::from(2u64),
+            Fr::from(5u64),
+            Fr::from(7u64),
+            Fr::from(11u64),
+        ];
+        let mut sequence_lengths = vec![5, 3, 10, 30];
+
+        let m = sequence_lengths.iter().sum();
+
+        let domain = GeneralEvaluationDomain::<Fr>::new(m).unwrap();
+
+        let to_pad = domain.size() - m;
+        if to_pad > 0 {
+            initial_values.push(Fr::from(0u64));
+            sequence_lengths.push(to_pad);
+        }
+
+        let seq = generate_sequence::<Fr>(common_ratio, &initial_values, &sequence_lengths);
+        let f = DensePolynomial::<Fr>::from_coefficients_slice(&domain.ifft(&seq));
+        let labeled_f = LabeledPolynomial::new(String::from("f"), f, None, None);
+        let alphas = vec![F::one(), domain.element(1)];
+
+        let new_geo_vo = NewVO::new(
+            &vec![0, 0],
+            &alphas,
+            geometric_seq_check!(common_ratio, sequence_lengths, domain),
+        )
+        .unwrap();
+
+        let concrete_oracles = &[labeled_f.clone()];
+        let new_poly = new_geo_vo
+            .instantiate_in_coeffs_form(concrete_oracles, &alphas)
+            .unwrap();
+
+        let eval_point = F::rand(rng);
+        let poly_eval = new_poly.evaluate(&eval_point);
+        let manual_eval = new_geo_vo
+            .query(
+                &[
+                    labeled_f.evaluate(&eval_point),
+                    labeled_f.evaluate(&(eval_point * alphas[1])),
+                ],
+                eval_point,
+            )
+            .unwrap();
+
+        assert_eq!(poly_eval, manual_eval)
     }
 }

@@ -1,8 +1,8 @@
 use crate::error::Error;
 use crate::util::shift_dense_poly;
 use crate::virtual_oracle::new_vo::vo_term::VOTerm;
-use ark_ff::{FftField, Field, PrimeField};
-use ark_poly::{univariate::DensePolynomial, EvaluationDomain};
+use ark_ff::{Field, PrimeField};
+use ark_poly::{univariate::DensePolynomial, UVPolynomial};
 use ark_poly_commit::{Evaluations, PolynomialLabel, QuerySet};
 
 use super::VirtualOracle;
@@ -11,16 +11,14 @@ pub mod presets;
 mod tests;
 pub mod vo_term;
 
-pub type EvalFunction<F> = Box<dyn Fn(&[VOTerm<F>]) -> VOTerm<F>>;
-
 pub struct NewVO<F, T>
 where
     F: Field,
     T: Fn(&[VOTerm<F>]) -> VOTerm<F>,
 {
-    mapping_vector: Vec<usize>,
-    shifting_coefficients: Vec<F>,
-    combine_function: T,
+    pub mapping_vector: Vec<usize>,
+    pub shifting_coefficients: Vec<F>,
+    pub combine_function: T,
     minimum_oracle_length: usize,
 }
 
@@ -31,13 +29,13 @@ where
 {
     /// Constructor for an input-shifting virtual oracle
     pub fn new(
-        mapping_vector: &Vec<usize>,
-        shifting_coefficients: &Vec<F>,
+        mapping_vector: &[usize],
+        shifting_coefficients: &[F],
         combine_function: T,
     ) -> Result<Self, Error> {
-        let number_of_terms = mapping_vector.len();
+        let number_of_user_oracles = mapping_vector.len();
 
-        if shifting_coefficients.len() != number_of_terms {
+        if shifting_coefficients.len() != number_of_user_oracles {
             return Err(Error::InputLengthError(String::from(
                 "mapping vector and shifting coefficients do not match",
             )));
@@ -49,11 +47,11 @@ where
             .expect("mapping vector is empty")
             .clone();
 
-        let minimum_oracle_length = max_index + 1;
+        let minimum_oracle_length = max_index;
 
         Ok(Self {
-            mapping_vector: mapping_vector.clone(),
-            shifting_coefficients: shifting_coefficients.clone(),
+            mapping_vector: mapping_vector.to_vec(),
+            shifting_coefficients: shifting_coefficients.to_vec(),
             combine_function,
             minimum_oracle_length,
         })
@@ -80,7 +78,10 @@ where
     ) -> Result<DensePolynomial<F>, Error> {
         self.check_conrete_oracle_length(concrete_oracles.len())?;
 
-        let mut terms: Vec<VOTerm<F>> = Vec::new();
+        let x_poly = DensePolynomial::from_coefficients_slice(&[F::zero(), F::one()]);
+
+        // Put the indeterminate variable X as terms[0]
+        let mut terms: Vec<VOTerm<F>> = vec![VOTerm::Polynomial(x_poly)];
 
         // For each item in the mapping vector, we select the corresponding concrete oracle, apply the desired
         // shift and push the resulting polynomial as a term.
@@ -102,7 +103,7 @@ where
         }
     }
 
-    pub fn query(
+    pub fn generate_query_set(
         &self,
         concrete_oracle_labels: &[PolynomialLabel],
         labeled_point: &(String, F),
@@ -111,6 +112,8 @@ where
 
         let mut query_set = QuerySet::new();
 
+        // for each term, extract the concrete oracle's label, choose the desired eval point (based on the query point and alpha),
+        // and create a label for this point. Insert the resulting tuple into the query set.
         self.mapping_vector
             .iter()
             .enumerate()
@@ -132,7 +135,7 @@ where
         eval_point: &F,
         evaluations: &Evaluations<F, F>,
     ) -> Result<F, Error> {
-        let terms: Vec<VOTerm<_>> = self
+        let mut terms: Vec<VOTerm<_>> = self
             .mapping_vector
             .iter()
             .enumerate()
@@ -149,6 +152,13 @@ where
                 )
             })
             .collect();
+
+        terms.insert(0, VOTerm::Evaluation(eval_point.clone()));
+
+        // match terms[0] {
+        //     VOTerm::Evaluation(eval) => {assert_eq!(&eval, eval_point); println!("all good")},
+        //     _ => println!("bad branch"),
+        // }
 
         let combined = (self.combine_function)(&terms);
         match combined {
@@ -177,7 +187,7 @@ where
     fn instantiate_in_coeffs_form(
         &self,
         concrete_oracles: &[ark_poly_commit::LabeledPolynomial<F, DensePolynomial<F>>],
-        alphas: &[F],
+        _alphas: &[F],
     ) -> Result<DensePolynomial<F>, Error> {
         let oracle_polys: Vec<_> = concrete_oracles
             .iter()
@@ -186,29 +196,7 @@ where
         self.compute_polynomial(&oracle_polys)
     }
 
-    fn instantiate_in_evals_form(
-        &self,
-        concrete_oracles: &[ark_poly_commit::LabeledPolynomial<F, DensePolynomial<F>>],
-        alphas: &[F],
-        domain: &ark_poly::GeneralEvaluationDomain<F>,
-    ) -> Result<Vec<F>, Error> {
-        let oracle_polys: Vec<_> = concrete_oracles
-            .iter()
-            .map(|p| p.polynomial().clone())
-            .collect();
-        let poly = self.compute_polynomial(&oracle_polys)?;
-        Ok(domain.fft(&poly.coeffs))
-    }
-
-    fn compute_scaling_factor(&self, _domain: &ark_poly::GeneralEvaluationDomain<F>) -> usize {
-        2
-    }
-
-    fn degree_bound(&self, domain_size: usize) -> usize {
-        domain_size
-    }
-
-    fn get_h_labels(&self, concrete_oracle_labels: &[PolynomialLabel]) -> Vec<PolynomialLabel> {
+    fn get_term_labels(&self, concrete_oracle_labels: &[PolynomialLabel]) -> Vec<PolynomialLabel> {
         self.get_term_labels(concrete_oracle_labels)
     }
 
@@ -216,19 +204,17 @@ where
         self.mapping_vector.clone()
     }
 
-    fn name(&self) -> String {
-        String::from("General VO")
-    }
-
     fn num_of_oracles(&self) -> usize {
         self.mapping_vector.len()
     }
 
     fn query(&self, evals: &[F], point: F) -> Result<F, Error> {
-        let terms: Vec<_> = evals
+        let terms: Vec<_> = vec![point]
             .iter()
+            .chain(evals.iter())
             .map(|e| VOTerm::Evaluation(e.clone()))
             .collect();
+
         match (self.combine_function)(&terms) {
             VOTerm::Evaluation(res) => Ok(res),
             VOTerm::Polynomial(_) => Err(Error::VOFailedToCompute),

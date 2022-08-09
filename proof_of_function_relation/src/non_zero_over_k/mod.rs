@@ -1,8 +1,8 @@
 use crate::non_zero_over_k::{piop::PIOPforNonZeroOverK, proof::Proof};
+use crate::virtual_oracle::new_vo::{presets, NewVO};
 use crate::{
     commitment::AdditivelyHomomorphicPCS,
     error::{to_pc_error, Error},
-    virtual_oracle::inverse_check_oracle::InverseCheckOracle,
     zero_over_k::ZeroOverK,
 };
 use ark_ff::PrimeField;
@@ -47,8 +47,8 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> NonZeroOverK<F, 
 
         let concrete_oracles = [f.clone(), prover_first_oracles.g.clone()];
 
-        let inverse_check_oracle = InverseCheckOracle::new();
         let alphas = vec![F::one(), F::one()];
+        let inverse_check_oracle = NewVO::new(&vec![0, 1], &alphas, presets::inverse_check)?;
 
         let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
             &concrete_oracles,
@@ -87,14 +87,14 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> NonZeroOverK<F, 
         );
 
         let concrete_oracles_commitments = [bounded_f_commit.clone(), g_commit];
-        let zero_over_k_vo = InverseCheckOracle::new();
         let alphas = vec![F::one(), F::one()];
+        let inverse_check_oracle = NewVO::new(&vec![0, 1], &alphas, presets::inverse_check)?;
 
         ZeroOverK::<F, PC, D>::verify(
             proof.zero_over_k_proof,
             &concrete_oracles_commitments,
             enforced_degree_bound,
-            &zero_over_k_vo,
+            &inverse_check_oracle,
             &domain,
             &alphas,
             &vk,
