@@ -24,7 +24,7 @@ pub fn square_check<F: FftField>(terms: &[VOTerm<F>]) -> VOTerm<F> {
 
 /// A function to be used in a virtual oracle. This function can be used to check that the product of
 /// terms[1] and terms[2] is 0 over a domain K
-pub fn product_check<F: FftField>(terms: &[VOTerm<F>]) -> VOTerm<F> {
+pub fn zero_product_check<F: FftField>(terms: &[VOTerm<F>]) -> VOTerm<F> {
     terms[1].clone() * terms[2].clone()
 }
 
