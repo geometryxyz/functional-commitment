@@ -28,6 +28,12 @@ pub fn zero_product_check<F: FftField>(terms: &[VOTerm<F>]) -> VOTerm<F> {
     terms[1].clone() * terms[2].clone()
 }
 
+/// A function to be used in a virtual oracle. This function can be used to check that terms[1] agrees with
+/// the product of terms[2] and terms[3] over a domain K
+pub fn abc_product_check<F: FftField>(terms: &[VOTerm<F>]) -> VOTerm<F> {
+    terms[1].clone() - terms[2].clone() * terms[3].clone()
+}
+
 /// A closure to be used in a geometric sequence test virtual oracle.
 /// This specific construction expects terms[0] to be X (as enforced by default), terms[1] to be f(X) and
 /// terms[2] to be f(gamma*X); where X is an indeterminate variable, f is a polynomial for which we make

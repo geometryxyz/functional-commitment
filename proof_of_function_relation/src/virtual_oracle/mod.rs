@@ -4,7 +4,6 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::{LabeledPolynomial, PolynomialLabel};
 
 pub mod new_vo;
-pub mod product_check_oracle;
 pub mod square_check_oracle;
 
 pub trait VirtualOracle<F: PrimeField> {

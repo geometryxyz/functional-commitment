@@ -6,7 +6,8 @@ use crate::{
     non_zero_over_k::NonZeroOverK,
     subset_over_k::SubsetOverK,
     virtual_oracle::{
-        product_check_oracle::ProductCheckVO, square_check_oracle::SquareCheckOracle,
+        new_vo::{presets, NewVO},
+        square_check_oracle::SquareCheckOracle,
     },
     zero_over_k::ZeroOverK,
 };
@@ -140,7 +141,8 @@ where
         // }
 
         // Step 4d: Zero over K for f' = (s')*(g')
-        let product_check_vo = ProductCheckVO::new();
+        let product_check_vo =
+            NewVO::new(&[0, 1, 2], &vec![F::one(); 3], presets::abc_product_check)?;
         let alphas = [F::one(), F::one(), F::one()];
         let f_prime_product_proof = ZeroOverK::<F, PC, D>::prove(
             &[
@@ -360,7 +362,8 @@ where
             vk,
         )?;
 
-        let product_check_vo = ProductCheckVO::new();
+        let product_check_vo =
+            NewVO::new(&[0, 1, 2], &vec![F::one(); 3], presets::abc_product_check)?;
         let alphas = [F::one(), F::one(), F::one()];
 
         // Zero over K for f' = (s')*(g')
