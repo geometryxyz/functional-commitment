@@ -5,9 +5,9 @@ use crate::{
     non_zero_over_k::NonZeroOverK,
     t_diag::proof::Proof,
     util::generate_sequence,
-    virtual_oracle::{
-        new_vo::{presets, NewVO},
-        prod_vo::ProdVO,
+    virtual_oracle::new_vo::{
+        presets::{self, product_check},
+        NewVO,
     },
     zero_over_k::ZeroOverK,
 };
@@ -160,7 +160,7 @@ where
         )?;
 
         // Step 5: Zero over K for valM * h2 = 0
-        let prod_vo = ProdVO::new();
+        let prod_vo = NewVO::new(&[0, 1], &[F::one(), F::one()], product_check)?;
         let val_m_times_h2_proof = ZeroOverK::<F, PC, D>::prove(
             &[val_m.clone(), h2.clone()],
             &[val_m_commitment.clone(), h_commitments[1].clone()],
@@ -329,7 +329,7 @@ where
         )?;
 
         // Step 5: Zero over K for valM * h2 = 0
-        let prod_vo = ProdVO::new();
+        let prod_vo = NewVO::new(&[0, 1], &[F::one(), F::one()], product_check)?;
         ZeroOverK::<F, PC, D>::verify(
             proof.val_m_times_h2_proof,
             vec![val_m_commitment.clone(), h_commitments[1].clone()].as_slice(),
