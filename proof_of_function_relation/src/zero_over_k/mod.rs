@@ -4,7 +4,7 @@ use crate::commitment::AdditivelyHomomorphicPCS;
 use crate::error::{to_pc_error, Error};
 use crate::get_labels;
 use crate::util::powers_of;
-use crate::virtual_oracle::{EvaluationsProvider, VirtualOracle};
+use crate::virtual_oracle::VirtualOracle;
 use crate::zero_over_k::piop::PIOPforZeroOverK;
 use crate::zero_over_k::proof::Proof;
 use ark_ff::to_bytes;
@@ -339,6 +339,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> ZeroOverK<F, PC,
         // derive commitment to q2 through additive homomorphism
         let q2_linear_combination =
             PIOPforZeroOverK::generate_q2_linear_combination(virtual_oracle, verifier_first_msg.c);
+
         let q2_commit = PC::get_commitments_lc(&r_commitments, &q2_linear_combination)?;
 
         let fs_bytes =
@@ -402,10 +403,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> ZeroOverK<F, PC,
         let z_k_at_beta_2 = domain.evaluate_vanishing_polynomial(beta_2);
 
         // compute F_prime(beta_1)
-        let f_prime_eval_r =
-            proof
-                .h_prime_evals
-                .evaluate(virtual_oracle, beta_1, &Vec::<F>::default());
+        let f_prime_eval_r = virtual_oracle.query(&proof.h_prime_evals, beta_1);
 
         if f_prime_eval_r.is_err() {
             return Err(Error::FPrimeEvalError);

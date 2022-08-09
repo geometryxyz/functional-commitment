@@ -4,8 +4,7 @@ mod test {
         commitment::KZG10,
         error::{to_pc_error, Error},
         util::random_deg_n_polynomial,
-        virtual_oracle::inverse_check_oracle::InverseCheckOracle,
-        virtual_oracle::prod_vo::ProdVO,
+        virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO},
         zero_over_k::ZeroOverK,
     };
     use ark_bn254::{Bn254, Fr};
@@ -85,7 +84,8 @@ mod test {
 
         // Step 6: Derive the desired virtual oracle
         let alphas = vec![F::one(), F::one()];
-        let inverse_check_oracle = InverseCheckOracle::new();
+        let inverse_check_oracle =
+            GenericShiftingVO::new(&vec![0, 1], &alphas, presets::inverse_check).unwrap();
 
         // Step 7: prove
         let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
@@ -142,21 +142,21 @@ mod test {
 
         let f = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&f_evals));
         let f = LabeledPolynomial::new(
-            String::from("g"),
+            String::from("f"),
             f,
             Some(enforced_degree_bound),
             enforced_hiding_bound,
         );
 
         let g_evals: Vec<F> = vec![
-            F::from(1u64),
-            F::from(2u64),
-            F::from(3u64),
-            F::from(4u64),
-            F::from(5u64),
-            F::from(6u64),
-            F::from(7u64),
             F::from(8u64),
+            F::from(7u64),
+            F::from(6u64),
+            F::from(5u64),
+            F::from(4u64),
+            F::from(3u64),
+            F::from(2u64),
+            F::from(1u64),
         ];
 
         let g = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&g_evals));
@@ -173,7 +173,8 @@ mod test {
             .map_err(to_pc_error::<F, PC>)
             .unwrap();
 
-        let zero_over_k_vo = ProdVO {};
+        let zero_over_k_vo =
+            GenericShiftingVO::new(&[0, 1], &alphas, presets::equality_check).unwrap();
 
         let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
             &concrete_oracles,
@@ -263,7 +264,8 @@ mod test {
 
         // Step 6: Derive the desired virtual oracle
         let alphas = vec![F::one(), F::one()];
-        let inverse_check_oracle = InverseCheckOracle::new();
+        let inverse_check_oracle =
+            GenericShiftingVO::new(&vec![0, 1], &alphas, presets::inverse_check).unwrap();
 
         // Step 7: prove
         let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(

@@ -6,7 +6,7 @@ mod tests {
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
     };
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
-    use ark_std::rand::thread_rng;
+    use ark_std::{rand::thread_rng, test_rng};
     use blake2::Blake2s;
 
     type F = Fr;
@@ -62,7 +62,7 @@ mod tests {
 
     #[test]
     fn test_geo_seq() {
-        let rng = &mut thread_rng();
+        let rng = &mut test_rng();
 
         // define a sequence
         let common_ratio = Fr::from(9u64);

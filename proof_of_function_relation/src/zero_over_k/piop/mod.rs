@@ -33,7 +33,7 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
         virtual_oracle: &VO,
         concrete_oracle_labels: &[PolynomialLabel],
     ) -> Vec<LinearCombination<F>> {
-        let h_labels = virtual_oracle.get_h_labels(concrete_oracle_labels);
+        let h_labels = virtual_oracle.get_term_labels(concrete_oracle_labels);
         let h_prime_labels = Self::get_h_prime_labels(virtual_oracle);
         let mut linear_combinations: Vec<LinearCombination<F>> = Vec::new();
 

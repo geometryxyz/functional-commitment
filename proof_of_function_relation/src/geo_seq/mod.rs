@@ -1,8 +1,9 @@
 use crate::commitment::AdditivelyHomomorphicPCS;
 use crate::error::{to_pc_error, Error};
 use crate::geo_seq::proof::Proof;
-use crate::virtual_oracle::geometric_sequence_vo::GeoSequenceVO;
+use crate::virtual_oracle::generic_shifting_vo::{vo_term::VOTerm, GenericShiftingVO};
 use crate::zero_over_k::ZeroOverK;
+use crate::{geometric_seq_check, vo_constant};
 use ark_ff::{to_bytes, PrimeField};
 use ark_marlin::rng::FiatShamirRng;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
@@ -11,6 +12,7 @@ use ark_std::marker::PhantomData;
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use rand::Rng;
 use rand_core::OsRng;
+use std::iter;
 
 pub mod proof;
 mod tests;
@@ -24,7 +26,6 @@ pub struct GeoSeqTest<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest>
 impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC, D> {
     pub const PROTOCOL_NAME: &'static [u8] = b"Geometric Sequence Test";
     // TODO: for both prove() and verify:
-    // TODO: degree bounds!
     // TODO: have an assertion that domain is large enough given m
     // TODO: move the padding outside and the check that the length is correct
     // TODO: verifier should check that the size of the sequence is correct given the domain
@@ -40,9 +41,12 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
         rng: &mut R,
     ) -> Result<Proof<F, PC>, Error> {
         // Generate the GeoSequenceVO virtual oracle
-        let geo_seq_vo = GeoSequenceVO::new(&sequence_lengths, domain.element(1), common_ratio);
-
-        let alphas = [F::from(1u64), domain.element(1)];
+        let alphas = [F::one(), domain.element(1)];
+        let geo_seq_vo = GenericShiftingVO::new(
+            &[0, 1],
+            &alphas,
+            geometric_seq_check!(common_ratio, sequence_lengths, domain),
+        )?;
 
         let fs_bytes = &to_bytes![
             &Self::PROTOCOL_NAME,
@@ -59,7 +63,12 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
         let mut fs_rng = FiatShamirRng::<D>::from_seed(fs_bytes);
 
         let mut query_set = QuerySet::new();
-        let sequence_starting_indices = geo_seq_vo.get_pi_s();
+        let sequence_starting_indices = iter::once(0)
+            .chain(sequence_lengths.iter().scan(0, |st, elem| {
+                *st += elem;
+                Some(*st)
+            }))
+            .collect::<Vec<_>>();
         for (i, &pi) in sequence_starting_indices.iter().enumerate() {
             query_set.insert((
                 f.label().clone(),
@@ -83,9 +92,9 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
         .map_err(to_pc_error::<F, PC>)?;
 
         let z_proof = ZeroOverK::<F, PC, D>::prove(
-            &[f.clone()],
-            &[f_commit.clone()],
-            &[f_rand.clone()],
+            &[f.clone(), f.clone()],
+            &[f_commit.clone(), f_commit.clone()],
+            &[f_rand.clone(), f_rand.clone()],
             f.degree_bound(),
             &geo_seq_vo,
             &alphas.to_vec(),
@@ -117,11 +126,20 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
             enforced_degree_bound,
         );
 
-        let alphas = [F::from(1u64), domain.element(1)];
-        let geo_seq_vo = GeoSequenceVO::new(&sequence_lengths, domain.element(1), common_ratio);
+        let alphas = [F::one(), domain.element(1)];
+        let geo_seq_vo = GenericShiftingVO::new(
+            &[0, 1],
+            &alphas,
+            geometric_seq_check!(common_ratio, sequence_lengths, domain),
+        )?;
 
         // Test that for all i in n, check that f(gamma^p_i) = a_i
-        let sequence_starting_indices = geo_seq_vo.get_pi_s();
+        let sequence_starting_indices = iter::once(0)
+            .chain(sequence_lengths.iter().scan(0, |st, elem| {
+                *st += elem;
+                Some(*st)
+            }))
+            .collect::<Vec<_>>();
         let points = sequence_starting_indices
             .iter()
             .map(|&pi| domain.element(1).pow([pi as u64]))
@@ -135,7 +153,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
                 .map(|&x| x as u64)
                 .collect::<Vec<_>>(),
             common_ratio,
-            &[&bounded_f_commit].to_vec(),
+            &[f_commit.clone()].to_vec(),
             &alphas.to_vec()
         ]
         .map_err(|_| Error::ToBytesError)?;
@@ -177,7 +195,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
         // TODO: raise a different error?
         ZeroOverK::<F, PC, D>::verify(
             proof.z_proof,
-            &[bounded_f_commit.clone()],
+            &[bounded_f_commit.clone(), bounded_f_commit.clone()],
             enforced_degree_bound,
             &geo_seq_vo,
             &domain,
