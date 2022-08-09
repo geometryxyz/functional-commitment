@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::util::shift_dense_poly;
-use crate::virtual_oracle::new_vo::vo_term::VOTerm;
+use crate::virtual_oracle::generic_shifting_vo::vo_term::VOTerm;
 use ark_ff::{Field, PrimeField};
 use ark_poly::{univariate::DensePolynomial, UVPolynomial};
 use ark_poly_commit::{Evaluations, PolynomialLabel, QuerySet};
@@ -11,18 +11,21 @@ pub mod presets;
 mod tests;
 pub mod vo_term;
 
-pub struct NewVO<F, T>
+/// A virtual oracle which shifts the concrete oracles and combines them according to a user-defined function.
+/// The function can be specified as a function or a closure if one needs to capture environment variables. Presets are
+/// available in this crate. See equation (2) in https://eprint.iacr.org/2021/1342 for an explicit definition.
+pub struct GenericShiftingVO<F, T>
 where
     F: Field,
     T: Fn(&[VOTerm<F>]) -> VOTerm<F>,
 {
-    pub mapping_vector: Vec<usize>,
-    pub shifting_coefficients: Vec<F>,
-    pub combine_function: T,
+    mapping_vector: Vec<usize>,
+    shifting_coefficients: Vec<F>,
+    combine_function: T,
     minimum_oracle_length: usize,
 }
 
-impl<F, T> NewVO<F, T>
+impl<F, T> GenericShiftingVO<F, T>
 where
     F: Field,
     T: Fn(&[VOTerm<F>]) -> VOTerm<F>,
@@ -179,7 +182,7 @@ where
     }
 }
 
-impl<F, T> VirtualOracle<F> for NewVO<F, T>
+impl<F, T> VirtualOracle<F> for GenericShiftingVO<F, T>
 where
     F: PrimeField,
     T: Fn(&[VOTerm<F>]) -> VOTerm<F>,

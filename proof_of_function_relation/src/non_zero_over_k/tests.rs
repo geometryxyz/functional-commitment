@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use crate::virtual_oracle::new_vo::{presets, NewVO};
+    use crate::virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO};
     use crate::virtual_oracle::VirtualOracle;
     use crate::{
         commitment::KZG10,
@@ -187,7 +187,8 @@ mod test {
         let concrete_oracles = [a, b];
         let alphas = vec![F::one(), F::one()];
 
-        let zero_over_k_vo = NewVO::new(&vec![0, 1], &alphas, presets::inverse_check).unwrap();
+        let zero_over_k_vo =
+            GenericShiftingVO::new(&vec![0, 1], &alphas, presets::inverse_check).unwrap();
 
         let f = zero_over_k_vo
             .instantiate_in_coeffs_form(&concrete_oracles, alphas.as_slice())

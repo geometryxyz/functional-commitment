@@ -1,7 +1,7 @@
 use crate::commitment::AdditivelyHomomorphicPCS;
 use crate::error::{to_pc_error, Error};
 use crate::geo_seq::proof::Proof;
-use crate::virtual_oracle::new_vo::{vo_term::VOTerm, NewVO};
+use crate::virtual_oracle::generic_shifting_vo::{vo_term::VOTerm, GenericShiftingVO};
 use crate::zero_over_k::ZeroOverK;
 use crate::{geometric_seq_check, vo_constant};
 use ark_ff::{to_bytes, PrimeField};
@@ -43,7 +43,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
     ) -> Result<Proof<F, PC>, Error> {
         // Generate the GeoSequenceVO virtual oracle
         let alphas = [F::one(), domain.element(1)];
-        let geo_seq_vo = NewVO::new(
+        let geo_seq_vo = GenericShiftingVO::new(
             &[0, 1],
             &alphas,
             geometric_seq_check!(common_ratio, sequence_lengths, domain),
@@ -128,7 +128,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
         );
 
         let alphas = [F::one(), domain.element(1)];
-        let geo_seq_vo = NewVO::new(
+        let geo_seq_vo = GenericShiftingVO::new(
             &[0, 1],
             &alphas,
             geometric_seq_check!(common_ratio, sequence_lengths, domain),

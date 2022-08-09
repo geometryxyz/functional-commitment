@@ -5,9 +5,9 @@ use crate::{
     geo_seq::GeoSeqTest,
     non_zero_over_k::NonZeroOverK,
     subset_over_k::SubsetOverK,
-    virtual_oracle::new_vo::{
+    virtual_oracle::generic_shifting_vo::{
         presets::{self, square_check},
-        NewVO,
+        GenericShiftingVO,
     },
     zero_over_k::ZeroOverK,
 };
@@ -84,7 +84,7 @@ where
         fs_rng.absorb(fs_bytes);
 
         let alphas = [F::one(), F::one()];
-        let square_check_vo = NewVO::new(&[0, 1], &alphas, square_check)?;
+        let square_check_vo = GenericShiftingVO::new(&[0, 1], &alphas, square_check)?;
 
         //------------------------------------------------------------------
         // Run sub-protocols
@@ -141,7 +141,7 @@ where
 
         // Step 4d: Zero over K for f' = (s')*(g')
         let product_check_vo =
-            NewVO::new(&[0, 1, 2], &vec![F::one(); 3], presets::abc_product_check)?;
+            GenericShiftingVO::new(&[0, 1, 2], &vec![F::one(); 3], presets::abc_product_check)?;
         let alphas = [F::one(), F::one(), F::one()];
         let f_prime_product_proof = ZeroOverK::<F, PC, D>::prove(
             &[
@@ -325,7 +325,7 @@ where
         fs_rng.absorb(fs_bytes);
 
         let alphas = [F::one(), F::one()];
-        let square_check_vo = NewVO::new(&[0, 1], &alphas, square_check)?;
+        let square_check_vo = GenericShiftingVO::new(&[0, 1], &alphas, square_check)?;
 
         // Zero over K for f_prime
         ZeroOverK::<F, PC, D>::verify(
@@ -361,7 +361,7 @@ where
         )?;
 
         let product_check_vo =
-            NewVO::new(&[0, 1, 2], &vec![F::one(); 3], presets::abc_product_check)?;
+            GenericShiftingVO::new(&[0, 1, 2], &vec![F::one(); 3], presets::abc_product_check)?;
         let alphas = [F::one(), F::one(), F::one()];
 
         // Zero over K for f' = (s')*(g')

@@ -5,9 +5,9 @@ use crate::{
     non_zero_over_k::NonZeroOverK,
     t_diag::proof::Proof,
     util::generate_sequence,
-    virtual_oracle::new_vo::{
+    virtual_oracle::generic_shifting_vo::{
         presets::{self, zero_product_check},
-        NewVO,
+        GenericShiftingVO,
     },
     zero_over_k::ZeroOverK,
 };
@@ -133,7 +133,7 @@ where
         )?;
 
         // Step 4b: Zero over K for h = rowM
-        let eq_vo = NewVO::new(&vec![0, 1], &alphas, presets::equality_check)?;
+        let eq_vo = GenericShiftingVO::new(&vec![0, 1], &alphas, presets::equality_check)?;
         let h_eq_row_m = ZeroOverK::<F, PC, D>::prove(
             &[h.clone(), row_m.clone()],
             &[h_commitment.clone(), row_m_commitment.clone()],
@@ -160,7 +160,7 @@ where
         )?;
 
         // Step 5: Zero over K for valM * h2 = 0
-        let prod_vo = NewVO::new(&[0, 1], &[F::one(), F::one()], zero_product_check)?;
+        let prod_vo = GenericShiftingVO::new(&[0, 1], &[F::one(), F::one()], zero_product_check)?;
         let val_m_times_h2_proof = ZeroOverK::<F, PC, D>::prove(
             &[val_m.clone(), h2.clone()],
             &[val_m_commitment.clone(), h_commitments[1].clone()],
@@ -306,7 +306,7 @@ where
         )?;
 
         // Step 4b: Zero over K for h = rowM
-        let eq_vo = NewVO::new(&vec![0, 1], &alphas, presets::equality_check)?;
+        let eq_vo = GenericShiftingVO::new(&vec![0, 1], &alphas, presets::equality_check)?;
         ZeroOverK::<F, PC, D>::verify(
             proof.h_eq_row_m,
             vec![h_commit.clone(), row_m_commitment.clone()].as_slice(),
@@ -329,7 +329,7 @@ where
         )?;
 
         // Step 5: Zero over K for valM * h2 = 0
-        let prod_vo = NewVO::new(&[0, 1], &[F::one(), F::one()], zero_product_check)?;
+        let prod_vo = GenericShiftingVO::new(&[0, 1], &[F::one(), F::one()], zero_product_check)?;
         ZeroOverK::<F, PC, D>::verify(
             proof.val_m_times_h2_proof,
             vec![val_m_commitment.clone(), h_commitments[1].clone()].as_slice(),

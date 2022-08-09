@@ -3,7 +3,7 @@ use ark_ff::PrimeField;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::{LabeledPolynomial, PolynomialLabel};
 
-pub mod new_vo;
+pub mod generic_shifting_vo;
 
 pub trait VirtualOracle<F: PrimeField> {
     /// Returns the list of concrete oracle labels ordered according to the mapping vector

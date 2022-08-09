@@ -2,7 +2,7 @@
 mod test {
     use crate::geometric_seq_check;
     use crate::util::sample_vector;
-    use crate::virtual_oracle::new_vo::presets;
+    use crate::virtual_oracle::generic_shifting_vo::presets;
     use crate::virtual_oracle::VirtualOracle;
     use crate::{
         commitment::KZG10, error::to_pc_error, util::random_deg_n_polynomial,
@@ -19,7 +19,7 @@ mod test {
     use ark_std::{rand::thread_rng, test_rng};
     use blake2::Blake2s;
 
-    use super::super::{NewVO, VOTerm};
+    use super::super::{GenericShiftingVO, VOTerm};
 
     type F = Fr;
     type PC = KZG10<Bn254>;
@@ -57,7 +57,8 @@ mod test {
         let expected = &shifted_c + &(&two_constant_poly * &shifted_a);
 
         let add_oracle =
-            NewVO::new(&mapping_vector, &shifting_coefficients, simple_addition).unwrap();
+            GenericShiftingVO::new(&mapping_vector, &shifting_coefficients, simple_addition)
+                .unwrap();
 
         // Check that we get the right polynomial
         let sum = add_oracle.compute_polynomial(concrete_oracles).unwrap();
@@ -80,7 +81,8 @@ mod test {
         let shifted_a = shift_dense_poly(&a_poly, &shifting_coefficients[1]);
         let expected = &shifted_c * &shifted_a;
 
-        let mul_oracle = NewVO::new(&mapping_vector, &shifting_coefficients, simple_mul).unwrap();
+        let mul_oracle =
+            GenericShiftingVO::new(&mapping_vector, &shifting_coefficients, simple_mul).unwrap();
 
         // Check that we get the right polynomial
         let prod = mul_oracle.compute_polynomial(concrete_oracles).unwrap();
@@ -92,7 +94,8 @@ mod test {
         // mapping vector expects there to be a concrete oracle with index 1; effectively expected at last 2 concrete oracles
         let mapping_vector = vec![2];
         let shift_coefficients = vec![F::one()];
-        let add_oracle = NewVO::new(&mapping_vector, &shift_coefficients, simple_addition).unwrap();
+        let add_oracle =
+            GenericShiftingVO::new(&mapping_vector, &shift_coefficients, simple_addition).unwrap();
 
         // We only provide one concrete oracle
         let err_poly = add_oracle.compute_polynomial(&vec![DensePolynomial::<F>::default()]);
@@ -141,7 +144,8 @@ mod test {
         let mapping_vector = vec![2, 2, 0];
 
         let add_oracle =
-            NewVO::new(&mapping_vector, &shifting_coefficients, harder_addition).unwrap();
+            GenericShiftingVO::new(&mapping_vector, &shifting_coefficients, harder_addition)
+                .unwrap();
 
         let eval_point = (String::from("beta"), F::rand(rng));
         let query_set = add_oracle
@@ -188,7 +192,7 @@ mod test {
         let f = DensePolynomial::<Fr>::from_coefficients_slice(&domain.ifft(&seq));
         let alphas = vec![F::one(), domain.element(1)];
 
-        let new_geo_vo = NewVO::new(
+        let new_geo_vo = GenericShiftingVO::new(
             &vec![0, 0],
             &alphas,
             geometric_seq_check!(common_ratio, sequence_lengths, domain),
@@ -274,7 +278,7 @@ mod test {
         // Step 6: Derive the desired virtual oracle
         let alphas = vec![F::one(), F::one()];
         let inverse_check_oracle =
-            NewVO::new(&vec![0, 1], &alphas.clone(), presets::inverse_check).unwrap();
+            GenericShiftingVO::new(&vec![0, 1], &alphas.clone(), presets::inverse_check).unwrap();
 
         // Step 7: prove
         let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
@@ -331,7 +335,7 @@ mod test {
         let labeled_f = LabeledPolynomial::new(String::from("f"), f, None, None);
         let alphas = vec![F::one(), domain.element(1)];
 
-        let new_geo_vo = NewVO::new(
+        let new_geo_vo = GenericShiftingVO::new(
             &vec![0, 0],
             &alphas,
             geometric_seq_check!(common_ratio, sequence_lengths, domain),

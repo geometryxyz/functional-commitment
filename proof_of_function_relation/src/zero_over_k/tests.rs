@@ -4,7 +4,7 @@ mod test {
         commitment::KZG10,
         error::{to_pc_error, Error},
         util::random_deg_n_polynomial,
-        virtual_oracle::new_vo::{presets, NewVO},
+        virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO},
         zero_over_k::ZeroOverK,
     };
     use ark_bn254::{Bn254, Fr};
@@ -85,7 +85,7 @@ mod test {
         // Step 6: Derive the desired virtual oracle
         let alphas = vec![F::one(), F::one()];
         let inverse_check_oracle =
-            NewVO::new(&vec![0, 1], &alphas, presets::inverse_check).unwrap();
+            GenericShiftingVO::new(&vec![0, 1], &alphas, presets::inverse_check).unwrap();
 
         // Step 7: prove
         let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
@@ -173,7 +173,8 @@ mod test {
             .map_err(to_pc_error::<F, PC>)
             .unwrap();
 
-        let zero_over_k_vo = NewVO::new(&[0, 1], &alphas, presets::equality_check).unwrap();
+        let zero_over_k_vo =
+            GenericShiftingVO::new(&[0, 1], &alphas, presets::equality_check).unwrap();
 
         let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
             &concrete_oracles,
@@ -264,7 +265,7 @@ mod test {
         // Step 6: Derive the desired virtual oracle
         let alphas = vec![F::one(), F::one()];
         let inverse_check_oracle =
-            NewVO::new(&vec![0, 1], &alphas, presets::inverse_check).unwrap();
+            GenericShiftingVO::new(&vec![0, 1], &alphas, presets::inverse_check).unwrap();
 
         // Step 7: prove
         let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(

@@ -1,5 +1,5 @@
 use crate::non_zero_over_k::{piop::PIOPforNonZeroOverK, proof::Proof};
-use crate::virtual_oracle::new_vo::{presets, NewVO};
+use crate::virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO};
 use crate::{
     commitment::AdditivelyHomomorphicPCS,
     error::{to_pc_error, Error},
@@ -48,7 +48,8 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> NonZeroOverK<F, 
         let concrete_oracles = [f.clone(), prover_first_oracles.g.clone()];
 
         let alphas = vec![F::one(), F::one()];
-        let inverse_check_oracle = NewVO::new(&vec![0, 1], &alphas, presets::inverse_check)?;
+        let inverse_check_oracle =
+            GenericShiftingVO::new(&vec![0, 1], &alphas, presets::inverse_check)?;
 
         let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
             &concrete_oracles,
@@ -88,7 +89,8 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> NonZeroOverK<F, 
 
         let concrete_oracles_commitments = [bounded_f_commit.clone(), g_commit];
         let alphas = vec![F::one(), F::one()];
-        let inverse_check_oracle = NewVO::new(&vec![0, 1], &alphas, presets::inverse_check)?;
+        let inverse_check_oracle =
+            GenericShiftingVO::new(&vec![0, 1], &alphas, presets::inverse_check)?;
 
         ZeroOverK::<F, PC, D>::verify(
             proof.zero_over_k_proof,
