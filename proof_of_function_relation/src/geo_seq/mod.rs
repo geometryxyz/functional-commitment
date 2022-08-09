@@ -26,7 +26,6 @@ pub struct GeoSeqTest<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest>
 impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC, D> {
     pub const PROTOCOL_NAME: &'static [u8] = b"Geometric Sequence Test";
     // TODO: for both prove() and verify:
-    // TODO: degree bounds!
     // TODO: have an assertion that domain is large enough given m
     // TODO: move the padding outside and the check that the length is correct
     // TODO: verifier should check that the size of the sequence is correct given the domain
