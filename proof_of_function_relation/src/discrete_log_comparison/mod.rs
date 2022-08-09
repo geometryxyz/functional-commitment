@@ -5,9 +5,9 @@ use crate::{
     geo_seq::GeoSeqTest,
     non_zero_over_k::NonZeroOverK,
     subset_over_k::SubsetOverK,
-    virtual_oracle::{
-        new_vo::{presets, NewVO},
-        square_check_oracle::SquareCheckOracle,
+    virtual_oracle::new_vo::{
+        presets::{self, square_check},
+        NewVO,
     },
     zero_over_k::ZeroOverK,
 };
@@ -83,9 +83,8 @@ where
             &to_bytes![Self::PROTOCOL_NAME, commitments].map_err(|_| Error::ToBytesError)?;
         fs_rng.absorb(fs_bytes);
 
-        let square_check_vo = SquareCheckOracle::new();
-
         let alphas = [F::one(), F::one()];
+        let square_check_vo = NewVO::new(&[0, 1], &alphas, square_check)?;
 
         //------------------------------------------------------------------
         // Run sub-protocols
@@ -325,9 +324,8 @@ where
             &to_bytes![Self::PROTOCOL_NAME, commitments].map_err(|_| Error::ToBytesError)?;
         fs_rng.absorb(fs_bytes);
 
-        let square_check_vo = SquareCheckOracle::new();
-
         let alphas = [F::one(), F::one()];
+        let square_check_vo = NewVO::new(&[0, 1], &alphas, square_check)?;
 
         // Zero over K for f_prime
         ZeroOverK::<F, PC, D>::verify(
