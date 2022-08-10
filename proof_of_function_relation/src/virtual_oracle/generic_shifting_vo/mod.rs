@@ -60,24 +60,26 @@ where
         })
     }
 
-    pub fn number_of_internal_terms(&self) -> usize {
-        self.mapping_vector.len()
+    /// Check that enough oracles were provided.
+    fn check_conrete_oracle_length(&self, input_length: usize) -> Result<(), Error> {
+        if input_length < self.minimum_oracle_length {
+            return Err(Error::InputLengthError(format!(
+                "Mapping vector requires {} oracles/evaluations but only {} were provided",
+                self.minimum_oracle_length, input_length
+            )));
+        }
+        Ok(())
     }
+}
 
-    pub fn get_term_labels(
+impl<F, T> VirtualOracle<F> for GenericShiftingVO<F, T>
+where
+    F: PrimeField,
+    T: Fn(&[VOTerm<F>]) -> VOTerm<F>,
+{
+    fn compute_polynomial(
         &self,
-        concrete_oracle_labels: &[PolynomialLabel],
-    ) -> Vec<PolynomialLabel> {
-        self.mapping_vector
-            .iter()
-            .map(|&mapped_index| concrete_oracle_labels[mapped_index].clone())
-            .collect()
-    }
-
-    /// Returns the polynomial that results from the combination of the given concrete oracles
-    pub fn compute_polynomial(
-        &self,
-        concrete_oracles: &[DensePolynomial<F>],
+        concrete_oracles: &[ark_poly_commit::LabeledPolynomial<F, DensePolynomial<F>>],
     ) -> Result<DensePolynomial<F>, Error> {
         self.check_conrete_oracle_length(concrete_oracles.len())?;
 
@@ -106,10 +108,10 @@ where
         }
     }
 
-    pub fn generate_query_set(
+    fn generate_query_set(
         &self,
         concrete_oracle_labels: &[PolynomialLabel],
-        labeled_point: &(String, F),
+        query_point: &(String, F),
     ) -> Result<QuerySet<F>, Error> {
         self.check_conrete_oracle_length(concrete_oracle_labels.len())?;
 
@@ -122,8 +124,8 @@ where
             .enumerate()
             .for_each(|(term_index, &mapped_index)| {
                 let poly_label = concrete_oracle_labels[mapped_index].clone();
-                let eval_point = self.shifting_coefficients[term_index] * labeled_point.1;
-                let point_label = format!("{}_times_alpha{}", labeled_point.0, term_index);
+                let eval_point = self.shifting_coefficients[term_index] * query_point.1;
+                let point_label = format!("{}_times_alpha{}", query_point.0, term_index);
 
                 query_set.insert((poly_label, (point_label, eval_point)));
             });
@@ -131,8 +133,7 @@ where
         Ok(query_set)
     }
 
-    /// Given evalutations of each of the concrete oracles, produce the corresponding evaluation for the virtual oracle
-    pub fn evaluate_from_concrete_evals(
+    fn evaluate_from_concrete_evals(
         &self,
         concrete_oracle_labels: &[PolynomialLabel],
         eval_point: &F,
@@ -158,11 +159,6 @@ where
 
         terms.insert(0, VOTerm::Evaluation(eval_point.clone()));
 
-        // match terms[0] {
-        //     VOTerm::Evaluation(eval) => {assert_eq!(&eval, eval_point); println!("all good")},
-        //     _ => println!("bad branch"),
-        // }
-
         let combined = (self.combine_function)(&terms);
         match combined {
             VOTerm::Evaluation(eval) => Ok(eval),
@@ -170,57 +166,26 @@ where
         }
     }
 
-    /// Check that enough oracles were provided.
-    fn check_conrete_oracle_length(&self, input_length: usize) -> Result<(), Error> {
-        if input_length < self.minimum_oracle_length {
-            return Err(Error::InputLengthError(format!(
-                "Mapping vector requires {} oracles/evaluations but only {} were provided",
-                self.minimum_oracle_length, input_length
-            )));
-        }
-        Ok(())
-    }
-}
-
-impl<F, T> VirtualOracle<F> for GenericShiftingVO<F, T>
-where
-    F: PrimeField,
-    T: Fn(&[VOTerm<F>]) -> VOTerm<F>,
-{
-    fn instantiate_in_coeffs_form(
-        &self,
-        concrete_oracles: &[ark_poly_commit::LabeledPolynomial<F, DensePolynomial<F>>],
-        _alphas: &[F],
-    ) -> Result<DensePolynomial<F>, Error> {
-        let oracle_polys: Vec<_> = concrete_oracles
-            .iter()
-            .map(|p| p.polynomial().clone())
-            .collect();
-        self.compute_polynomial(&oracle_polys)
-    }
-
     fn get_term_labels(&self, concrete_oracle_labels: &[PolynomialLabel]) -> Vec<PolynomialLabel> {
-        self.get_term_labels(concrete_oracle_labels)
+        self.mapping_vector
+            .iter()
+            .map(|&mapped_index| concrete_oracle_labels[mapped_index].clone())
+            .collect()
     }
 
     fn mapping_vector(&self) -> Vec<usize> {
         self.mapping_vector.clone()
     }
 
-    fn num_of_oracles(&self) -> usize {
-        self.mapping_vector.len()
+    fn shifting_coefficients(&self) -> Vec<F> {
+        self.shifting_coefficients.clone()
     }
 
-    fn query(&self, evals: &[F], point: F) -> Result<F, Error> {
-        let terms: Vec<_> = vec![point]
-            .iter()
-            .chain(evals.iter())
-            .map(|e| VOTerm::Evaluation(e.clone()))
-            .collect();
+    fn apply_evaluation_function(&self, terms: &[VOTerm<F>]) -> VOTerm<F> {
+        (self.combine_function)(terms)
+    }
 
-        match (self.combine_function)(&terms) {
-            VOTerm::Evaluation(res) => Ok(res),
-            VOTerm::Polynomial(_) => Err(Error::VOFailedToCompute),
-        }
+    fn num_of_variable_terms(&self) -> usize {
+        self.mapping_vector.len()
     }
 }

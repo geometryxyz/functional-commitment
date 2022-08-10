@@ -43,7 +43,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
         // Generate the GeoSequenceVO virtual oracle
         let alphas = [F::one(), domain.element(1)];
         let geo_seq_vo = GenericShiftingVO::new(
-            &[0, 1],
+            &[0, 0],
             &alphas,
             geometric_seq_check!(common_ratio, sequence_lengths, domain),
         )?;
@@ -92,9 +92,9 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
         .map_err(to_pc_error::<F, PC>)?;
 
         let z_proof = ZeroOverK::<F, PC, D>::prove(
-            &[f.clone(), f.clone()],
-            &[f_commit.clone(), f_commit.clone()],
-            &[f_rand.clone(), f_rand.clone()],
+            &[f.clone()],
+            &[f_commit.clone()],
+            &[f_rand.clone()],
             f.degree_bound(),
             &geo_seq_vo,
             &alphas.to_vec(),
@@ -128,7 +128,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
 
         let alphas = [F::one(), domain.element(1)];
         let geo_seq_vo = GenericShiftingVO::new(
-            &[0, 1],
+            &[0, 0],
             &alphas,
             geometric_seq_check!(common_ratio, sequence_lengths, domain),
         )?;
@@ -195,7 +195,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
         // TODO: raise a different error?
         ZeroOverK::<F, PC, D>::verify(
             proof.z_proof,
-            &[bounded_f_commit.clone(), bounded_f_commit.clone()],
+            &[bounded_f_commit.clone()],
             enforced_degree_bound,
             &geo_seq_vo,
             &domain,

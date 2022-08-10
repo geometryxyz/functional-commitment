@@ -18,13 +18,13 @@ pub struct PIOPforZeroOverK<F: PrimeField, VO: VirtualOracle<F>> {
 
 impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
     pub fn get_h_prime_labels(virtual_oracle: &VO) -> impl Iterator<Item = PolynomialLabel> {
-        (0..virtual_oracle.num_of_oracles())
+        (0..virtual_oracle.num_of_variable_terms())
             .enumerate()
             .map(|(i, _)| format!("h_prime_{}", i))
     }
 
     pub fn get_r_labels(virtual_oracle: &VO) -> impl Iterator<Item = PolynomialLabel> {
-        (0..virtual_oracle.num_of_oracles())
+        (0..virtual_oracle.num_of_variable_terms())
             .enumerate()
             .map(|(i, _)| format!("r_{}", i))
     }

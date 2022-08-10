@@ -191,7 +191,7 @@ mod test {
             GenericShiftingVO::new(&vec![0, 1], &alphas, presets::inverse_check).unwrap();
 
         let f = zero_over_k_vo
-            .instantiate_in_coeffs_form(&concrete_oracles, alphas.as_slice())
+            .compute_polynomial(&concrete_oracles)
             .unwrap();
         let f = LabeledPolynomial::new(
             String::from("f"),

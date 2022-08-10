@@ -4,7 +4,7 @@ use crate::commitment::AdditivelyHomomorphicPCS;
 use crate::error::{to_pc_error, Error};
 use crate::get_labels;
 use crate::util::powers_of;
-use crate::virtual_oracle::VirtualOracle;
+use crate::virtual_oracle::{generic_shifting_vo::vo_term::VOTerm, VirtualOracle};
 use crate::zero_over_k::piop::PIOPforZeroOverK;
 use crate::zero_over_k::proof::Proof;
 use ark_ff::to_bytes;
@@ -403,12 +403,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> ZeroOverK<F, PC,
         let z_k_at_beta_2 = domain.evaluate_vanishing_polynomial(beta_2);
 
         // compute F_prime(beta_1)
-        let f_prime_eval_r = virtual_oracle.query(&proof.h_prime_evals, beta_1);
-
-        if f_prime_eval_r.is_err() {
-            return Err(Error::FPrimeEvalError);
-        }
-        let f_prime_eval = f_prime_eval_r.unwrap();
+        let f_prime_eval = compute_f_prime_eval(virtual_oracle, &proof.h_prime_evals, &beta_1)?;
 
         // check that M(beta_2) - q2(beta_2)*zK(beta_2) = 0
         let check_1 = *big_m_at_beta_2 - proof.q2_eval * z_k_at_beta_2;
@@ -423,5 +418,22 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> ZeroOverK<F, PC,
         }
 
         Ok(())
+    }
+}
+
+fn compute_f_prime_eval<F: PrimeField, VO: VirtualOracle<F>>(
+    virtual_oracle: &VO,
+    evals: &[F],
+    point: &F,
+) -> Result<F, Error> {
+    let terms: Vec<_> = vec![point.clone()]
+        .iter()
+        .chain(evals.iter())
+        .map(|e| VOTerm::Evaluation(e.clone()))
+        .collect();
+
+    match virtual_oracle.apply_evaluation_function(&terms) {
+        VOTerm::Evaluation(res) => Ok(res),
+        VOTerm::Polynomial(_) => Err(Error::VOFailedToCompute),
     }
 }
