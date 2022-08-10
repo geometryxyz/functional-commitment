@@ -3,7 +3,6 @@ mod test {
     use crate::{
         commitment::KZG10,
         error::{to_pc_error, Error},
-        util::random_deg_n_polynomial,
         virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO},
         zero_over_k::ZeroOverK,
     };
@@ -48,7 +47,7 @@ mod test {
         .unwrap();
 
         // Step 1: choose a random polynomial
-        let f_unlabeled: DensePolynomial<F> = random_deg_n_polynomial(7, rng);
+        let f_unlabeled: DensePolynomial<F> = DensePolynomial::rand(7, rng);
         let f = LabeledPolynomial::new(
             String::from("f"),
             f_unlabeled,
@@ -228,7 +227,7 @@ mod test {
         .unwrap();
 
         // Step 1: choose a random polynomial
-        let f_unlabeled: DensePolynomial<F> = random_deg_n_polynomial(7, rng);
+        let f_unlabeled: DensePolynomial<F> = DensePolynomial::rand(7, rng);
         let f = LabeledPolynomial::new(
             String::from("f"),
             f_unlabeled,

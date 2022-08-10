@@ -148,11 +148,11 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePo
 #[cfg(test)]
 mod test {
     use crate::commitment::{AdditivelyHomomorphicPCS, KZG10};
-    use crate::util::random_deg_n_polynomial;
     use ark_bn254::{Bn254, Fr};
     use ark_ff::One;
     use ark_ff::UniformRand;
     use ark_poly::univariate::DensePolynomial;
+    use ark_poly::UVPolynomial;
     use ark_poly_commit::LinearCombination;
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_std::rand::thread_rng;
@@ -180,10 +180,10 @@ mod test {
         .unwrap();
 
         // Define polynomials and a linear combination
-        let a_unlabeled: DensePolynomial<F> = random_deg_n_polynomial(7, rng);
+        let a_unlabeled: DensePolynomial<F> = DensePolynomial::rand(7, rng);
         let a_poly = LabeledPolynomial::new(String::from("a"), a_unlabeled, Some(10), Some(1));
 
-        let b_unlabeled: DensePolynomial<F> = random_deg_n_polynomial(5, rng);
+        let b_unlabeled: DensePolynomial<F> = DensePolynomial::rand(5, rng);
         let b_poly = LabeledPolynomial::new(String::from("b"), b_unlabeled, Some(10), Some(1));
 
         let a_plus_2b_poly = a_poly.polynomial().clone() + (b_poly.polynomial() * F::from(2u64));

@@ -1,11 +1,9 @@
 use ark_ff::{FftField, Field, PrimeField};
 use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, Evaluations, GeneralEvaluationDomain,
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
     UVPolynomial,
 };
 use ark_poly_commit::LabeledPolynomial;
-use ark_std::UniformRand;
-use rand::Rng;
 
 #[inline]
 pub fn powers_of<F>(scalar: F) -> impl Iterator<Item = F>
@@ -13,55 +11,6 @@ where
     F: Field,
 {
     core::iter::successors(Some(F::one()), move |p| Some(*p * scalar))
-}
-
-#[macro_export]
-macro_rules! to_poly {
-    ($value:expr) => {
-        DensePolynomial::from_coefficients_slice(&[$value])
-    };
-}
-
-/// Lazy labelling of polynomials for testing.
-#[macro_export]
-macro_rules! label_polynomial {
-    ($poly:expr) => {
-        ark_poly_commit::LabeledPolynomial::new(
-            stringify!($poly).to_owned(),
-            $poly.clone(),
-            None,
-            None,
-        )
-    };
-}
-
-/// Extract the labels from a list of labeled elements
-#[macro_export]
-macro_rules! get_labels {
-    ($vector:expr) => {
-        $vector
-            .iter()
-            .map(|f| f.label().clone())
-            .collect::<Vec<_>>()
-    };
-}
-
-pub fn shift_dense_poly<F: Field>(
-    p: &DensePolynomial<F>,
-    shifting_factor: &F,
-) -> DensePolynomial<F> {
-    if *shifting_factor == F::one() {
-        return p.clone();
-    }
-
-    let mut coeffs = p.coeffs().to_vec();
-    let mut acc = F::one();
-    for i in 0..coeffs.len() {
-        coeffs[i] = coeffs[i] * acc;
-        acc *= shifting_factor;
-    }
-
-    DensePolynomial::from_coefficients_vec(coeffs)
 }
 
 /// Generates the concatenation of geometric sequences that all share a common ratio
@@ -85,44 +34,6 @@ pub fn generate_sequence<F: PrimeField>(
     concatenation
 }
 
-#[allow(dead_code)]
-/// Sample a vector of random elements of type T
-pub fn sample_vector<T: UniformRand, R: Rng>(seed: &mut R, length: usize) -> Vec<T> {
-    (0..length)
-        .collect::<Vec<usize>>()
-        .iter()
-        .map(|_| T::rand(seed))
-        .collect::<Vec<_>>()
-}
-
-/// Sample a random polynomial of a defined degree
-pub fn random_deg_n_polynomial<F: Field, R: Rng>(
-    degree: usize,
-    seed: &mut R,
-) -> DensePolynomial<F> {
-    DensePolynomial::from_coefficients_vec(sample_vector(seed, degree))
-}
-
-pub fn compute_vanishing_poly_over_coset<F: FftField>(
-    domain: &GeneralEvaluationDomain<F>, // domain to evaluate over
-    poly_degree: u64,                    // degree of the vanishing polynomial
-) -> Evaluations<F> {
-    assert!(
-        (domain.size() as u64) > poly_degree,
-        "domain_size = {}, poly_degree = {}",
-        domain.size() as u64,
-        poly_degree
-    );
-
-    let group_gen = domain.element(1);
-    let coset_gen = F::multiplicative_generator().pow(&[poly_degree, 0, 0, 0]);
-    let v_h: Vec<_> = (0..domain.size())
-        .map(|i| (coset_gen * group_gen.pow(&[poly_degree * i as u64, 0, 0, 0])) - F::one())
-        .collect();
-    Evaluations::from_vec_and_domain(v_h, *domain)
-}
-
-#[allow(dead_code)]
 pub fn gen_t_diag_test_polys<F: FftField>(
     domain_k: GeneralEvaluationDomain<F>,
     domain_h: GeneralEvaluationDomain<F>,

@@ -3,10 +3,7 @@ mod test {
     use crate::util::sample_vector;
     use crate::virtual_oracle::generic_shifting_vo::presets;
     use crate::virtual_oracle::VirtualOracle;
-    use crate::{
-        commitment::KZG10, error::to_pc_error, util::random_deg_n_polynomial,
-        zero_over_k::ZeroOverK,
-    };
+    use crate::{commitment::KZG10, error::to_pc_error, zero_over_k::ZeroOverK};
     use crate::{error::Error, util::shift_dense_poly, vo_constant};
     use ark_bn254::{Bn254, Fr};
     use ark_ff::{Field, One, UniformRand};
@@ -219,7 +216,7 @@ mod test {
         .unwrap();
 
         // Step 1: choose a random polynomial
-        let f_unlabeled: DensePolynomial<F> = random_deg_n_polynomial(7, rng);
+        let f_unlabeled: DensePolynomial<F> = DensePolynomial::rand(7, rng);
         let f = LabeledPolynomial::new(
             String::from("f"),
             f_unlabeled,

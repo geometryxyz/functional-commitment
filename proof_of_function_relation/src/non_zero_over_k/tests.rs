@@ -3,7 +3,6 @@ mod test {
     use crate::{
         error::Error,
         non_zero_over_k::NonZeroOverK,
-        util::{random_deg_n_polynomial, sample_vector},
     };
     use ark_bn254::{Bn254, Fr};
     use ark_ff::Field;
@@ -18,6 +17,7 @@ mod test {
     use zero_over_k::{
         commitment::KZG10,
         virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO},
+        util::sample_vector
     };
 
     type F = Fr;
@@ -46,7 +46,7 @@ mod test {
         )
         .unwrap();
 
-        let f_unlabeled: DensePolynomial<F> = random_deg_n_polynomial(7, rng);
+        let f_unlabeled: DensePolynomial<F> = DensePolynomial::rand(7, rng);
         let f = LabeledPolynomial::new(
             String::from("f"),
             f_unlabeled,
