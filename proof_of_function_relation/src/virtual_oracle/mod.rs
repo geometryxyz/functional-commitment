@@ -1,31 +1,14 @@
 use crate::error::Error;
 use ark_ff::PrimeField;
-use ark_poly::univariate::DensePolynomial;
-use ark_poly_commit::{LabeledPolynomial, PolynomialLabel, QuerySet, Evaluations};
+use ark_poly_commit::{Evaluations, PolynomialLabel, QuerySet};
 
 use self::generic_shifting_vo::vo_term::VOTerm;
 
 pub mod generic_shifting_vo;
 
 pub trait VirtualOracle<F: PrimeField> {
-    /// Returns the list of concrete oracle labels ordered according to the mapping vector
-    fn get_term_labels(&self, concrete_oracle_labels: &[PolynomialLabel]) -> Vec<PolynomialLabel> {
-        let mut h_labels = Vec::with_capacity(self.num_of_variable_terms());
-        for concrete_oracle_index in self.mapping_vector() {
-            h_labels.push(concrete_oracle_labels[concrete_oracle_index].clone());
-        }
-
-        h_labels
-    }
-
-    /// Returns the polynomial that results from the combination of the given concrete oracles
-    fn compute_polynomial(
-        &self,
-        concrete_oracles: &[LabeledPolynomial<F, DensePolynomial<F>>],
-    ) -> Result<DensePolynomial<F>, Error>;
-
-    /// each new (f, alpha) pair should be mapped to new h (new concrete oracle)
-    /// this function provides mapping from concrete oracle indices to h indices
+    /// maps input concrete oracles to internal terms, e.g.:
+    /// mapping_vector = [0, 0, 2] means h_0 = concrete_0, h_1 = concrete_0, h_2 = concrete_2
     fn mapping_vector(&self) -> Vec<usize>;
 
     /// returns the shifting coefficients (denoted alpha in the paper)
@@ -50,4 +33,17 @@ pub trait VirtualOracle<F: PrimeField> {
         eval_point: &F,
         evaluations: &Evaluations<F, F>,
     ) -> Result<F, Error>;
+}
+
+/// Returns the list of concrete oracle labels ordered according to the mapping vector
+pub fn get_term_labels<F: PrimeField, VO: VirtualOracle<F>>(
+    virtual_oracle: &VO,
+    concrete_oracle_labels: &[PolynomialLabel],
+) -> Vec<PolynomialLabel> {
+    let mut h_labels = Vec::with_capacity(virtual_oracle.num_of_variable_terms());
+    for concrete_oracle_index in virtual_oracle.mapping_vector() {
+        h_labels.push(concrete_oracle_labels[concrete_oracle_index].clone());
+    }
+
+    h_labels
 }

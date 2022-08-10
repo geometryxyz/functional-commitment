@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod test {
     use crate::virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO};
-    use crate::virtual_oracle::VirtualOracle;
     use crate::{
         commitment::KZG10,
         error::Error,

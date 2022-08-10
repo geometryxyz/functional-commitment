@@ -256,9 +256,7 @@ fn compute_f_prime<F: PrimeField, VO: VirtualOracle<F>>(
         .map(|poly| VOTerm::Polynomial(poly.clone()))
         .collect::<Vec<VOTerm<F>>>();
 
-    let f_prime = match virtual_oracle
-        .apply_evaluation_function(&terms_for_eval_function)
-    {
+    let f_prime = match virtual_oracle.apply_evaluation_function(&terms_for_eval_function) {
         VOTerm::Polynomial(f_prime) => Ok(f_prime),
         VOTerm::Evaluation(_) => Err(Error::VOFailedToInstantiate),
     };

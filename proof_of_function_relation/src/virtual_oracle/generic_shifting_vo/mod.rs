@@ -60,24 +60,8 @@ where
         })
     }
 
-    /// Check that enough oracles were provided.
-    fn check_conrete_oracle_length(&self, input_length: usize) -> Result<(), Error> {
-        if input_length < self.minimum_oracle_length {
-            return Err(Error::InputLengthError(format!(
-                "Mapping vector requires {} oracles/evaluations but only {} were provided",
-                self.minimum_oracle_length, input_length
-            )));
-        }
-        Ok(())
-    }
-}
-
-impl<F, T> VirtualOracle<F> for GenericShiftingVO<F, T>
-where
-    F: PrimeField,
-    T: Fn(&[VOTerm<F>]) -> VOTerm<F>,
-{
-    fn compute_polynomial(
+    /// Returns the polynomial that results from the combination of the given concrete oracles
+    pub fn compute_polynomial(
         &self,
         concrete_oracles: &[ark_poly_commit::LabeledPolynomial<F, DensePolynomial<F>>],
     ) -> Result<DensePolynomial<F>, Error> {
@@ -108,6 +92,23 @@ where
         }
     }
 
+    /// Check that enough oracles were provided.
+    fn check_conrete_oracle_length(&self, input_length: usize) -> Result<(), Error> {
+        if input_length < self.minimum_oracle_length {
+            return Err(Error::InputLengthError(format!(
+                "Mapping vector requires {} oracles/evaluations but only {} were provided",
+                self.minimum_oracle_length, input_length
+            )));
+        }
+        Ok(())
+    }
+}
+
+impl<F, T> VirtualOracle<F> for GenericShiftingVO<F, T>
+where
+    F: PrimeField,
+    T: Fn(&[VOTerm<F>]) -> VOTerm<F>,
+{
     fn generate_query_set(
         &self,
         concrete_oracle_labels: &[PolynomialLabel],
@@ -164,13 +165,6 @@ where
             VOTerm::Evaluation(eval) => Ok(eval),
             VOTerm::Polynomial(_) => Err(Error::VOFailedToCompute),
         }
-    }
-
-    fn get_term_labels(&self, concrete_oracle_labels: &[PolynomialLabel]) -> Vec<PolynomialLabel> {
-        self.mapping_vector
-            .iter()
-            .map(|&mapped_index| concrete_oracle_labels[mapped_index].clone())
-            .collect()
     }
 
     fn mapping_vector(&self) -> Vec<usize> {
