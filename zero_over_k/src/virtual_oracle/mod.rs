@@ -1,12 +1,12 @@
 use crate::error::Error;
-use ark_ff::PrimeField;
+use ark_ff::Field;
 use ark_poly_commit::{Evaluations, PolynomialLabel, QuerySet};
 
 use self::generic_shifting_vo::vo_term::VOTerm;
 
 pub mod generic_shifting_vo;
 
-pub trait VirtualOracle<F: PrimeField> {
+pub trait VirtualOracle<F: Field> {
     /// maps input concrete oracles to internal terms, e.g.:
     /// mapping_vector = [0, 0, 2] means h_0 = concrete_0, h_1 = concrete_0, h_2 = concrete_2
     fn mapping_vector(&self) -> Vec<usize>;
@@ -36,7 +36,7 @@ pub trait VirtualOracle<F: PrimeField> {
 }
 
 /// Returns the list of concrete oracle labels ordered according to the mapping vector
-pub fn get_term_labels<F: PrimeField, VO: VirtualOracle<F>>(
+pub fn get_term_labels<F: Field, VO: VirtualOracle<F>>(
     virtual_oracle: &VO,
     concrete_oracle_labels: &[PolynomialLabel],
 ) -> Vec<PolynomialLabel> {

@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::util::shift_dense_poly;
 use crate::virtual_oracle::generic_shifting_vo::vo_term::VOTerm;
-use ark_ff::{Field, PrimeField};
+use ark_ff::Field;
 use ark_poly::{univariate::DensePolynomial, UVPolynomial};
 use ark_poly_commit::{Evaluations, PolynomialLabel, QuerySet};
 
@@ -106,7 +106,7 @@ where
 
 impl<F, T> VirtualOracle<F> for GenericShiftingVO<F, T>
 where
-    F: PrimeField,
+    F: Field,
     T: Fn(&[VOTerm<F>]) -> VOTerm<F>,
 {
     fn generate_query_set(

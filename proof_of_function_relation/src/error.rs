@@ -12,17 +12,16 @@ pub enum Error {
     // In discrete_log_comparison
     OmegaSqrtError,
 
-    
     /// Number of user inputs is too large
     T2Large,
-    
+
     ProofSerializationError,
     ProofDeserializationError,
-    
+
     PCError {
         error: String,
     },
-    
+
     ZeroOverKError(String),
 }
 
