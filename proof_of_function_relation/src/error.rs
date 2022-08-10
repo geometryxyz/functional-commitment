@@ -1,18 +1,10 @@
 #[derive(Debug, PartialEq)]
-#[allow(dead_code)]
 pub enum Error {
-    MaxDegreeExceeded,
-
     // In zero_over_k and geo_seq
     BatchCheckError,
 
-    // In zero_over_k
-    Check1Failed,
-    Check2Failed,
-
     // In non_zero_over_k
     FEvalIsZero,
-    FPrimeEvalError,
 
     // In zero_over_k, discrete_log_comparison,
     ToBytesError,
@@ -20,33 +12,17 @@ pub enum Error {
     // In discrete_log_comparison
     OmegaSqrtError,
 
+    
+    /// Number of user inputs is too large
+    T2Large,
+    
+    ProofSerializationError,
+    ProofDeserializationError,
+    
     PCError {
         error: String,
     },
-
-    // In various protocols
-    FsRngAbsorbError,
-
-    InvalidDescriptionError,
-    EvaluationError,
-    InstantiationError,
-    InvalidGeoSeq,
-    T2Large,
-
-    ProofSerializationError,
-    ProofDeserializationError,
-
-    /// A commitment could not be found when evaluating a linear combination
-    MissingCommitment(String),
-    InputLengthError(String),
-    MismatchedDegreeBounds(String),
-
-    UnsupportedDegree(String),
-
-    VOMismatchedVariants,
-    VOFailedToInstantiate,
-    VOFailedToCompute,
-
+    
     ZeroOverKError(String),
 }
 
