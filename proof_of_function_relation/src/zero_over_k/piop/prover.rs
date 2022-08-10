@@ -135,9 +135,9 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
             .collect::<Vec<_>>();
 
         // Compute f_prime using the virtual oracle's function
-        let f_prime = compute_f_prime(&state, &h_primes)?;
+        let f_prime = compute_f_prime(state.virtual_oracle, &h_primes)?;
 
-        // divide by the banishing polynomial
+        // divide by the vanishing polynomial
         let (quotient, _r) = DenseOrSparsePolynomial::from(&f_prime)
             .divide_with_q_and_r(&DenseOrSparsePolynomial::from(
                 &domain.vanishing_polynomial(),
@@ -234,8 +234,8 @@ fn compute_maskings<R: Rng, F: PrimeField, VO: VirtualOracle<F>>(
     (random_polynomials, masking_polynomials)
 }
 
-fn compute_f_prime<'a, F: PrimeField, VO: VirtualOracle<F>>(
-    state: &ProverState<'a, F, VO>,
+fn compute_f_prime<F: PrimeField, VO: VirtualOracle<F>>(
+    virtual_oracle: &VO,
     h_prime_polynomials: &[LabeledPolynomial<F>],
 ) -> Result<DensePolynomial<F>, Error> {
     let x_poly = DensePolynomial::from_coefficients_slice(&[F::zero(), F::one()]);
@@ -246,7 +246,7 @@ fn compute_f_prime<'a, F: PrimeField, VO: VirtualOracle<F>>(
         .map(|(i, labeled_poly)| {
             shift_dense_poly(
                 labeled_poly.polynomial(),
-                &state.virtual_oracle.shifting_coefficients()[i],
+                &virtual_oracle.shifting_coefficients()[i],
             )
         })
         .collect();
@@ -256,8 +256,7 @@ fn compute_f_prime<'a, F: PrimeField, VO: VirtualOracle<F>>(
         .map(|poly| VOTerm::Polynomial(poly.clone()))
         .collect::<Vec<VOTerm<F>>>();
 
-    let f_prime = match state
-        .virtual_oracle
+    let f_prime = match virtual_oracle
         .apply_evaluation_function(&terms_for_eval_function)
     {
         VOTerm::Polynomial(f_prime) => Ok(f_prime),
