@@ -1,9 +1,7 @@
 #[derive(Debug, PartialEq)]
 #[allow(dead_code)]
 pub enum Error {
-    MaxDegreeExceeded,
-
-    // In zero_over_k and geo_seq
+    // In zero_over_k
     BatchCheckError,
 
     // In zero_over_k
@@ -14,25 +12,22 @@ pub enum Error {
     FEvalIsZero,
     FPrimeEvalError,
 
-    // In zero_over_k, discrete_log_comparison,
+    // In zero_over_k,
     ToBytesError,
 
-    // In discrete_log_comparison
-    OmegaSqrtError,
+    PCError {
+        error: String,
+    },
 
-    PCError { error: String },
+    /// A commitment could not be found when evaluating a linear combination
+    MissingCommitment(String),
+    InputLengthError(String),
+    MismatchedDegreeBounds(String),
 
-    // In various protocols
-    FsRngAbsorbError,
+    UnsupportedDegree(String),
 
-    InvalidDescriptionError,
-    EvaluationError,
-    InstantiationError,
-    InvalidGeoSeq,
-    T2Large,
-
-    ProofSerializationError,
-    ProofDeserializationError,
+    VOFailedToInstantiate,
+    VOFailedToCompute,
 }
 
 /// Convert an ark_poly_commit error
