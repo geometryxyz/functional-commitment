@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::{commitment::KZG10, error::Error, geo_seq::GeoSeqTest, util::generate_sequence};
+    use crate::{error::Error, geo_seq::GeoSeqTest, util::generate_sequence};
     use ark_bn254::{Bn254, Fr};
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
@@ -8,6 +8,7 @@ mod tests {
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_std::{rand::thread_rng, test_rng};
     use blake2::Blake2s;
+    use zero_over_k::commitment::KZG10;
 
     type F = Fr;
     type PC = KZG10<Bn254>;
@@ -237,7 +238,10 @@ mod tests {
         assert!(res.is_err());
 
         // Test for a specific error
-        assert_eq!(res.err().unwrap(), Error::Check2Failed);
+        assert_eq!(
+            res.err().unwrap(),
+            Error::ZeroOverKError(String::from("Check2Failed"))
+        );
     }
 
     #[test]

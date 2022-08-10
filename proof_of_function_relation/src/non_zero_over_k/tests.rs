@@ -1,8 +1,6 @@
 #[cfg(test)]
 mod test {
-    use crate::virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO};
     use crate::{
-        commitment::KZG10,
         error::Error,
         non_zero_over_k::NonZeroOverK,
         util::{random_deg_n_polynomial, sample_vector},
@@ -17,6 +15,10 @@ mod test {
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
+    use zero_over_k::{
+        commitment::KZG10,
+        virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO},
+    };
 
     type F = Fr;
     type PC = KZG10<Bn254>;
@@ -220,6 +222,9 @@ mod test {
 
         assert!(res.is_err());
         // Test for a specific error
-        assert_eq!(res.err().unwrap(), Error::Check2Failed);
+        assert_eq!(
+            res.err().unwrap(),
+            Error::ZeroOverKError(String::from("Check2Failed"))
+        );
     }
 }

@@ -1,15 +1,9 @@
 use crate::{
-    commitment::AdditivelyHomomorphicPCS,
     error::{to_pc_error, Error},
     geo_seq::GeoSeqTest,
     non_zero_over_k::NonZeroOverK,
     t_diag::proof::Proof,
     util::generate_sequence,
-    virtual_oracle::generic_shifting_vo::{
-        presets::{self, zero_product_check},
-        GenericShiftingVO,
-    },
-    zero_over_k::ZeroOverK,
 };
 use ark_ff::{PrimeField, SquareRootField};
 use ark_poly::{
@@ -19,6 +13,14 @@ use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use rand::Rng;
 use std::marker::PhantomData;
+use zero_over_k::{
+    commitment::AdditivelyHomomorphicPCS,
+    virtual_oracle::generic_shifting_vo::{
+        presets::{self, zero_product_check},
+        GenericShiftingVO,
+    },
+    zero_over_k::ZeroOverK,
+};
 
 use self::piop::PIOPforTDiagTest;
 

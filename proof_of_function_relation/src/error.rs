@@ -46,6 +46,8 @@ pub enum Error {
     VOMismatchedVariants,
     VOFailedToInstantiate,
     VOFailedToCompute,
+
+    ZeroOverKError(String),
 }
 
 /// Convert an ark_poly_commit error
@@ -57,5 +59,11 @@ where
     println!("Polynomial Commitment Error: {:?}", error);
     Error::PCError {
         error: format!("Polynomial Commitment Error: {:?}", error),
+    }
+}
+
+impl From<zero_over_k::error::Error> for Error {
+    fn from(err: zero_over_k::error::Error) -> Self {
+        Self::ZeroOverKError(format!("{:?}", err))
     }
 }

@@ -1,5 +1,4 @@
 use crate::{
-    commitment::AdditivelyHomomorphicPCS,
     discrete_log_comparison::DLComparison,
     error::{to_pc_error, Error},
     geo_seq::GeoSeqTest,
@@ -16,6 +15,7 @@ use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use rand::Rng;
 use std::marker::PhantomData;
+use zero_over_k::commitment::AdditivelyHomomorphicPCS;
 
 pub mod proof;
 mod tests;

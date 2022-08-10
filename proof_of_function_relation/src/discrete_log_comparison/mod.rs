@@ -1,15 +1,9 @@
 use crate::{
-    commitment::AdditivelyHomomorphicPCS,
     discrete_log_comparison::{piop::PIOPforDLComparison, proof::Proof},
     error::{to_pc_error, Error},
     geo_seq::GeoSeqTest,
     non_zero_over_k::NonZeroOverK,
     subset_over_k::SubsetOverK,
-    virtual_oracle::generic_shifting_vo::{
-        presets::{self, square_check},
-        GenericShiftingVO,
-    },
-    zero_over_k::ZeroOverK,
 };
 use ark_ff::{to_bytes, PrimeField, SquareRootField};
 use ark_marlin::rng::FiatShamirRng;
@@ -21,6 +15,14 @@ use ark_std::marker::PhantomData;
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use rand::Rng;
 use std::iter;
+use zero_over_k::{
+    commitment::AdditivelyHomomorphicPCS,
+    virtual_oracle::generic_shifting_vo::{
+        presets::{self, square_check},
+        GenericShiftingVO,
+    },
+    zero_over_k::ZeroOverK,
+};
 
 pub mod piop;
 pub mod proof;

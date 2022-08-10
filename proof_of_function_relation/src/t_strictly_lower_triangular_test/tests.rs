@@ -1,8 +1,6 @@
 #[cfg(test)]
 mod test {
-    use crate::{
-        commitment::KZG10, error::Error, t_strictly_lower_triangular_test::TStrictlyLowerTriangular,
-    };
+    use crate::{error::Error, t_strictly_lower_triangular_test::TStrictlyLowerTriangular};
 
     use ark_bn254::{Bn254, Fr};
     use ark_ff::to_bytes;
@@ -13,6 +11,7 @@ mod test {
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
+    use zero_over_k::commitment::KZG10;
 
     type F = Fr;
     type PC = KZG10<Bn254>;

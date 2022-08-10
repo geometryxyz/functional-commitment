@@ -1,12 +1,13 @@
 #[cfg(test)]
 mod test {
-    use crate::{commitment::KZG10, error::Error, t_diag::TDiag, util::gen_t_diag_test_polys};
+    use crate::{error::Error, t_diag::TDiag, util::gen_t_diag_test_polys};
 
     use ark_bn254::{Bn254, Fr};
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
     use ark_poly_commit::PolynomialCommitment;
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
+    use zero_over_k::commitment::KZG10;
 
     type F = Fr;
     type PC = KZG10<Bn254>;

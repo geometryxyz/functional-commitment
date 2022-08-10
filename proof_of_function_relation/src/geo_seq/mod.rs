@@ -1,9 +1,5 @@
-use crate::commitment::AdditivelyHomomorphicPCS;
 use crate::error::{to_pc_error, Error};
 use crate::geo_seq::proof::Proof;
-use crate::virtual_oracle::generic_shifting_vo::{vo_term::VOTerm, GenericShiftingVO};
-use crate::zero_over_k::ZeroOverK;
-use crate::{geometric_seq_check, vo_constant};
 use ark_ff::{to_bytes, PrimeField};
 use ark_marlin::rng::FiatShamirRng;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
@@ -13,6 +9,12 @@ use digest::Digest; // Note that in the latest Marlin commit, Digest has been re
 use rand::Rng;
 use rand_core::OsRng;
 use std::iter;
+use zero_over_k::{
+    commitment::AdditivelyHomomorphicPCS,
+    virtual_oracle::generic_shifting_vo::{vo_term::VOTerm, GenericShiftingVO},
+    zero_over_k::ZeroOverK,
+    {geometric_seq_check, vo_constant},
+};
 
 pub mod proof;
 mod tests;

@@ -1,8 +1,6 @@
-use crate::{
-    commitment::AdditivelyHomomorphicPCS, geo_seq::proof::Proof as GeoSeqProof,
-    non_zero_over_k::proof::Proof as NonZeroProof, zero_over_k::proof::Proof as ZeroProof,
-};
+use crate::{geo_seq::proof::Proof as GeoSeqProof, non_zero_over_k::proof::Proof as NonZeroProof};
 use ark_ff::PrimeField;
+use zero_over_k::{commitment::AdditivelyHomomorphicPCS, zero_over_k::proof::Proof as ZeroProof};
 
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use ark_std::io::{Read, Write};

@@ -1,7 +1,8 @@
-use crate::{commitment::AdditivelyHomomorphicPCS, error::Error, subset_over_k::proof::Proof};
+use crate::{error::Error, subset_over_k::proof::Proof};
 use ark_ff::PrimeField;
 use ark_std::marker::PhantomData;
 use digest::Digest;
+use zero_over_k::commitment::AdditivelyHomomorphicPCS;
 
 pub mod proof;
 

@@ -1,8 +1,6 @@
 #[cfg(test)]
 mod test {
-    use crate::{
-        commitment::KZG10, error::Error, t_functional_triple::TFT, util::gen_t_diag_test_polys,
-    };
+    use crate::{error::Error, t_functional_triple::TFT, util::gen_t_diag_test_polys};
 
     use ark_bn254::{Bn254, Fr};
     use ark_poly_commit::kzg10::Randomness;
@@ -17,6 +15,7 @@ mod test {
     use ark_poly_commit::{LabeledCommitment, PolynomialCommitment};
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
+    use zero_over_k::commitment::KZG10;
 
     type F = Fr;
     type PC = KZG10<Bn254>;
@@ -551,7 +550,10 @@ mod test {
         assert!(is_valid.is_err());
 
         // Test for a specific error. TODO: figure out how to bubble up errors...
-        assert_eq!(is_valid.err().unwrap(), Error::BatchCheckError);
+        assert_eq!(
+            is_valid.err().unwrap(),
+            Error::ZeroOverKError(String::from("BatchCheckError"))
+        );
     }
 
     #[test]
@@ -659,7 +661,10 @@ mod test {
         assert!(is_valid.is_err());
 
         // Test for a specific error. TODO: figure out how to bubble up errors...
-        assert_eq!(is_valid.err().unwrap(), Error::BatchCheckError);
+        assert_eq!(
+            is_valid.err().unwrap(),
+            Error::ZeroOverKError(String::from("BatchCheckError"))
+        );
     }
 
     #[test]
@@ -767,6 +772,9 @@ mod test {
         assert!(is_valid.is_err());
 
         // Test for a specific error. TODO: figure out how to bubble up errors...
-        assert_eq!(is_valid.err().unwrap(), Error::BatchCheckError);
+        assert_eq!(
+            is_valid.err().unwrap(),
+            Error::ZeroOverKError(String::from("BatchCheckError"))
+        );
     }
 }

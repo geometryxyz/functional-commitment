@@ -1,6 +1,5 @@
-use crate::{commitment::AdditivelyHomomorphicPCS, zero_over_k};
+use ::zero_over_k::{commitment::AdditivelyHomomorphicPCS, zero_over_k};
 use ark_ff::PrimeField;
-
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use ark_std::io::{Read, Write};
 

@@ -1,6 +1,6 @@
 use crate::{
-    commitment::AdditivelyHomomorphicPCS, error::Error, t_diag::TDiag,
-    t_functional_triple::proof::Proof, t_strictly_lower_triangular_test::TStrictlyLowerTriangular,
+    error::Error, t_diag::TDiag, t_functional_triple::proof::Proof,
+    t_strictly_lower_triangular_test::TStrictlyLowerTriangular,
 };
 use ark_marlin::rng::FiatShamirRng;
 use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain};
@@ -12,6 +12,7 @@ use ark_ff::{PrimeField, SquareRootField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use std::io::BufReader;
+use zero_over_k::commitment::AdditivelyHomomorphicPCS;
 
 pub mod proof;
 mod tests;

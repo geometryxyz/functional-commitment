@@ -9,8 +9,9 @@ mod tests {
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
+    use zero_over_k::commitment::KZG10;
 
-    use crate::{commitment::KZG10, discrete_log_comparison::DLComparison, error::Error};
+    use crate::{discrete_log_comparison::DLComparison, error::Error};
 
     type F = Fr;
     type PC = KZG10<Bn254>;
@@ -221,7 +222,10 @@ mod tests {
         assert!(res.is_err());
 
         // Test for a specific error
-        assert_eq!(res.err().unwrap(), Error::Check2Failed);
+        assert_eq!(
+            res.err().unwrap(),
+            Error::ZeroOverKError(String::from("Check2Failed"))
+        );
     }
 
     #[test]
@@ -322,6 +326,9 @@ mod tests {
         assert!(res.is_err());
 
         // Test for a specific error
-        assert_eq!(res.err().unwrap(), Error::BatchCheckError);
+        assert_eq!(
+            res.err().unwrap(),
+            Error::ZeroOverKError(String::from("BatchCheckError"))
+        );
     }
 }

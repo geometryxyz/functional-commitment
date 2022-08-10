@@ -1,16 +1,16 @@
+use crate::error::{to_pc_error, Error};
 use crate::non_zero_over_k::{piop::PIOPforNonZeroOverK, proof::Proof};
-use crate::virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO};
-use crate::{
-    commitment::AdditivelyHomomorphicPCS,
-    error::{to_pc_error, Error},
-    zero_over_k::ZeroOverK,
-};
 use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain};
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use rand::Rng;
 use std::marker::PhantomData;
+use zero_over_k::{
+    commitment::AdditivelyHomomorphicPCS,
+    virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO},
+    zero_over_k::ZeroOverK,
+};
 
 pub mod piop;
 pub mod proof;
@@ -101,5 +101,6 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> NonZeroOverK<F, 
             &alphas,
             &vk,
         )
+        .map_err(Error::from)
     }
 }
