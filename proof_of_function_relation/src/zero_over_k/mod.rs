@@ -1,9 +1,10 @@
 #![allow(dead_code)]
 
-use crate::commitment::HomomorphicPolynomialCommitment;
+use crate::commitment::AdditivelyHomomorphicPCS;
 use crate::error::{to_pc_error, Error};
+use crate::get_labels;
 use crate::util::powers_of;
-use crate::virtual_oracle::{EvaluationsProvider, VirtualOracle};
+use crate::virtual_oracle::{generic_shifting_vo::vo_term::VOTerm, VirtualOracle};
 use crate::zero_over_k::piop::PIOPforZeroOverK;
 use crate::zero_over_k::proof::Proof;
 use ark_ff::to_bytes;
@@ -11,7 +12,10 @@ use ark_ff::PrimeField;
 use ark_marlin::rng::FiatShamirRng;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::Evaluations;
-use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PCRandomness};
+use ark_poly_commit::{
+    data_structures::{PCCommitterKey, PCVerifierKey},
+    LabeledCommitment, LabeledPolynomial,
+};
 use ark_std::marker::PhantomData;
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use rand::Rng;
@@ -22,29 +26,48 @@ mod piop;
 pub mod proof;
 mod tests;
 
-pub struct ZeroOverK<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
+/// zk-SNARK to prove that a virtual oracle evaluates to 0 over a given domain
+pub struct ZeroOverK<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> {
     _field: PhantomData<F>,
     _polynomial_commitment_scheme: PhantomData<PC>,
     _digest: PhantomData<D>,
 }
 
-impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK<F, PC, D> {
+impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> ZeroOverK<F, PC, D> {
     pub const PROTOCOL_NAME: &'static [u8] = b"Zero Over K";
 
     pub fn prove<R: Rng, VO: VirtualOracle<F>>(
         concrete_oracles: &[LabeledPolynomial<F, DensePolynomial<F>>],
         concrete_oracle_commitments: &[LabeledCommitment<PC::Commitment>],
-        _concrete_oracle_commit_rands: &[PC::Randomness],
+        concrete_oracle_commit_rands: &[PC::Randomness],
+        maximum_oracle_degree_bound: Option<usize>,
         virtual_oracle: &VO,
         alphas: &Vec<F>,
         domain: &GeneralEvaluationDomain<F>,
         ck: &PC::CommitterKey,
         rng: &mut R,
     ) -> Result<Proof<F, PC>, Error> {
-        let prover_initial_state =
-            PIOPforZeroOverK::prover_init(domain, concrete_oracles, virtual_oracle, &alphas)?;
-        let verifier_initial_state =
-            PIOPforZeroOverK::<F, VO>::verifier_init(virtual_oracle, domain)?;
+        if let Some(degree) = maximum_oracle_degree_bound {
+            if degree > ck.supported_degree() {
+                return Err(Error::UnsupportedDegree(format!(
+                    "Cannot produce proof for max degree {} with the provided committer key",
+                    degree
+                )));
+            }
+        };
+
+        let prover_initial_state = PIOPforZeroOverK::prover_init(
+            domain,
+            concrete_oracles,
+            maximum_oracle_degree_bound,
+            virtual_oracle,
+            alphas,
+        )?;
+        let verifier_initial_state = PIOPforZeroOverK::<F, VO>::verifier_init(
+            virtual_oracle,
+            maximum_oracle_degree_bound,
+            domain,
+        )?;
 
         let fs_bytes = &to_bytes![&Self::PROTOCOL_NAME, concrete_oracle_commitments, alphas]
             .map_err(|_| Error::ToBytesError)?;
@@ -60,16 +83,16 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         let q_1 = prover_first_oracles.q_1.clone();
 
         // commit to the random polynomials
-        let (r_commitments, _) =
-            PC::commit(ck, random_polynomials.iter(), None).map_err(to_pc_error::<F, PC>)?;
+        let (r_commitments, r_rands) =
+            PC::commit(ck, random_polynomials.iter(), Some(rng)).map_err(to_pc_error::<F, PC>)?;
 
         // commit to the masking polynomials
-        let (m_commitments, _m_rands) =
-            PC::commit(ck, masking_polynomials.iter(), None).map_err(to_pc_error::<F, PC>)?;
+        let (m_commitments, m_rands) =
+            PC::commit(ck, masking_polynomials.iter(), Some(rng)).map_err(to_pc_error::<F, PC>)?;
 
         // commit to q_1
-        let (q1_commit, _q1_rand) =
-            PC::commit(ck, &[q_1.clone()], None).map_err(to_pc_error::<F, PC>)?;
+        let (q1_commit, q1_rand) =
+            PC::commit(ck, &[q_1], Some(rng)).map_err(to_pc_error::<F, PC>)?;
 
         let fs_bytes =
             &to_bytes![r_commitments, m_commitments, q1_commit].map_err(|_| Error::ToBytesError)?;
@@ -122,9 +145,9 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         }
 
         // sort the evaluation by poly label name => h_prime_is, m_is, q_1, q_2
-        h_prime_evals.sort_by(|a, b| a.0.cmp(&b.0));
+        h_prime_evals.sort_by(|a, b| a.0.cmp(b.0));
         let h_prime_evals = h_prime_evals.into_iter().map(|x| x.1).collect::<Vec<F>>();
-        m_evals.sort_by(|a, b| a.0.cmp(&b.0));
+        m_evals.sort_by(|a, b| a.0.cmp(b.0));
         let m_evals = m_evals.into_iter().map(|x| x.1).collect::<Vec<F>>();
 
         // sanity checks
@@ -136,32 +159,38 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             .map_err(|_| Error::ToBytesError)?;
         fs_rng.absorb(fs_bytes);
 
-        let q2_commit = PC::multi_scalar_mul(
-            &r_commitments,
-            powers_of(verifier_first_msg.c)
-                .take(random_polynomials.len())
-                .collect::<Vec<_>>()
-                .as_slice(),
+        // Use commitments to all the random polynomials to compute a commitment to q2
+        let q2_linear_combination =
+            PIOPforZeroOverK::generate_q2_linear_combination(virtual_oracle, verifier_first_msg.c);
+
+        let (q2_commit, q2_rand) =
+            PC::get_commitments_lc_with_rands(&r_commitments, &r_rands, &q2_linear_combination)?;
+
+        // Use commitments to each h and each m to homomorphically derive commitments to each h_prime
+        let h_prime_lcs = PIOPforZeroOverK::generate_h_prime_linear_combinations(
+            virtual_oracle,
+            &get_labels!(concrete_oracles),
         );
-        let q2_commit = LabeledCommitment::new(String::from("q_2"), q2_commit, None);
 
-        let fs2hs = virtual_oracle.mapping_vector();
-        let mut h_commitments = Vec::with_capacity(virtual_oracle.num_of_oracles());
-        for concrete_oracle_index in fs2hs {
-            h_commitments.push(concrete_oracle_commitments[concrete_oracle_index].clone())
-        }
-
-        let h_prime_commitments = h_commitments
+        let h_and_m_commitments: Vec<_> = concrete_oracle_commitments
             .iter()
-            .zip(m_commitments.iter())
-            .enumerate()
-            .map(|(i, (h_commitment, m))| {
-                let c =
-                    PC::multi_scalar_mul(&[h_commitment.clone(), m.clone()], &[F::one(), F::one()]);
-                // In order to work with batched version of PC, commitment labels must be same as poly labels
-                LabeledCommitment::new(format!("h_prime_{}", i), c, None)
-            })
-            .collect::<Vec<_>>();
+            .cloned()
+            .chain(m_commitments.iter().cloned())
+            .collect();
+        let h_and_m_rands: Vec<_> = concrete_oracle_commit_rands
+            .iter()
+            .cloned()
+            .chain(m_rands.iter().cloned())
+            .collect();
+
+        let mut h_prime_commitments = Vec::new();
+        let mut h_prime_rands = Vec::new();
+        for lc in h_prime_lcs {
+            let (comm, rand) =
+                PC::get_commitments_lc_with_rands(&h_and_m_commitments, &h_and_m_rands, &lc)?;
+            h_prime_commitments.push(comm);
+            h_prime_rands.push(rand);
+        }
 
         let fs_bytes =
             &to_bytes![h_prime_commitments, q2_commit].map_err(|_| Error::ToBytesError)?;
@@ -173,8 +202,11 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             .chain(q1_commit.iter())
             .chain(iter::once(&q2_commit));
 
-        let rands =
-            vec![PC::Randomness::empty(); m_commitments.len() + h_prime_commitments.len() + 2];
+        let rands = m_rands
+            .iter()
+            .chain(h_prime_rands.iter())
+            .chain(q1_rand.iter())
+            .chain(iter::once(&q2_rand));
 
         let separation_challenge = F::rand(&mut fs_rng);
 
@@ -184,7 +216,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             commitments,
             &query_set,
             separation_challenge,
-            &rands,
+            rands,
             Some(&mut fs_rng),
         )
         .map_err(to_pc_error::<F, PC>)?;
@@ -216,13 +248,26 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
     pub fn verify<VO: VirtualOracle<F>>(
         proof: Proof<F, PC>,
         concrete_oracle_commitments: &[LabeledCommitment<PC::Commitment>],
+        maximum_oracle_degree_bound: Option<usize>,
         virtual_oracle: &VO,
         domain: &GeneralEvaluationDomain<F>,
         alphas: &[F],
         vk: &PC::VerifierKey,
     ) -> Result<(), Error> {
-        let verifier_initial_state =
-            PIOPforZeroOverK::<F, VO>::verifier_init(virtual_oracle, &domain)?;
+        if let Some(degree) = maximum_oracle_degree_bound {
+            if degree > vk.supported_degree() {
+                return Err(Error::UnsupportedDegree(format!(
+                    "Cannot verify proof for max degree {} with the provided verifier key",
+                    degree
+                )));
+            }
+        };
+
+        let verifier_initial_state = PIOPforZeroOverK::<F, VO>::verifier_init(
+            virtual_oracle,
+            maximum_oracle_degree_bound,
+            domain,
+        )?;
 
         let fs_bytes = &to_bytes![&Self::PROTOCOL_NAME, concrete_oracle_commitments, alphas]
             .map_err(|_| Error::ToBytesError)?;
@@ -261,46 +306,41 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
             .r_commitments
             .iter()
             .enumerate()
-            .map(|(i, c)| LabeledCommitment::new(format!("r_{}", i), c.clone(), None))
+            .map(|(i, c)| LabeledCommitment::new(format!("r_{}", i), c.clone(), Some(2)))
             .collect::<Vec<_>>();
+
         let m_commitments = proof
             .m_commitments
             .iter()
             .enumerate()
-            .map(|(i, c)| LabeledCommitment::new(format!("m_{}", i), c.clone(), None))
-            .collect::<Vec<_>>();
-
-        let fs2hs = virtual_oracle.mapping_vector();
-        let mut h_commitments = Vec::with_capacity(virtual_oracle.num_of_oracles());
-        for concrete_oracle_index in fs2hs {
-            h_commitments.push(concrete_oracle_commitments[concrete_oracle_index].clone())
-        }
-
-        // derive commitment to h_prime through additive homomorphism
-        let h_prime_commitments = h_commitments
-            .iter()
-            .zip(m_commitments.iter())
-            .enumerate()
-            .map(|(i, (h_commitment, m_commitment))| {
-                let c = PC::multi_scalar_mul(
-                    &[h_commitment.clone(), m_commitment.clone()],
-                    &[F::one(), F::one()],
-                );
-                LabeledCommitment::new(format!("h_prime_{}", i), c, None)
+            .map(|(i, c)| {
+                LabeledCommitment::new(format!("m_{}", i), c.clone(), maximum_oracle_degree_bound)
             })
             .collect::<Vec<_>>();
 
-        // derive commitment to q2 through additive homomorphism
-        let q2_commit = PC::multi_scalar_mul(
-            &r_commitments,
-            powers_of(verifier_first_msg.c)
-                .take(h_prime_commitments.len())
-                .collect::<Vec<_>>()
-                .as_slice(),
+        // derive commitment to h_prime through additive homomorphism
+        let h_and_m_commitments: Vec<_> = concrete_oracle_commitments
+            .iter()
+            .cloned()
+            .chain(m_commitments.iter().cloned())
+            .collect();
+
+        let h_prime_lcs = PIOPforZeroOverK::generate_h_prime_linear_combinations(
+            virtual_oracle,
+            &get_labels!(concrete_oracle_commitments),
         );
+        let h_prime_commitments = h_prime_lcs
+            .iter()
+            .map(|lc| PC::get_commitments_lc(&h_and_m_commitments, lc))
+            .collect::<Result<Vec<_>, _>>()?;
 
         let q1_commit = LabeledCommitment::new(String::from("q_1"), proof.q1_commit, None);
-        let q2_commit = LabeledCommitment::new(String::from("q_2"), q2_commit, None);
+
+        // derive commitment to q2 through additive homomorphism
+        let q2_linear_combination =
+            PIOPforZeroOverK::generate_q2_linear_combination(virtual_oracle, verifier_first_msg.c);
+
+        let q2_commit = PC::get_commitments_lc(&r_commitments, &q2_linear_combination)?;
 
         let fs_bytes =
             &to_bytes![h_prime_commitments, q2_commit].map_err(|_| Error::ToBytesError)?;
@@ -363,15 +403,7 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         let z_k_at_beta_2 = domain.evaluate_vanishing_polynomial(beta_2);
 
         // compute F_prime(beta_1)
-        let f_prime_eval_r =
-            proof
-                .h_prime_evals
-                .evaluate(virtual_oracle, beta_1, &Vec::<F>::default());
-
-        if f_prime_eval_r.is_err() {
-            return Err(Error::FPrimeEvalError);
-        }
-        let f_prime_eval = f_prime_eval_r.unwrap();
+        let f_prime_eval = compute_f_prime_eval(virtual_oracle, &proof.h_prime_evals, &beta_1)?;
 
         // check that M(beta_2) - q2(beta_2)*zK(beta_2) = 0
         let check_1 = *big_m_at_beta_2 - proof.q2_eval * z_k_at_beta_2;
@@ -386,5 +418,22 @@ impl<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> ZeroOverK
         }
 
         Ok(())
+    }
+}
+
+fn compute_f_prime_eval<F: PrimeField, VO: VirtualOracle<F>>(
+    virtual_oracle: &VO,
+    evals: &[F],
+    point: &F,
+) -> Result<F, Error> {
+    let terms: Vec<_> = vec![point.clone()]
+        .iter()
+        .chain(evals.iter())
+        .map(|e| VOTerm::Evaluation(e.clone()))
+        .collect();
+
+    match virtual_oracle.apply_evaluation_function(&terms) {
+        VOTerm::Evaluation(res) => Ok(res),
+        VOTerm::Polynomial(_) => Err(Error::VOFailedToCompute),
     }
 }

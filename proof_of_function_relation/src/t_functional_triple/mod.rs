@@ -1,5 +1,5 @@
 use crate::{
-    commitment::HomomorphicPolynomialCommitment, error::Error, t_diag::TDiag,
+    commitment::AdditivelyHomomorphicPCS, error::Error, t_diag::TDiag,
     t_functional_triple::proof::Proof, t_strictly_lower_triangular_test::TStrictlyLowerTriangular,
 };
 use ark_marlin::rng::FiatShamirRng;
@@ -16,7 +16,7 @@ use std::io::BufReader;
 pub mod proof;
 mod tests;
 
-pub struct TFT<F: PrimeField + SquareRootField, PC: HomomorphicPolynomialCommitment<F>, D: Digest> {
+pub struct TFT<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
     _digest: PhantomData<D>,
@@ -25,7 +25,7 @@ pub struct TFT<F: PrimeField + SquareRootField, PC: HomomorphicPolynomialCommitm
 impl<F, PC, D> TFT<F, PC, D>
 where
     F: PrimeField + SquareRootField,
-    PC: HomomorphicPolynomialCommitment<F>,
+    PC: AdditivelyHomomorphicPCS<F>,
     D: Digest,
 {
     pub const PROTOCOL_NAME: &'static [u8] = b"t-FT Test";
@@ -36,20 +36,21 @@ where
         t: usize,
         domain_k: &GeneralEvaluationDomain<F>,
         domain_h: &GeneralEvaluationDomain<F>,
+        enforced_degree_bound: Option<usize>,
         // a
         row_a_poly: &LabeledPolynomial<F, DensePolynomial<F>>,
         col_a_poly: &LabeledPolynomial<F, DensePolynomial<F>>,
         row_a_commit: &LabeledCommitment<PC::Commitment>,
         col_a_commit: &LabeledCommitment<PC::Commitment>,
-        _row_a_random: &PC::Randomness,
-        _col_a_random: &PC::Randomness,
+        row_a_random: &PC::Randomness,
+        col_a_random: &PC::Randomness,
         // b
         row_b_poly: &LabeledPolynomial<F, DensePolynomial<F>>,
         col_b_poly: &LabeledPolynomial<F, DensePolynomial<F>>,
         row_b_commit: &LabeledCommitment<PC::Commitment>,
         col_b_commit: &LabeledCommitment<PC::Commitment>,
-        _row_b_random: &PC::Randomness,
-        _col_b_random: &PC::Randomness,
+        row_b_random: &PC::Randomness,
+        col_b_random: &PC::Randomness,
         // c
         row_c_poly: &LabeledPolynomial<F, DensePolynomial<F>>,
         col_c_poly: &LabeledPolynomial<F, DensePolynomial<F>>,
@@ -71,9 +72,12 @@ where
             domain_k,
             domain_h,
             row_a_poly,
-            col_a_poly,
             row_a_commit,
+            row_a_random,
+            col_a_poly,
             col_a_commit,
+            col_a_random,
+            enforced_degree_bound,
             fs_rng,
             rng,
         )?;
@@ -85,9 +89,12 @@ where
             domain_k,
             domain_h,
             row_b_poly,
-            col_b_poly,
             row_b_commit,
+            row_b_random,
+            col_b_poly,
             col_b_commit,
+            col_b_random,
+            enforced_degree_bound,
             fs_rng,
             rng,
         )?;
@@ -105,6 +112,7 @@ where
             row_c_random,
             col_c_random,
             val_c_random,
+            enforced_degree_bound,
             domain_k,
             domain_h,
             rng,
@@ -136,6 +144,7 @@ where
         row_c_commitment: &LabeledCommitment<PC::Commitment>,
         col_c_commitment: &LabeledCommitment<PC::Commitment>,
         val_c_commitment: &LabeledCommitment<PC::Commitment>,
+        enforced_degree_bound: Option<usize>,
         domain_h: &GeneralEvaluationDomain<F>,
         domain_k: &GeneralEvaluationDomain<F>,
         proof_bytes: Vec<u8>,
@@ -152,6 +161,7 @@ where
             domain_h,
             row_a_commitment,
             col_a_commitment,
+            enforced_degree_bound,
             proof.a_slt_proof,
             fs_rng,
         )?;
@@ -164,6 +174,7 @@ where
             domain_h,
             row_b_commitment,
             col_b_commitment,
+            enforced_degree_bound,
             proof.b_slt_proof,
             fs_rng,
         )?;
@@ -174,6 +185,7 @@ where
             row_c_commitment,
             col_c_commitment,
             val_c_commitment,
+            enforced_degree_bound,
             domain_h,
             domain_k,
             proof.c_diag_proof,

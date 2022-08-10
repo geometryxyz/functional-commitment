@@ -20,7 +20,9 @@ pub enum Error {
     // In discrete_log_comparison
     OmegaSqrtError,
 
-    PCError { error: String },
+    PCError {
+        error: String,
+    },
 
     // In various protocols
     FsRngAbsorbError,
@@ -33,6 +35,17 @@ pub enum Error {
 
     ProofSerializationError,
     ProofDeserializationError,
+
+    /// A commitment could not be found when evaluating a linear combination
+    MissingCommitment(String),
+    InputLengthError(String),
+    MismatchedDegreeBounds(String),
+
+    UnsupportedDegree(String),
+
+    VOMismatchedVariants,
+    VOFailedToInstantiate,
+    VOFailedToCompute,
 }
 
 /// Convert an ark_poly_commit error

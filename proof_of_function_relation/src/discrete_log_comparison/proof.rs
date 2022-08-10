@@ -1,4 +1,4 @@
-use crate::commitment::HomomorphicPolynomialCommitment;
+use crate::commitment::AdditivelyHomomorphicPCS;
 use crate::geo_seq::proof::Proof as GeoProof;
 use crate::non_zero_over_k::proof::Proof as NonZeroProof;
 use crate::subset_over_k::proof::Proof as SubsetProof;
@@ -9,7 +9,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError
 use ark_std::io::{Read, Write};
 
 #[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
-pub struct Proof<F: PrimeField, PC: HomomorphicPolynomialCommitment<F>> {
+pub struct Proof<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> {
     // Commitments
     pub s_commit: PC::Commitment,
     pub f_prime_commit: PC::Commitment,

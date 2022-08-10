@@ -1,6 +1,5 @@
 use crate::discrete_log_comparison::piop::PIOPforDLComparison;
 use crate::error::Error;
-use crate::label_polynomial;
 use crate::util::*;
 use ark_ff::{PrimeField, SquareRootField};
 use ark_marlin::ahp::prover::ProverMsg;
@@ -18,6 +17,8 @@ pub struct ProverState<'a, F: PrimeField + SquareRootField> {
     f: &'a LabeledPolynomial<F, DensePolynomial<F>>,
 
     g: &'a LabeledPolynomial<F, DensePolynomial<F>>,
+
+    enforced_degree_bound: Option<usize>,
 
     first_oracles: Option<ProverFirstOracles<F>>,
 
@@ -62,12 +63,14 @@ impl<F: PrimeField + SquareRootField> PIOPforDLComparison<F> {
         domain_h: &'a GeneralEvaluationDomain<F>,
         f: &'a LabeledPolynomial<F, DensePolynomial<F>>,
         g: &'a LabeledPolynomial<F, DensePolynomial<F>>,
+        enforced_degree_bound: Option<usize>,
     ) -> Result<ProverState<'a, F>, Error> {
         Ok(ProverState {
             domain_k,
             domain_h,
             f,
             g,
+            enforced_degree_bound,
             first_oracles: None,
             a_s: None,
             c_s: None,
@@ -94,7 +97,7 @@ impl<F: PrimeField + SquareRootField> PIOPforDLComparison<F> {
             .collect();
 
         let s = DensePolynomial::<F>::from_coefficients_slice(&state.domain_k.ifft(&s_evals));
-        let s = label_polynomial!(s);
+        let s = LabeledPolynomial::new(String::from("s"), s, state.enforced_degree_bound, Some(1));
 
         // For b in {f, g, s}, compute b_prime
         let omegas = state.domain_h.elements();
@@ -113,7 +116,12 @@ impl<F: PrimeField + SquareRootField> PIOPforDLComparison<F> {
 
         let f_prime =
             DensePolynomial::<F>::from_coefficients_slice(&state.domain_k.ifft(&f_prime_evals));
-        let f_prime = label_polynomial!(f_prime);
+        let f_prime = LabeledPolynomial::new(
+            String::from("f_prime"),
+            f_prime,
+            state.enforced_degree_bound,
+            Some(1),
+        );
 
         let g_prime_evals = g_evals
             .iter()
@@ -125,7 +133,12 @@ impl<F: PrimeField + SquareRootField> PIOPforDLComparison<F> {
 
         let g_prime =
             DensePolynomial::<F>::from_coefficients_slice(&state.domain_k.ifft(&g_prime_evals));
-        let g_prime = label_polynomial!(g_prime);
+        let g_prime = LabeledPolynomial::new(
+            String::from("g_prime"),
+            g_prime,
+            state.enforced_degree_bound,
+            Some(1),
+        );
 
         let s_prime_evals = s_evals
             .iter()
@@ -137,7 +150,12 @@ impl<F: PrimeField + SquareRootField> PIOPforDLComparison<F> {
 
         let s_prime =
             DensePolynomial::<F>::from_coefficients_slice(&state.domain_k.ifft(&s_prime_evals));
-        let s_prime = label_polynomial!(s_prime);
+        let s_prime = LabeledPolynomial::new(
+            String::from("s_prime"),
+            s_prime,
+            state.enforced_degree_bound,
+            Some(1),
+        );
 
         // Compute the sequence h
         let mut a_s = vec![F::one()];
@@ -151,7 +169,7 @@ impl<F: PrimeField + SquareRootField> PIOPforDLComparison<F> {
 
         let seq = generate_sequence(delta, &a_s, &c_s);
         let h = DensePolynomial::<F>::from_coefficients_slice(&state.domain_k.ifft(&seq));
-        let h = label_polynomial!(h);
+        let h = LabeledPolynomial::new(String::from("h"), h, state.enforced_degree_bound, Some(1));
 
         // create ProverFirstOracles struct
         let prover_oracles = ProverFirstOracles {

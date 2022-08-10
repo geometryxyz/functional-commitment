@@ -1,27 +1,22 @@
 #[cfg(test)]
 mod test {
     use crate::{
-        commitment::{HomomorphicPolynomialCommitment, KZG10},
+        commitment::KZG10,
         error::{to_pc_error, Error},
-        label_polynomial,
-        virtual_oracle::inverse_check_oracle::InverseCheckOracle,
-        virtual_oracle::prod_vo::ProdVO,
+        util::random_deg_n_polynomial,
+        virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO},
         zero_over_k::ZeroOverK,
     };
     use ark_bn254::{Bn254, Fr};
+    use ark_ff::Field;
     use ark_ff::One;
-    use ark_ff::{Field, UniformRand};
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, Evaluations, GeneralEvaluationDomain,
         UVPolynomial,
     };
-    use ark_poly_commit::{
-        LabeledCommitment, LabeledPolynomial, PCRandomness, PolynomialCommitment,
-    };
-    use ark_std::rand::thread_rng;
+    use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PolynomialCommitment};
+    use ark_std::{rand::thread_rng, test_rng};
     use blake2::Blake2s;
-    use rand_core::OsRng;
-    use std::iter;
 
     type F = Fr;
     type PC = KZG10<Bn254>;
@@ -33,64 +28,85 @@ mod test {
 
     #[test]
     fn test_zero_over_k_inverse_check_oracle() {
-        let n = 8;
-        let mut rng = thread_rng();
-        let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();
+        let m = 8;
+        let rng = &mut test_rng();
+        let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
 
         let max_degree = 20;
-        let pp = PC::setup(max_degree, None, &mut rng).unwrap();
-        let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
+        let max_hiding = 1;
 
-        let f_evals: Vec<F> = vec![
-            F::from(1u64),
-            F::from(2u64),
-            F::from(3u64),
-            F::from(4u64),
-            F::from(5u64),
-            F::from(6u64),
-            F::from(7u64),
-            F::from(8u64),
-        ];
+        let enforced_hiding_bound = Some(1);
+        let enforced_degree_bound = 14;
 
-        let f = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&f_evals));
-        let f = label_polynomial!(f);
+        let pp = PC::setup(max_degree, None, rng).unwrap();
+        let (ck, vk) = PC::trim(
+            &pp,
+            max_degree,
+            max_hiding,
+            Some(&[2, enforced_degree_bound]),
+        )
+        .unwrap();
 
-        let f_evals = domain.fft(f.coeffs());
+        // Step 1: choose a random polynomial
+        let f_unlabeled: DensePolynomial<F> = random_deg_n_polynomial(7, rng);
+        let f = LabeledPolynomial::new(
+            String::from("f"),
+            f_unlabeled,
+            Some(enforced_degree_bound),
+            enforced_hiding_bound,
+        );
 
-        let g_evals = f_evals
+        // Step 2: evaluate it
+        let f_evals = f.evaluate_over_domain_by_ref(domain_k);
+
+        // Step 3: find the inverse at each of these points
+        let desired_g_evals = f_evals
+            .evals
             .iter()
-            .map(|x| x.inverse().unwrap())
+            .map(|&x| x.inverse().unwrap())
             .collect::<Vec<_>>();
+        let desired_g_evals = Evaluations::from_vec_and_domain(desired_g_evals, domain_k);
 
-        let g = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&g_evals));
-        let g = LabeledPolynomial::new(String::from("g"), g.clone(), None, None);
+        // Step 4: interpolate a polynomial from the inverses
+        let g = desired_g_evals.clone().interpolate();
+        let g = LabeledPolynomial::new(
+            String::from("g"),
+            g.clone(),
+            Some(enforced_degree_bound),
+            enforced_hiding_bound,
+        );
 
+        // Step 5: commit to the concrete oracles
         let concrete_oracles = [f, g];
-        let alphas = vec![F::one(), F::one()];
-        let (commitments, rands) = PC::commit(&ck, &concrete_oracles, None)
+        let (commitments, rands) = PC::commit(&ck, &concrete_oracles, Some(rng))
             .map_err(to_pc_error::<F, PC>)
             .unwrap();
 
-        let zero_over_k_vo = InverseCheckOracle {};
+        // Step 6: Derive the desired virtual oracle
+        let alphas = vec![F::one(), F::one()];
+        let inverse_check_oracle =
+            GenericShiftingVO::new(&vec![0, 1], &alphas, presets::inverse_check).unwrap();
 
+        // Step 7: prove
         let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
             &concrete_oracles,
             &commitments,
             &rands,
-            &zero_over_k_vo,
+            Some(enforced_degree_bound),
+            &inverse_check_oracle,
             &alphas,
-            &domain,
+            &domain_k,
             &ck,
-            &mut rng,
+            rng,
         );
 
-        assert!(zero_over_k_proof.is_ok());
-
+        // Step 8: verify
         let is_valid = ZeroOverK::<F, PC, D>::verify(
             zero_over_k_proof.unwrap(),
             &commitments,
-            &zero_over_k_vo,
-            &domain,
+            Some(enforced_degree_bound),
+            &inverse_check_oracle,
+            &domain_k,
             &alphas,
             &vk,
         );
@@ -99,14 +115,19 @@ mod test {
     }
 
     #[test]
-    fn test_zero_over_k_prod_vo() {
-        let n = 8;
-        let mut rng = thread_rng();
-        let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();
+    fn test_error_on_invalid_proof() {
+        let m = 8;
+        let rng = &mut thread_rng();
+        let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
 
         let max_degree = 20;
-        let pp = PC::setup(max_degree, None, &mut rng).unwrap();
-        let (ck, vk) = PC::trim(&pp, max_degree, 0, None).unwrap();
+        let max_hiding = 1;
+
+        let enforced_hiding_bound = Some(1);
+        let enforced_degree_bound = 14;
+
+        let pp = PC::setup(max_degree, None, rng).unwrap();
+        let (ck, vk) = PC::trim(&pp, max_degree, max_hiding, Some(&[2, 14])).unwrap();
 
         let f_evals: Vec<F> = vec![
             F::from(1u64),
@@ -119,135 +140,168 @@ mod test {
             F::from(8u64),
         ];
 
-        let f = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&f_evals));
-        let f = label_polynomial!(f);
+        let f = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&f_evals));
+        let f = LabeledPolynomial::new(
+            String::from("f"),
+            f,
+            Some(enforced_degree_bound),
+            enforced_hiding_bound,
+        );
 
         let g_evals: Vec<F> = vec![
-            F::from(1u64),
-            F::from(2u64),
-            F::from(3u64),
-            F::from(4u64),
-            F::from(5u64),
-            F::from(6u64),
-            F::from(7u64),
             F::from(8u64),
+            F::from(7u64),
+            F::from(6u64),
+            F::from(5u64),
+            F::from(4u64),
+            F::from(3u64),
+            F::from(2u64),
+            F::from(1u64),
         ];
 
-        let g = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&g_evals));
-        let g = LabeledPolynomial::new(String::from("g"), g.clone(), None, None);
+        let g = DensePolynomial::<F>::from_coefficients_slice(&domain_k.ifft(&g_evals));
+        let g = LabeledPolynomial::new(
+            String::from("g"),
+            g.clone(),
+            Some(enforced_degree_bound),
+            enforced_hiding_bound,
+        );
 
         let concrete_oracles = [f, g];
         let alphas = vec![F::one(), F::one()];
-        let (commitments, rands) = PC::commit(&ck, &concrete_oracles, None)
+        let (commitments, rands) = PC::commit(&ck, &concrete_oracles, Some(rng))
             .map_err(to_pc_error::<F, PC>)
             .unwrap();
 
-        let zero_over_k_vo = ProdVO {};
+        let zero_over_k_vo =
+            GenericShiftingVO::new(&[0, 1], &alphas, presets::equality_check).unwrap();
 
         let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
             &concrete_oracles,
             &commitments,
             &rands,
+            Some(enforced_degree_bound),
             &zero_over_k_vo,
             &alphas,
-            &domain,
+            &domain_k,
             &ck,
-            &mut rng,
-        );
-
-        assert!(zero_over_k_proof.is_ok());
-
-        let is_valid = ZeroOverK::<F, PC, D>::verify(
-            zero_over_k_proof.unwrap(),
-            &commitments,
-            &zero_over_k_vo,
-            &domain,
-            &alphas,
-            &vk,
-        );
-
-        assert!(is_valid.is_err());
-
-        // Test for a specific error
-        assert_eq!(is_valid.err().unwrap(), Error::Check2Failed);
-    }
-
-    #[test]
-    fn test_commit_with_bounds() {
-        let n = 4;
-        let domain = GeneralEvaluationDomain::<F>::new(n).unwrap();
-        let rng = &mut thread_rng();
-
-        //test oracle to be zero at roots of unity
-        let a_evals = vec![F::from(2u64), F::from(4u64)];
-        let a_poly = Evaluations::from_vec_and_domain(a_evals, domain).interpolate();
-        let a_poly = LabeledPolynomial::new(String::from("a"), a_poly, Some(4), None);
-
-        let b_evals = vec![
-            F::from(5u64),
-            F::from(4 as u64),
-            F::from(6 as u64),
-            F::from(8 as u64),
-        ];
-        let b_poly = Evaluations::from_vec_and_domain(b_evals, domain).interpolate();
-        let b_poly = LabeledPolynomial::new(String::from("b"), b_poly, Some(4), None);
-
-        let a_plus_b_poly = a_poly.polynomial() + b_poly.polynomial();
-        let a_plus_b_poly =
-            LabeledPolynomial::new(String::from("a_plus_b"), a_plus_b_poly, Some(4), None);
-
-        let point = Fr::rand(rng);
-        let eval = a_plus_b_poly.evaluate(&point);
-
-        let maximum_degree: usize = 16;
-
-        let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
-        let (ck, vk) = PC::trim(&pp, maximum_degree, 0, Some(&[4])).unwrap();
-
-        let (commitments, _rands) = PC::commit(&ck, &[a_poly, b_poly], None).unwrap();
-        let a_commit = commitments[0].clone();
-        //let a_rand = rands[0].clone();
-
-        let b_commit = commitments[1].clone();
-        // let b_rand = rands[1].clone();
-
-        let one = Fr::one();
-        let a_plus_b_commit = PC::multi_scalar_mul(&[a_commit, b_commit], &[one, one]);
-        let a_plus_b_commit =
-            LabeledCommitment::new(String::from("a_plus_b"), a_plus_b_commit, Some(4));
-
-        let challenge = Fr::from(1u64);
-
-        let homomorphic_randomness =
-            ark_poly_commit::kzg10::Randomness::<Fr, DensePolynomial<Fr>>::empty();
-
-        let opening = PC::open(
-            &ck,
-            &[a_plus_b_poly.clone()],
-            &[a_plus_b_commit.clone()],
-            &point,
-            challenge,
-            &[homomorphic_randomness],
-            None,
+            rng,
         )
         .unwrap();
 
-        let res = PC::check(
+        let res = ZeroOverK::<F, PC, D>::verify(
+            zero_over_k_proof,
+            &commitments,
+            Some(enforced_degree_bound),
+            &zero_over_k_vo,
+            &domain_k,
+            &alphas,
             &vk,
-            &[a_plus_b_commit],
-            &point,
-            iter::once(eval),
-            &opening,
-            challenge,
-            None,
         );
 
-        println!("{:?}", res);
+        assert!(res.is_err());
 
-        // let (commitments, randoms) = PC::commit(&ck, &[a_poly_no_bound, a_poly_with_bound], None).unwrap();
+        // Test for a specific error
+        assert_eq!(res.unwrap_err(), Error::Check2Failed);
+    }
 
-        // for c in commitments {
-        //     println!("{:?}", c.commitment());
-        // }
+    #[test]
+    fn test_degree_bound_not_respected() {
+        let m = 8;
+        let rng = &mut test_rng();
+        let domain_k = GeneralEvaluationDomain::<F>::new(m).unwrap();
+
+        let max_degree = 20;
+        let max_hiding = 1;
+
+        let enforced_hiding_bound = Some(1);
+        let prover_degree_bound = 15;
+        let verifier_degree_bound = 14;
+
+        let pp = PC::setup(max_degree, None, rng).unwrap();
+        let (ck, vk) = PC::trim(
+            &pp,
+            max_degree,
+            max_hiding,
+            Some(&[2, verifier_degree_bound, prover_degree_bound]),
+        )
+        .unwrap();
+
+        // Step 1: choose a random polynomial
+        let f_unlabeled: DensePolynomial<F> = random_deg_n_polynomial(7, rng);
+        let f = LabeledPolynomial::new(
+            String::from("f"),
+            f_unlabeled,
+            Some(prover_degree_bound),
+            enforced_hiding_bound,
+        );
+
+        // Step 2: evaluate it
+        let f_evals = f.evaluate_over_domain_by_ref(domain_k);
+
+        // Step 3: find the inverse at each of these points
+        let desired_g_evals = f_evals
+            .evals
+            .iter()
+            .map(|&x| x.inverse().unwrap())
+            .collect::<Vec<_>>();
+        let desired_g_evals = Evaluations::from_vec_and_domain(desired_g_evals, domain_k);
+
+        // Step 4: interpolate a polynomial from the inverses
+        let g = desired_g_evals.clone().interpolate();
+        let g = LabeledPolynomial::new(
+            String::from("g"),
+            g.clone(),
+            Some(prover_degree_bound),
+            enforced_hiding_bound,
+        );
+
+        // Step 5: commit to the concrete oracles
+        let concrete_oracles = [f, g];
+        let (commitments, rands) = PC::commit(&ck, &concrete_oracles, Some(rng))
+            .map_err(to_pc_error::<F, PC>)
+            .unwrap();
+
+        // Step 6: Derive the desired virtual oracle
+        let alphas = vec![F::one(), F::one()];
+        let inverse_check_oracle =
+            GenericShiftingVO::new(&vec![0, 1], &alphas, presets::inverse_check).unwrap();
+
+        // Step 7: prove
+        let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
+            &concrete_oracles,
+            &commitments,
+            &rands,
+            Some(prover_degree_bound),
+            &inverse_check_oracle,
+            &alphas,
+            &domain_k,
+            &ck,
+            rng,
+        )
+        .unwrap();
+
+        // Step 8: verify
+        let verifier_commitments: Vec<LabeledCommitment<_>> = commitments
+            .iter()
+            .map(|c| {
+                let label = c.label().clone();
+                let comm = c.commitment().clone();
+                LabeledCommitment::new(label, comm, Some(verifier_degree_bound))
+            })
+            .collect();
+        let res = ZeroOverK::<F, PC, D>::verify(
+            zero_over_k_proof,
+            &verifier_commitments,
+            Some(verifier_degree_bound),
+            &inverse_check_oracle,
+            &domain_k,
+            &alphas,
+            &vk,
+        );
+
+        assert!(res.is_err());
+
+        assert_eq!(res.unwrap_err(), Error::BatchCheckError);
     }
 }
