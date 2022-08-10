@@ -1,12 +1,14 @@
 use super::PIOPforZeroOverK;
 use crate::error::Error;
 use crate::util::*;
+use crate::virtual_oracle::generic_shifting_vo::vo_term::VOTerm;
 use crate::virtual_oracle::VirtualOracle;
 use crate::zero_over_k::piop::{verifier::VerifierFirstMsg, LabeledPolynomial};
 use ark_ff::{PrimeField, Zero};
 use ark_marlin::ahp::prover::ProverMsg;
 use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
+    univariate::DenseOrSparsePolynomial, univariate::DensePolynomial, EvaluationDomain,
+    GeneralEvaluationDomain, UVPolynomial,
 };
 use ark_std::rand::Rng;
 use std::iter;
@@ -15,9 +17,11 @@ use std::iter;
 pub struct ProverState<'a, F: PrimeField, VO: VirtualOracle<F>> {
     all_concrete_oracles: &'a [LabeledPolynomial<F>],
 
+    maximum_oracle_degree_bound: Option<usize>,
+
     alphas: &'a Vec<F>,
 
-    pub virtual_oracle: &'a VO, // TODO: made public for debugging. Private later
+    virtual_oracle: &'a VO,
 
     /// domain K over which a virtual oracle should be equal to 0
     domain_k: &'a GeneralEvaluationDomain<F>,
@@ -26,7 +30,7 @@ pub struct ProverState<'a, F: PrimeField, VO: VirtualOracle<F>> {
 
     random_polynomials: Option<Vec<LabeledPolynomial<F>>>,
 
-    // this variable is made public to avoid recomputing the masked oracles at the PIOP to SNARK compiler stage
+    // this variable is made public to avoid recomputing the masked oracles at the PIOP-to-SNARK compiler stage
     pub masked_oracles: Option<Vec<LabeledPolynomial<F>>>,
 
     q_1: Option<LabeledPolynomial<F>>,
@@ -72,11 +76,13 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
     pub fn prover_init<'a>(
         domain: &'a GeneralEvaluationDomain<F>,
         all_concrete_oracles: &'a [LabeledPolynomial<F>],
+        maximum_oracle_degree_bound: Option<usize>,
         virtual_oracle: &'a VO,
         alphas: &'a Vec<F>,
     ) -> Result<ProverState<'a, F, VO>, Error> {
         Ok(ProverState {
             all_concrete_oracles,
+            maximum_oracle_degree_bound,
             alphas,
             virtual_oracle,
             domain_k: domain,
@@ -97,17 +103,24 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
         let alphas = state.alphas;
 
         // generate the masking polynomials and keep a record of the random polynomials that were used
-        let (random_polynomials, masking_polynomials) =
-            compute_maskings(state.virtual_oracle, &domain, &alphas, rng);
+        let (random_polynomials, masking_polynomials) = compute_maskings(
+            state.virtual_oracle,
+            &domain,
+            &alphas,
+            state.maximum_oracle_degree_bound,
+            rng,
+        );
 
-        let mapping_vector = state.virtual_oracle.mapping_vector();
-        let mut hs = Vec::with_capacity(state.virtual_oracle.num_of_oracles());
-        for concrete_oracle_index in mapping_vector {
-            hs.push(state.all_concrete_oracles[concrete_oracle_index].clone())
-        }
+        // assign h polynomials based on the VO's mapping
+        let h_polynomials: Vec<_> = state
+            .virtual_oracle
+            .mapping_vector()
+            .iter()
+            .map(|&mapped_index| state.all_concrete_oracles[mapped_index].clone())
+            .collect();
 
         // compute the masked oracles
-        let h_primes = hs
+        let h_primes = h_polynomials
             .iter()
             .zip(masking_polynomials.iter())
             .enumerate()
@@ -115,51 +128,28 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
                 LabeledPolynomial::new(
                     format!("h_prime_{}", i),
                     oracle.polynomial() + masking_poly.polynomial(),
-                    None,
-                    None,
+                    state.maximum_oracle_degree_bound,
+                    Some(1),
                 )
             })
             .collect::<Vec<_>>();
 
-        let k = state.virtual_oracle.compute_scaling_factor(&domain);
-        let domain_kn = GeneralEvaluationDomain::<F>::new(k * domain.size()).unwrap();
-        let vh = compute_vanishing_poly_over_coset(&domain_kn, domain.size() as u64);
+        // Compute f_prime using the virtual oracle's function
+        let f_prime = compute_f_prime(state.virtual_oracle, &h_primes)?;
 
-        let f_prime_evals =
-            state
-                .virtual_oracle
-                .instantiate_in_evals_form(h_primes.as_slice(), &alphas, domain)?;
+        // divide by the vanishing polynomial
+        let (quotient, _r) = DenseOrSparsePolynomial::from(&f_prime)
+            .divide_with_q_and_r(&DenseOrSparsePolynomial::from(
+                &domain.vanishing_polynomial(),
+            ))
+            .unwrap();
 
-        let quotient_evals = f_prime_evals
-            .iter()
-            .zip(vh.evals.iter())
-            .map(|(&nominator_eval, &denominator_eval)| {
-                nominator_eval * denominator_eval.inverse().unwrap()
-            })
-            .collect::<Vec<_>>();
-
-        let quotient =
-            DensePolynomial::from_coefficients_slice(&domain_kn.coset_ifft(&quotient_evals));
-
-        ///////////////////////////////////////////////////////////
-        // HOW TO COMPUTE Q IN COEFFS FORM
-        // let f_prime = state
-        //     .virtual_oracle
-        //     .instantiate_in_coeffs_form(h_primes.as_slice(), &alphas)?;
-
-        // let (quotient, _r) = DenseOrSparsePolynomial::from(&f_prime)
-        //     .divide_with_q_and_r(&DenseOrSparsePolynomial::from(
-        //         &domain.vanishing_polynomial(),
-        //     ))
-        //     .unwrap();
-        //
         // sanity check
         // assert_eq!(_r, DensePolynomial::<F>::zero());
-        ///////////////////////////////////////////////////////////
 
         let msg = ProverMsg::EmptyMessage;
 
-        let q_1 = LabeledPolynomial::new(String::from("q_1"), quotient, None, None);
+        let q_1 = LabeledPolynomial::new(String::from("q_1"), quotient, None, None); // TODO: enforce degree bound on q1. Requires degree of the VO function
 
         let oracles = ProverFirstOracles {
             masking_polynomials: masking_polynomials.clone(),
@@ -180,7 +170,8 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
         mut state: ProverState<'a, F, VO>,
         _r: &mut R,
     ) -> (ProverMsg<F>, ProverSecondOracles<F>, ProverState<'a, F, VO>) {
-        let random_polynomials = state.random_polynomials.clone().expect("ProverState should include the random polynomials that were used to create the maskings in round 1");
+        let random_polynomials = state.random_polynomials.clone()
+            .expect("ProverState should include the random polynomials that were used to create the maskings in round 1");
 
         // q_2 is defined as r1 + c*r2 + c^2r3 + ...
         let q_2 = random_polynomials
@@ -208,9 +199,10 @@ fn compute_maskings<R: Rng, F: PrimeField, VO: VirtualOracle<F>>(
     virtual_oracle: &VO,
     domain: &GeneralEvaluationDomain<F>,
     alphas: &[F],
+    masking_bound: Option<usize>,
     rng: &mut R,
 ) -> (Vec<LabeledPolynomial<F>>, Vec<LabeledPolynomial<F>>) {
-    let num_of_concrete_oracles = virtual_oracle.num_of_oracles();
+    let num_of_concrete_oracles = virtual_oracle.num_of_variable_terms();
     //r is defined as polynomial degree < 2
     let degree = 1;
 
@@ -224,15 +216,50 @@ fn compute_maskings<R: Rng, F: PrimeField, VO: VirtualOracle<F>>(
         let vanishing_shifted =
             shift_dense_poly(&domain.vanishing_polynomial().into(), &shifting_factor);
 
-        // random_polynomials.push(LabeledPolynomial::new(format!("r_{}", i), r, Some(2), None));
-        random_polynomials.push(LabeledPolynomial::new(format!("r_{}", i), r, None, None));
+        random_polynomials.push(LabeledPolynomial::new(
+            format!("r_{}", i),
+            r,
+            Some(2),
+            Some(1),
+        ));
+        // random_polynomials.push(LabeledPolynomial::new(format!("r_{}", i), r, None, None));
         masking_polynomials.push(LabeledPolynomial::new(
             format!("m_{}", i),
             &r_shifted * &vanishing_shifted,
-            None,
-            None,
+            masking_bound,
+            Some(1),
         ));
     }
 
     (random_polynomials, masking_polynomials)
+}
+
+fn compute_f_prime<F: PrimeField, VO: VirtualOracle<F>>(
+    virtual_oracle: &VO,
+    h_prime_polynomials: &[LabeledPolynomial<F>],
+) -> Result<DensePolynomial<F>, Error> {
+    let x_poly = DensePolynomial::from_coefficients_slice(&[F::zero(), F::one()]);
+
+    let shifted_h_primes: Vec<DensePolynomial<F>> = h_prime_polynomials
+        .iter()
+        .enumerate()
+        .map(|(i, labeled_poly)| {
+            shift_dense_poly(
+                labeled_poly.polynomial(),
+                &virtual_oracle.shifting_coefficients()[i],
+            )
+        })
+        .collect();
+
+    let terms_for_eval_function = iter::once(&x_poly)
+        .chain(shifted_h_primes.iter())
+        .map(|poly| VOTerm::Polynomial(poly.clone()))
+        .collect::<Vec<VOTerm<F>>>();
+
+    let f_prime = match virtual_oracle.apply_evaluation_function(&terms_for_eval_function) {
+        VOTerm::Polynomial(f_prime) => Ok(f_prime),
+        VOTerm::Evaluation(_) => Err(Error::VOFailedToInstantiate),
+    };
+
+    f_prime
 }

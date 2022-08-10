@@ -1,33 +1,11 @@
 use ark_ec::PairingEngine;
-use ark_ff::PrimeField;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::{
     sonic_pc::SonicKZG10, LCTerm, LabeledCommitment, LinearCombination, PCCommitment, PCRandomness,
     PolynomialCommitment,
 };
 
-use crate::error::Error;
-
-/// An additively homomorphic polynomial commitment scheme
-pub trait AdditivelyHomomorphicPCS<F>: PolynomialCommitment<F, DensePolynomial<F>>
-where
-    F: PrimeField,
-    Self::VerifierKey: core::fmt::Debug,
-{
-    /// Compute the linear combination of the provided commitments
-    fn get_commitments_lc(
-        commitments: &[LabeledCommitment<Self::Commitment>],
-        lc: &LinearCombination<F>,
-    ) -> Result<LabeledCommitment<Self::Commitment>, Error>;
-
-    /// Compute the commitment and randomness that result of the linear combination of the provided commtiments and randomness values.
-    /// We assume that commitments and randomness match 1-to-1 and are in the same order.
-    fn get_commitments_lc_with_rands(
-        commitments: &[LabeledCommitment<Self::Commitment>],
-        hiding_rands: &[Self::Randomness],
-        lc: &LinearCombination<F>,
-    ) -> Result<(LabeledCommitment<Self::Commitment>, Self::Randomness), Error>;
-}
+use crate::{error::Error, AdditivelyHomomorphicPCS};
 
 /// The Default KZG-style commitment scheme
 pub type KZG10<E> = SonicKZG10<E, DensePolynomial<<E as PairingEngine>::Fr>>;
@@ -147,7 +125,7 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePo
 
 #[cfg(test)]
 mod test {
-    use crate::commitment::{AdditivelyHomomorphicPCS, KZG10};
+    use crate::kzg10::{AdditivelyHomomorphicPCS, KZG10};
     use ark_bn254::{Bn254, Fr};
     use ark_ff::One;
     use ark_ff::UniformRand;

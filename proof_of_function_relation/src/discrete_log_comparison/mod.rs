@@ -1,36 +1,35 @@
 use crate::{
-    commitment::HomomorphicPolynomialCommitment,
     discrete_log_comparison::{piop::PIOPforDLComparison, proof::Proof},
     error::{to_pc_error, Error},
     geo_seq::GeoSeqTest,
-    label_polynomial,
     non_zero_over_k::NonZeroOverK,
     subset_over_k::SubsetOverK,
-    to_poly,
-    virtual_oracle::{
-        product_check_oracle::ProductCheckVO, square_check_oracle::SquareCheckOracle,
-    },
-    zero_over_k::ZeroOverK,
 };
 use ark_ff::{to_bytes, PrimeField, SquareRootField};
 use ark_marlin::rng::FiatShamirRng;
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };
-use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PCRandomness};
+use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
 use ark_std::marker::PhantomData;
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
+use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use rand::Rng;
+use std::iter;
+use zero_over_k::{
+    virtual_oracle::generic_shifting_vo::{
+        presets::{self, square_check},
+        GenericShiftingVO,
+    },
+    zero_over_k::ZeroOverK,
+};
 
 pub mod piop;
 pub mod proof;
 mod tests;
 
-pub struct DLComparison<
-    F: PrimeField + SquareRootField,
-    PC: HomomorphicPolynomialCommitment<F>,
-    D: Digest,
-> {
+pub struct DLComparison<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>, D: Digest>
+{
     _field: PhantomData<F>,
     _polynomial_commitment_scheme: PhantomData<PC>,
     _digest: PhantomData<D>,
@@ -39,7 +38,7 @@ pub struct DLComparison<
 impl<F, PC, D> DLComparison<F, PC, D>
 where
     F: PrimeField + SquareRootField,
-    PC: HomomorphicPolynomialCommitment<F>,
+    PC: AdditivelyHomomorphicPCS<F>,
     D: Digest,
 {
     pub const PROTOCOL_NAME: &'static [u8] = b"Discrete-log Comparison";
@@ -49,37 +48,55 @@ where
         domain_k: &GeneralEvaluationDomain<F>,
         domain_h: &GeneralEvaluationDomain<F>,
         f: &LabeledPolynomial<F, DensePolynomial<F>>,
-        g: &LabeledPolynomial<F, DensePolynomial<F>>,
         f_commit: &LabeledCommitment<PC::Commitment>,
+        f_rand: &PC::Randomness,
+        g: &LabeledPolynomial<F, DensePolynomial<F>>,
         g_commit: &LabeledCommitment<PC::Commitment>,
+        g_rand: &PC::Randomness,
+        enforced_degree_bound: Option<usize>,
         fs_rng: &mut FiatShamirRng<D>,
         rng: &mut R,
     ) -> Result<Proof<F, PC>, Error> {
-        let prover_initial_state = PIOPforDLComparison::prover_init(domain_k, domain_h, f, g)?;
+        let prover_initial_state =
+            PIOPforDLComparison::prover_init(domain_k, domain_h, f, g, enforced_degree_bound)?;
 
         //------------------------------------------------------------------
         // First Round
         let (_, prover_first_oracles, prover_state) =
             PIOPforDLComparison::prover_first_round(prover_initial_state, rng)?;
 
-        // commit to s and p where p in {f_prime, g_prime, s_prime}
-        // order of commitments is: s, f_prime, g_prime, s_prime, h
-        let (commitments, rands) =
-            PC::commit(ck, prover_first_oracles.iter(), None).map_err(to_pc_error::<F, PC>)?;
+        //------------------------------------------------------------------
+        // Commit Phase
+
+        let one_poly = DensePolynomial::from_coefficients_vec(vec![F::one()]);
+        let one_poly =
+            LabeledPolynomial::new(String::from("one"), one_poly, enforced_degree_bound, None);
+
+        // commit to s, f_prime, g_prime, s_prime, h and the constant 1 polynomial
+        // order of commitments is: s, f_prime, g_prime, s_prime, h, one
+        let (commitments, rands) = PC::commit(
+            ck,
+            prover_first_oracles.iter().chain(iter::once(&one_poly)),
+            Some(rng),
+        )
+        .map_err(to_pc_error::<F, PC>)?;
 
         let fs_bytes =
             &to_bytes![Self::PROTOCOL_NAME, commitments].map_err(|_| Error::ToBytesError)?;
         fs_rng.absorb(fs_bytes);
 
-        let square_check_vo = SquareCheckOracle::new();
-
         let alphas = [F::one(), F::one()];
+        let square_check_vo = GenericShiftingVO::new(&[0, 1], &alphas, square_check)?;
+
+        //------------------------------------------------------------------
+        // Run sub-protocols
 
         // Step 4a: Zero over K for f = (f')^2
         let f_prime_square_proof = ZeroOverK::<F, PC, D>::prove(
             &[f.clone(), prover_first_oracles.f_prime.clone()],
             &[f_commit.clone(), commitments[1].clone()], // f and f'
-            &[PC::Randomness::empty(), PC::Randomness::empty()],
+            &[f_rand.clone(), rands[1].clone()],
+            enforced_degree_bound,
             &square_check_vo,
             &alphas.to_vec(),
             &domain_k,
@@ -91,7 +108,8 @@ where
         let g_prime_square_proof = ZeroOverK::<F, PC, D>::prove(
             &[g.clone(), prover_first_oracles.g_prime.clone()],
             &[g_commit.clone(), commitments[2].clone()], // g and g'
-            &[PC::Randomness::empty(), PC::Randomness::empty()],
+            &[g_rand.clone(), rands[2].clone()],
+            enforced_degree_bound,
             &square_check_vo,
             &alphas.to_vec(),
             &domain_k,
@@ -106,7 +124,8 @@ where
                 prover_first_oracles.s_prime.clone(),
             ],
             &[commitments[0].clone(), commitments[3].clone()], // s and s'
-            &[PC::Randomness::empty(), PC::Randomness::empty()],
+            &[rands[0].clone(), rands[3].clone()],
+            enforced_degree_bound,
             &square_check_vo,
             &alphas.to_vec(),
             &domain_k,
@@ -123,7 +142,8 @@ where
         // }
 
         // Step 4d: Zero over K for f' = (s')*(g')
-        let product_check_vo = ProductCheckVO::new();
+        let product_check_vo =
+            GenericShiftingVO::new(&[0, 1, 2], &vec![F::one(); 3], presets::abc_product_check)?;
         let alphas = [F::one(), F::one(), F::one()];
         let f_prime_product_proof = ZeroOverK::<F, PC, D>::prove(
             &[
@@ -136,11 +156,8 @@ where
                 commitments[3].clone(),
                 commitments[2].clone(),
             ], // f', s' and g'
-            &[
-                PC::Randomness::empty(),
-                PC::Randomness::empty(),
-                PC::Randomness::empty(),
-            ],
+            &[rands[1].clone(), rands[3].clone(), rands[2].clone()],
+            enforced_degree_bound,
             &product_check_vo,
             &alphas.to_vec(),
             &domain_k,
@@ -181,25 +198,60 @@ where
         let s_prime_subset_proof = SubsetOverK::<F, PC, D>::prove();
 
         // Step 7a: Non-zero over K for f′
-        let nzk_f_prime_proof =
-            NonZeroOverK::<F, PC, D>::prove(ck, domain_k, &prover_first_oracles.f_prime, rng)?;
+        let nzk_f_prime_proof = NonZeroOverK::<F, PC, D>::prove(
+            ck,
+            domain_k,
+            &prover_first_oracles.f_prime,
+            &commitments[1].clone(),
+            &rands[1].clone(),
+            rng,
+        )?;
 
         // Step 7b: Non-zero over K for g′
-        let nzk_g_prime_proof =
-            NonZeroOverK::<F, PC, D>::prove(ck, domain_k, &prover_first_oracles.g_prime, rng)?;
+        let nzk_g_prime_proof = NonZeroOverK::<F, PC, D>::prove(
+            ck,
+            domain_k,
+            &prover_first_oracles.g_prime,
+            &commitments[2].clone(),
+            &rands[2].clone(),
+            rng,
+        )?;
 
         // Step 7c: Non-zero over K for s′
-        let nzk_s_prime_proof =
-            NonZeroOverK::<F, PC, D>::prove(ck, domain_k, &prover_first_oracles.s_prime, rng)?;
+        let nzk_s_prime_proof = NonZeroOverK::<F, PC, D>::prove(
+            ck,
+            domain_k,
+            &prover_first_oracles.s_prime,
+            &commitments[3].clone(),
+            &rands[3].clone(),
+            rng,
+        )?;
 
         // Step 7d: Non-zero over K for s(X) − 1
-        // it's important to note that verifier will derive S(x) - 1 commitment on it's own side
-        // we can use msm from our HomomorphicPolynomial trait and generator from ck
-        let one_poly = label_polynomial!(to_poly!(F::one()));
+        // The verifier is expected to derive a commitment to the constant one polynomial on their own
         let s_minus_one = prover_first_oracles.s.polynomial() - one_poly.polynomial();
-        let s_minus_one = label_polynomial!(s_minus_one);
-        let nzk_s_minus_one_proof =
-            NonZeroOverK::<F, PC, D>::prove(ck, domain_k, &s_minus_one, rng)?;
+        let s_minus_one = LabeledPolynomial::new(
+            String::from("s_minus_one"),
+            s_minus_one,
+            enforced_degree_bound,
+            Some(1),
+        );
+
+        let (s_minus_one_commitment, s_minus_one_rand) = PC::get_commitments_lc_with_rands(
+            &commitments,
+            &rands,
+            &PIOPforDLComparison::s_minus_one_linear_combination(),
+        )
+        .unwrap();
+
+        let nzk_s_minus_one_proof = NonZeroOverK::<F, PC, D>::prove(
+            ck,
+            domain_k,
+            &s_minus_one,
+            &s_minus_one_commitment,
+            &s_minus_one_rand,
+            rng,
+        )?;
 
         let proof = Proof {
             // Commitments
@@ -234,29 +286,54 @@ where
         domain_h: &GeneralEvaluationDomain<F>,
         f_commit: &LabeledCommitment<PC::Commitment>,
         g_commit: &LabeledCommitment<PC::Commitment>,
+        enforced_degree_bound: Option<usize>,
         proof: Proof<F, PC>,
         fs_rng: &mut FiatShamirRng<D>,
     ) -> Result<(), Error> {
+        // re-label f and g with the enforced degree bound
+        let f_commit = LabeledCommitment::new(
+            f_commit.label().clone(),
+            f_commit.commitment().clone(),
+            enforced_degree_bound,
+        );
+        let g_commit = LabeledCommitment::new(
+            g_commit.label().clone(),
+            g_commit.commitment().clone(),
+            enforced_degree_bound,
+        );
+
         let commitments = vec![
-            LabeledCommitment::new(String::from("s"), proof.s_commit, None),
-            LabeledCommitment::new(String::from("f_prime"), proof.f_prime_commit, None),
-            LabeledCommitment::new(String::from("g_prime"), proof.g_prime_commit, None),
-            LabeledCommitment::new(String::from("s_prime"), proof.s_prime_commit, None),
-            LabeledCommitment::new(String::from("h"), proof.h_commit, None),
+            LabeledCommitment::new(String::from("s"), proof.s_commit, enforced_degree_bound),
+            LabeledCommitment::new(
+                String::from("f_prime"),
+                proof.f_prime_commit,
+                enforced_degree_bound,
+            ),
+            LabeledCommitment::new(
+                String::from("g_prime"),
+                proof.g_prime_commit,
+                enforced_degree_bound,
+            ),
+            LabeledCommitment::new(
+                String::from("s_prime"),
+                proof.s_prime_commit,
+                enforced_degree_bound,
+            ),
+            LabeledCommitment::new(String::from("h"), proof.h_commit, enforced_degree_bound),
         ];
 
         let fs_bytes =
             &to_bytes![Self::PROTOCOL_NAME, commitments].map_err(|_| Error::ToBytesError)?;
         fs_rng.absorb(fs_bytes);
 
-        let square_check_vo = SquareCheckOracle::new();
-
         let alphas = [F::one(), F::one()];
+        let square_check_vo = GenericShiftingVO::new(&[0, 1], &alphas, square_check)?;
 
         // Zero over K for f_prime
         ZeroOverK::<F, PC, D>::verify(
             proof.f_prime_square_proof,
             &[f_commit.clone(), commitments[1].clone()],
+            enforced_degree_bound,
             &square_check_vo,
             &domain_k,
             &alphas,
@@ -267,6 +344,7 @@ where
         ZeroOverK::<F, PC, D>::verify(
             proof.g_prime_square_proof,
             &[g_commit.clone(), commitments[2].clone()],
+            enforced_degree_bound,
             &square_check_vo,
             &domain_k,
             &alphas,
@@ -277,13 +355,15 @@ where
         ZeroOverK::<F, PC, D>::verify(
             proof.s_prime_square_proof,
             &[commitments[0].clone(), commitments[3].clone()],
+            enforced_degree_bound,
             &square_check_vo,
             &domain_k,
             &alphas,
             vk,
         )?;
 
-        let product_check_vo = ProductCheckVO::new();
+        let product_check_vo =
+            GenericShiftingVO::new(&[0, 1, 2], &vec![F::one(); 3], presets::abc_product_check)?;
         let alphas = [F::one(), F::one(), F::one()];
 
         // Zero over K for f' = (s')*(g')
@@ -294,6 +374,7 @@ where
                 commitments[3].clone(),
                 commitments[2].clone(),
             ],
+            enforced_degree_bound,
             &product_check_vo,
             &domain_k,
             &alphas,
@@ -324,6 +405,7 @@ where
             &mut c_s,
             &domain_k,
             &commitments[4],
+            enforced_degree_bound,
             proof.h_proof,
             &vk,
         )?;
@@ -341,7 +423,8 @@ where
         NonZeroOverK::<F, PC, D>::verify(
             &vk,
             &domain_k,
-            commitments[1].clone(),
+            commitments[1].commitment().clone(),
+            enforced_degree_bound,
             proof.nzk_f_prime_proof,
         )?;
 
@@ -349,7 +432,8 @@ where
         NonZeroOverK::<F, PC, D>::verify(
             &vk,
             &domain_k,
-            commitments[2].clone(),
+            commitments[2].commitment().clone(),
+            enforced_degree_bound,
             proof.nzk_g_prime_proof,
         )?;
 
@@ -357,25 +441,30 @@ where
         NonZeroOverK::<F, PC, D>::verify(
             &vk,
             &domain_k,
-            commitments[3].clone(),
+            commitments[3].commitment().clone(),
+            enforced_degree_bound,
             proof.nzk_s_prime_proof,
         )?;
 
         // Non-zero over K for s(X) − 1
-        let one_poly = label_polynomial!(to_poly!(F::one()));
+        let one_poly = LabeledPolynomial::new(
+            String::from("one"),
+            DensePolynomial::from_coefficients_slice(&[F::one()]),
+            enforced_degree_bound,
+            None,
+        );
         let (commit_to_one, _) = PC::commit(ck, &[one_poly], None).map_err(to_pc_error::<F, PC>)?;
 
-        let s_minus_one_commitment = PC::multi_scalar_mul(
+        let s_minus_one_commitment = PC::get_commitments_lc(
             &[commitments[0].clone(), commit_to_one[0].clone()],
-            &[F::one(), -F::one()],
-        );
-        let s_minus_one_commitment =
-            LabeledCommitment::new(String::from("s_minus_one"), s_minus_one_commitment, None);
+            &PIOPforDLComparison::s_minus_one_linear_combination(),
+        )?;
 
         NonZeroOverK::<F, PC, D>::verify(
             &vk,
             &domain_k,
-            s_minus_one_commitment.clone(),
+            s_minus_one_commitment.commitment().clone(),
+            enforced_degree_bound,
             proof.nzk_s_minus_one_proof,
         )?;
 

@@ -11,6 +11,8 @@ use std::collections::HashMap;
 pub struct VerifierState<'a, F: PrimeField, VO: VirtualOracle<F>> {
     virtual_oracle: &'a VO,
 
+    maximum_oracle_degree_bound: Option<usize>,
+
     /// domain K over which a virtual oracle should be equal to 0
     domain_k: &'a GeneralEvaluationDomain<F>,
 
@@ -32,10 +34,12 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
     /// Return the initial verifier state
     pub fn verifier_init<'a>(
         virtual_oracle: &'a VO,
+        maximum_oracle_degree_bound: Option<usize>,
         domain_k: &'a GeneralEvaluationDomain<F>,
     ) -> Result<VerifierState<'a, F, VO>, Error> {
         Ok(VerifierState {
             virtual_oracle,
+            maximum_oracle_degree_bound,
             domain_k,
             verifier_first_message: None,
             beta_1: None,

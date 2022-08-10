@@ -1,18 +1,10 @@
 #[derive(Debug, PartialEq)]
-#[allow(dead_code)]
 pub enum Error {
-    MaxDegreeExceeded,
-
     // In zero_over_k and geo_seq
     BatchCheckError,
 
-    // In zero_over_k
-    Check1Failed,
-    Check2Failed,
-
     // In non_zero_over_k
     FEvalIsZero,
-    FPrimeEvalError,
 
     // In zero_over_k, discrete_log_comparison,
     ToBytesError,
@@ -20,19 +12,17 @@ pub enum Error {
     // In discrete_log_comparison
     OmegaSqrtError,
 
-    PCError { error: String },
-
-    // In various protocols
-    FsRngAbsorbError,
-
-    InvalidDescriptionError,
-    EvaluationError,
-    InstantiationError,
-    InvalidGeoSeq,
+    /// Number of user inputs is too large
     T2Large,
 
     ProofSerializationError,
     ProofDeserializationError,
+
+    PCError {
+        error: String,
+    },
+
+    ZeroOverKError(String),
 }
 
 /// Convert an ark_poly_commit error
@@ -44,5 +34,19 @@ where
     println!("Polynomial Commitment Error: {:?}", error);
     Error::PCError {
         error: format!("Polynomial Commitment Error: {:?}", error),
+    }
+}
+
+impl From<zero_over_k::error::Error> for Error {
+    fn from(err: zero_over_k::error::Error) -> Self {
+        Self::ZeroOverKError(format!("{:?}", err))
+    }
+}
+
+impl From<homomorphic_poly_commit::error::Error> for Error {
+    fn from(err: homomorphic_poly_commit::error::Error) -> Self {
+        Self::PCError {
+            error: format!("{:?}", err),
+        }
     }
 }
