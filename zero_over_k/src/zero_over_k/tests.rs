@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod test {
     use crate::{
-        commitment::KZG10,
         error::{to_pc_error, Error},
         virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO},
         zero_over_k::ZeroOverK,
@@ -16,6 +15,7 @@ mod test {
     use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PolynomialCommitment};
     use ark_std::{rand::thread_rng, test_rng};
     use blake2::Blake2s;
+    use homomorphic_poly_commit::kzg10::KZG10;
 
     type F = Fr;
     type PC = KZG10<Bn254>;

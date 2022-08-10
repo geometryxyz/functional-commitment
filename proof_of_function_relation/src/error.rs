@@ -67,3 +67,11 @@ impl From<zero_over_k::error::Error> for Error {
         Self::ZeroOverKError(format!("{:?}", err))
     }
 }
+
+impl From<homomorphic_poly_commit::error::Error> for Error {
+    fn from(err: homomorphic_poly_commit::error::Error) -> Self {
+        Self::PCError {
+            error: format!("{:?}", err),
+        }
+    }
+}

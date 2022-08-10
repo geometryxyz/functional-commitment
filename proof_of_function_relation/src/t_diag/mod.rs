@@ -11,10 +11,10 @@ use ark_poly::{
 };
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
+use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use rand::Rng;
 use std::marker::PhantomData;
 use zero_over_k::{
-    commitment::AdditivelyHomomorphicPCS,
     virtual_oracle::generic_shifting_vo::{
         presets::{self, zero_product_check},
         GenericShiftingVO,

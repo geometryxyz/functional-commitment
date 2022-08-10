@@ -1,5 +1,5 @@
-use crate::commitment::AdditivelyHomomorphicPCS;
 use ark_ff::PrimeField;
+use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use ark_std::io::{Read, Write};

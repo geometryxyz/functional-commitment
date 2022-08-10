@@ -1,7 +1,8 @@
-use ::zero_over_k::{commitment::AdditivelyHomomorphicPCS, zero_over_k};
+use ::zero_over_k::zero_over_k;
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use ark_std::io::{Read, Write};
+use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 
 #[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Proof<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> {

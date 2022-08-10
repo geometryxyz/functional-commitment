@@ -3,7 +3,7 @@ mod test {
     use crate::util::sample_vector;
     use crate::virtual_oracle::generic_shifting_vo::presets;
     use crate::virtual_oracle::VirtualOracle;
-    use crate::{commitment::KZG10, error::to_pc_error, zero_over_k::ZeroOverK};
+    use crate::{error::to_pc_error, zero_over_k::ZeroOverK};
     use crate::{error::Error, util::shift_dense_poly, vo_constant};
     use ark_bn254::{Bn254, Fr};
     use ark_ff::{Field, One, UniformRand};
@@ -14,6 +14,7 @@ mod test {
     use ark_poly_commit::{evaluate_query_set, LabeledPolynomial, PolynomialCommitment};
     use ark_std::{rand::thread_rng, test_rng};
     use blake2::Blake2s;
+    use homomorphic_poly_commit::kzg10::KZG10;
 
     use super::super::{GenericShiftingVO, VOTerm};
 

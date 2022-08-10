@@ -1,9 +1,6 @@
 #[cfg(test)]
 mod test {
-    use crate::{
-        error::Error,
-        non_zero_over_k::NonZeroOverK,
-    };
+    use crate::{error::Error, non_zero_over_k::NonZeroOverK};
     use ark_bn254::{Bn254, Fr};
     use ark_ff::Field;
     use ark_ff::One;
@@ -14,10 +11,10 @@ mod test {
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
+    use homomorphic_poly_commit::kzg10::KZG10;
     use zero_over_k::{
-        commitment::KZG10,
+        util::sample_vector,
         virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO},
-        util::sample_vector
     };
 
     type F = Fr;

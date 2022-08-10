@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use crate::commitment::AdditivelyHomomorphicPCS;
 use crate::error::{to_pc_error, Error};
 use crate::get_labels;
 use crate::util::powers_of;
@@ -18,6 +17,7 @@ use ark_poly_commit::{
 };
 use ark_std::marker::PhantomData;
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
+use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use rand::Rng;
 use rand_core::OsRng;
 use std::iter;

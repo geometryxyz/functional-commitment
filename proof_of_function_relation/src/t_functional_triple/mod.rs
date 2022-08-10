@@ -11,8 +11,8 @@ use std::marker::PhantomData;
 use ark_ff::{PrimeField, SquareRootField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
+use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use std::io::BufReader;
-use zero_over_k::commitment::AdditivelyHomomorphicPCS;
 
 pub mod proof;
 mod tests;

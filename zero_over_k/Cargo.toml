@@ -18,3 +18,4 @@ ark-bn254 = "0.3.0"
 rand = "0.8.4"
 blake2 = { version = "0.9", default-features = false }
 digest = { version = "0.9" }
+homomorphic_poly_commit = { path = "../homomorphic_poly_commit" }

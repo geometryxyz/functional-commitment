@@ -1,19 +1,5 @@
 #[derive(Debug, PartialEq)]
 pub enum Error {
-    // In zero_over_k
-    BatchCheckError,
-
-    // In zero_over_k
-    Check1Failed,
-    Check2Failed,
-
-    // In non_zero_over_k
-    FEvalIsZero,
-    FPrimeEvalError,
-
-    // In zero_over_k,
-    ToBytesError,
-
     PCError {
         error: String,
     },
@@ -22,11 +8,6 @@ pub enum Error {
     MissingCommitment(String),
     InputLengthError(String),
     MismatchedDegreeBounds(String),
-
-    UnsupportedDegree(String),
-
-    VOFailedToInstantiate,
-    VOFailedToCompute,
 }
 
 /// Convert an ark_poly_commit error
@@ -38,13 +19,5 @@ where
     println!("Polynomial Commitment Error: {:?}", error);
     Error::PCError {
         error: format!("Polynomial Commitment Error: {:?}", error),
-    }
-}
-
-impl From<homomorphic_poly_commit::error::Error> for Error {
-    fn from(err: homomorphic_poly_commit::error::Error) -> Self {
-        Self::PCError {
-            error: format!("{:?}", err),
-        }
     }
 }

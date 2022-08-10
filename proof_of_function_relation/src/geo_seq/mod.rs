@@ -6,11 +6,11 @@ use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationD
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, QuerySet};
 use ark_std::marker::PhantomData;
 use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
+use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use rand::Rng;
 use rand_core::OsRng;
 use std::iter;
 use zero_over_k::{
-    commitment::AdditivelyHomomorphicPCS,
     virtual_oracle::generic_shifting_vo::{vo_term::VOTerm, GenericShiftingVO},
     zero_over_k::ZeroOverK,
     {geometric_seq_check, vo_constant},

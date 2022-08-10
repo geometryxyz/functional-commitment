@@ -7,7 +7,7 @@ mod test {
     use ark_poly_commit::PolynomialCommitment;
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
-    use zero_over_k::commitment::KZG10;
+    use homomorphic_poly_commit::kzg10::KZG10;
 
     type F = Fr;
     type PC = KZG10<Bn254>;

@@ -2,7 +2,7 @@ use crate::{error::Error, subset_over_k::proof::Proof};
 use ark_ff::PrimeField;
 use ark_std::marker::PhantomData;
 use digest::Digest;
-use zero_over_k::commitment::AdditivelyHomomorphicPCS;
+use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 
 pub mod proof;
 

@@ -4,7 +4,7 @@ use crate::{
 use ark_ff::{PrimeField, SquareRootField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use ark_std::io::{Read, Write};
-use zero_over_k::commitment::AdditivelyHomomorphicPCS;
+use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 
 #[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Proof<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>> {

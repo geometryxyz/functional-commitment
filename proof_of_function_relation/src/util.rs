@@ -1,7 +1,6 @@
 use ark_ff::{FftField, Field, PrimeField};
 use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-    UVPolynomial,
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };
 use ark_poly_commit::LabeledPolynomial;
 

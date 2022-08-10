@@ -2,7 +2,8 @@ use crate::geo_seq::proof::Proof as GeoProof;
 use crate::non_zero_over_k::proof::Proof as NonZeroProof;
 use crate::subset_over_k::proof::Proof as SubsetProof;
 use ark_ff::PrimeField;
-use zero_over_k::{commitment::AdditivelyHomomorphicPCS, zero_over_k::proof::Proof as ZeroProof};
+use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
+use zero_over_k::zero_over_k::proof::Proof as ZeroProof;
 
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use ark_std::io::{Read, Write};
