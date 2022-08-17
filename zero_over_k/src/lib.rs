@@ -1,4 +1,3 @@
-// pub mod commitment;
 pub mod error;
 pub mod util;
 pub mod virtual_oracle;
