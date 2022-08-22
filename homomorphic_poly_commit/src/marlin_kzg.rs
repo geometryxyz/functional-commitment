@@ -1,14 +1,14 @@
 use ark_ec::PairingEngine;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::{
-    sonic_pc::SonicKZG10, LCTerm, LabeledCommitment, LinearCombination, PCCommitment, PCRandomness,
-    PolynomialCommitment,
+    marlin_pc::MarlinKZG10, LCTerm, LabeledCommitment, LinearCombination, PCCommitment,
+    PCRandomness, PolynomialCommitment,
 };
 
 use crate::{error::Error, AdditivelyHomomorphicPCS};
 
 /// The Default KZG-style commitment scheme
-pub type KZG10<E> = SonicKZG10<E, DensePolynomial<<E as PairingEngine>::Fr>>;
+pub type KZG10<E> = MarlinKZG10<E, DensePolynomial<<E as PairingEngine>::Fr>>;
 
 /// A single KZG10 commitment
 pub type KZG10Commitment<E> = <KZG10<E> as PolynomialCommitment<
@@ -21,12 +21,13 @@ pub type KZGRandomness<E> = <KZG10<E> as PolynomialCommitment<
     DensePolynomial<<E as PairingEngine>::Fr>,
 >>::Randomness;
 
-impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePolynomial<E::Fr>> {
+impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for MarlinKZG10<E, DensePolynomial<E::Fr>> {
     fn get_commitments_lc(
         commitments: &[LabeledCommitment<Self::Commitment>],
         lc: &LinearCombination<E::Fr>,
     ) -> Result<LabeledCommitment<Self::Commitment>, Error> {
         let mut aggregate_commitment = Self::Commitment::empty();
+        aggregate_commitment.shifted_comm = None;
 
         let degree_bound = commitments[0].degree_bound();
         for comm in commitments {
@@ -57,7 +58,7 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePo
             } else {
                 Self::Commitment::empty()
             };
-            aggregate_commitment = aggregate_commitment + commitment * *coef;
+            aggregate_commitment.comm = aggregate_commitment.comm + commitment.comm * *coef;
         }
 
         Ok(LabeledCommitment::new(
@@ -95,7 +96,11 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePo
         }
 
         let mut aggregate_commitment = Self::Commitment::empty();
+        aggregate_commitment.shifted_comm = None;
+
         let mut aggregate_randomness = Self::Randomness::empty();
+        // aggregate_randomness.shifted_rand = None;
+
 
         for (coef, term) in lc.iter() {
             let (comm, rand) = if let LCTerm::PolyLabel(label) = term {
@@ -112,8 +117,8 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePo
             } else {
                 (Self::Commitment::empty(), Self::Randomness::empty())
             };
-            aggregate_commitment = aggregate_commitment + comm * *coef;
-            aggregate_randomness = aggregate_randomness + rand * *coef;
+            aggregate_commitment.comm = aggregate_commitment.comm + comm.comm * *coef;
+            aggregate_randomness.rand = aggregate_randomness.rand + rand.rand * *coef;
         }
 
         Ok((
@@ -125,14 +130,15 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePo
 
 #[cfg(test)]
 mod test {
-    use crate::{kzg10::KZG10, AdditivelyHomomorphicPCS};
+    use crate::marlin_kzg::{KZGRandomness, test};
+    use crate::{marlin_kzg::KZG10, AdditivelyHomomorphicPCS};
     use ark_bn254::{Bn254, Fr};
     use ark_ff::One;
     use ark_ff::UniformRand;
     use ark_poly::univariate::DensePolynomial;
     use ark_poly::UVPolynomial;
     use ark_poly_commit::LinearCombination;
-    use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
+    use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment, PCRandomness};
     use ark_std::rand::thread_rng;
     use rand_core::OsRng;
     use std::iter;
@@ -160,14 +166,14 @@ mod test {
 
         // Define polynomials and a linear combination
         let a_unlabeled: DensePolynomial<F> = DensePolynomial::rand(7, rng);
-        let a_poly = LabeledPolynomial::new(String::from("a"), a_unlabeled, Some(10), Some(1));
+        let a_poly = LabeledPolynomial::new(String::from("a"), a_unlabeled, None, Some(hiding_bound));
 
         let b_unlabeled: DensePolynomial<F> = DensePolynomial::rand(5, rng);
-        let b_poly = LabeledPolynomial::new(String::from("b"), b_unlabeled, Some(10), Some(1));
+        let b_poly = LabeledPolynomial::new(String::from("b"), b_unlabeled, None, Some(hiding_bound));
 
         let a_plus_2b_poly = a_poly.polynomial().clone() + (b_poly.polynomial() * F::from(2u64));
         let a_plus_2b_poly =
-            LabeledPolynomial::new(String::from("a_plus_2b"), a_plus_2b_poly, Some(10), Some(1));
+            LabeledPolynomial::new(String::from("a_plus_2b"), a_plus_2b_poly, None, Some(hiding_bound));
         let polynomials = vec![a_poly.clone(), b_poly.clone()];
         let linear_combination =
             LinearCombination::new("a_plus_2b", vec![(F::one(), "a"), (F::from(2u64), "b")]);
@@ -177,14 +183,44 @@ mod test {
         let (test_commitment, test_rand) =
             PC::get_commitments_lc_with_rands(&commitments, &rands, &linear_combination).unwrap();
 
+        for comm in &commitments {
+            println!("{}: {:?}", comm.label(), comm.commitment().shifted_comm);
+        }
+        println!("{}: {:?}", test_commitment.label(), test_commitment.commitment().shifted_comm);
+
+        let manual_commitment = commitments[0].commitment().comm + commitments[1].commitment().comm * F::from(2u64);
+
+        assert_eq!(test_commitment.commitment().comm, manual_commitment);
+        println!("PASSED SANITY");
+
         // Derive evaluation point and generate a query set
         let evaluation_point = Fr::rand(rng);
 
         // Evaluation Phase, here we only output the evaluation of the linear combination
         let manual_eval = a_plus_2b_poly.evaluate(&evaluation_point);
 
-        // Opening phase
         let opening_challenge = F::rand(rng);
+        // // sanity opening
+        // let normal_opening_proof = PC::open(
+        //     &ck,
+        //     &[a_plus_2b_poly.clone()],
+        //     &[],
+        //     &evaluation_point,
+        //     opening_challenge,
+        //     &[],
+        //     Some(rng),
+        // );
+        // let sanity_res = PC::check(
+        //     &vk,
+        //     &[test_commitment.clone()],
+        //     &evaluation_point,
+        //     iter::once(a_plus_2b_poly.evaluate(&evaluation_point)),
+        //     &normal_opening_proof.unwrap(),
+        //     opening_challenge,
+        //     Some(rng),
+        // ).unwrap();
+
+        // Opening phase
         let lc_opening_proof = PC::open(
             &ck,
             &[a_plus_2b_poly],

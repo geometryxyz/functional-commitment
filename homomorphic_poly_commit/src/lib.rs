@@ -6,6 +6,7 @@ use crate::error::Error;
 
 pub mod error;
 pub mod kzg10;
+pub mod marlin_kzg;
 
 /// An additively homomorphic polynomial commitment scheme
 pub trait AdditivelyHomomorphicPCS<F>: PolynomialCommitment<F, DensePolynomial<F>>
