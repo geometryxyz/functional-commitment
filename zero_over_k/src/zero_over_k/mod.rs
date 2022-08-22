@@ -217,7 +217,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> ZeroOverK<F, PC,
             &query_set,
             separation_challenge,
             rands,
-            Some(&mut fs_rng),
+            Some(rng),
         )
         .map_err(to_pc_error::<F, PC>)?;
 
