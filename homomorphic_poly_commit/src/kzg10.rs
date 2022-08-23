@@ -2,7 +2,6 @@ use ark_ec::PairingEngine;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::{
     sonic_pc::SonicKZG10, LCTerm, LabeledCommitment, LinearCombination, PCCommitment, PCRandomness,
-    PolynomialCommitment,
 };
 
 use crate::{error::Error, AdditivelyHomomorphicPCS};
@@ -11,15 +10,15 @@ use crate::{error::Error, AdditivelyHomomorphicPCS};
 pub type KZG10<E> = SonicKZG10<E, DensePolynomial<<E as PairingEngine>::Fr>>;
 
 /// A single KZG10 commitment
-pub type KZG10Commitment<E> = <KZG10<E> as PolynomialCommitment<
-    <E as PairingEngine>::Fr,
-    DensePolynomial<<E as PairingEngine>::Fr>,
->>::Commitment;
+// pub type KZG10Commitment<E> = <KZG10<E> as PolynomialCommitment<
+//     <E as PairingEngine>::Fr,
+//     DensePolynomial<<E as PairingEngine>::Fr>,
+// >>::Commitment;
 
-pub type KZGRandomness<E> = <KZG10<E> as PolynomialCommitment<
-    <E as PairingEngine>::Fr,
-    DensePolynomial<<E as PairingEngine>::Fr>,
->>::Randomness;
+// pub type KZGRandomness<E> = <KZG10<E> as PolynomialCommitment<
+//     <E as PairingEngine>::Fr,
+//     DensePolynomial<<E as PairingEngine>::Fr>,
+// >>::Randomness;
 
 impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePolynomial<E::Fr>> {
     fn get_commitments_lc(
@@ -57,7 +56,7 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePo
             } else {
                 Self::Commitment::empty()
             };
-            aggregate_commitment = aggregate_commitment + commitment * *coef;
+            aggregate_commitment += (*coef, &commitment);
         }
 
         Ok(LabeledCommitment::new(
@@ -110,10 +109,11 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePo
                     )))?;
                 (current_pair.0.commitment().clone(), current_pair.1.clone())
             } else {
+                println!("I'm here");
                 (Self::Commitment::empty(), Self::Randomness::empty())
             };
-            aggregate_commitment = aggregate_commitment + comm * *coef;
-            aggregate_randomness = aggregate_randomness + rand * *coef;
+            aggregate_commitment += (*coef, &comm);
+            aggregate_randomness += (*coef, &rand);
         }
 
         Ok((
@@ -135,7 +135,6 @@ mod test {
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_std::rand::thread_rng;
     use rand_core::OsRng;
-    use std::iter;
 
     type F = Fr;
     type PC = KZG10<Bn254>;
