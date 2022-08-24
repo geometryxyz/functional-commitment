@@ -168,7 +168,6 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> ZeroOverK<F, PC,
             Some(r_rands.to_vec()),
             &q2_linear_combination,
         )?;
-        println!("q2 prover degree bound: {:?}", q2_commit.degree_bound());
 
         // Use commitments to each h and each m to homomorphically derive commitments to each h_prime
         let h_prime_lcs = PIOPforZeroOverK::generate_h_prime_linear_combinations(
@@ -349,7 +348,6 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> ZeroOverK<F, PC,
 
         let (q2_commit, _) =
             PC::aggregate_commitments(&r_commitments, None, &q2_linear_combination)?;
-        println!("q2 verifier degree bound: {:?}", q2_commit.degree_bound());
 
         let fs_bytes =
             &to_bytes![h_prime_commitments, q2_commit].map_err(|_| Error::ToBytesError)?;

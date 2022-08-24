@@ -128,9 +128,9 @@ where
         let h = LabeledPolynomial::new(String::from("h"), h, enforced_degree_bound, Some(1));
         let alphas = vec![F::one(), F::one()];
 
-        let (h_commitment, h_rand) = PC::get_commitments_lc_with_rands(
+        let (h_commitment, h_rand) = PC::aggregate_commitments(
             &h_commitments,
-            &h_rands,
+            Some(h_rands.to_vec()),
             &PIOPforTDiagTest::generate_h_linear_combination(),
         )?;
 
@@ -183,9 +183,9 @@ where
             enforced_degree_bound,
             Some(1),
         );
-        let (val_plus_h2_commit, val_plus_h2_rand) = PC::get_commitments_lc_with_rands(
+        let (val_plus_h2_commit, val_plus_h2_rand) = PC::aggregate_commitments(
             &[h_commitments[1].clone(), val_m_commitment.clone()],
-            &[h_rands[1].clone(), val_m_random.clone()],
+            Some(vec![h_rands[1].clone(), val_m_random.clone()]),
             &PIOPforTDiagTest::generate_valM_plus_h2_linear_combination(&String::from(
                 val_m.label(),
             )),
@@ -302,8 +302,9 @@ where
 
         // Step 4a: Verifier derives a commitment to h = h1 + h2
         let alphas = [F::one(), F::one()];
-        let h_commit = PC::get_commitments_lc(
+        let (h_commit, _) = PC::aggregate_commitments(
             &h_commitments,
+            None,
             &PIOPforTDiagTest::generate_h_linear_combination(),
         )?;
 
@@ -343,8 +344,9 @@ where
         )?;
 
         // Step 6: Non-zero over K for valM + h2 != 0
-        let val_plus_h2_commit = PC::get_commitments_lc(
+        let (val_plus_h2_commit, _) = PC::aggregate_commitments(
             &[val_m_commitment.clone(), h_commitments[1].clone()],
+            None,
             &PIOPforTDiagTest::generate_valM_plus_h2_linear_combination(val_m_commitment.label()),
         )?;
 

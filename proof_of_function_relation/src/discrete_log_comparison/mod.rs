@@ -237,9 +237,9 @@ where
             Some(1),
         );
 
-        let (s_minus_one_commitment, s_minus_one_rand) = PC::get_commitments_lc_with_rands(
+        let (s_minus_one_commitment, s_minus_one_rand) = PC::aggregate_commitments(
             &commitments,
-            &rands,
+            Some(rands.to_vec()),
             &PIOPforDLComparison::s_minus_one_linear_combination(),
         )
         .unwrap();
@@ -455,8 +455,9 @@ where
         );
         let (commit_to_one, _) = PC::commit(ck, &[one_poly], None).map_err(to_pc_error::<F, PC>)?;
 
-        let s_minus_one_commitment = PC::get_commitments_lc(
+        let (s_minus_one_commitment, _) = PC::aggregate_commitments(
             &[commitments[0].clone(), commit_to_one[0].clone()],
+            None,
             &PIOPforDLComparison::s_minus_one_linear_combination(),
         )?;
 

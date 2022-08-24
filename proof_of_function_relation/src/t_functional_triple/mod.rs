@@ -15,7 +15,7 @@ use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use std::io::BufReader;
 
 pub mod proof;
-mod tests;
+// mod tests;
 
 pub struct TFT<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> {
     _field: PhantomData<F>,

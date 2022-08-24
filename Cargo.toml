@@ -3,4 +3,5 @@
 members = [
     "homomorphic_poly_commit",
     "zero_over_k",
+    "proof_of_function_relation"
 ]

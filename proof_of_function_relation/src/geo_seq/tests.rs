@@ -6,9 +6,9 @@ mod tests {
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
     };
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
-    use ark_std::{rand::thread_rng, test_rng};
+    use ark_std::rand::thread_rng;
     use blake2::Blake2s;
-    use homomorphic_poly_commit::kzg10::KZG10;
+    use homomorphic_poly_commit::marlin_kzg::KZG10;
 
     type F = Fr;
     type PC = KZG10<Bn254>;
@@ -62,8 +62,8 @@ mod tests {
     }
 
     #[test]
-    fn test_geo_seq() {
-        let rng = &mut test_rng();
+    fn test_geo_seq_proof() {
+        let rng = &mut thread_rng();
 
         // define a sequence
         let common_ratio = Fr::from(9u64);
@@ -181,7 +181,7 @@ mod tests {
         );
 
         // Setup our polynomial commitment scheme
-        let max_degree = 129;
+        let max_degree = 80;
         let max_hiding = 1;
 
         let enforced_hiding_bound = Some(1);
@@ -238,10 +238,7 @@ mod tests {
         assert!(res.is_err());
 
         // Test for a specific error
-        assert_eq!(
-            res.err().unwrap(),
-            Error::ZeroOverKError(String::from("Check2Failed"))
-        );
+        assert_eq!(res.err().unwrap(), Error::BatchCheckError);
     }
 
     #[test]
