@@ -1,23 +1,23 @@
 use crate::{error::Error, subset_over_k::proof::Proof};
 use ark_ff::PrimeField;
 use ark_std::marker::PhantomData;
-use digest::Digest;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
+use fiat_shamir_rng::FiatShamirRng;
 
 pub mod proof;
 
 // TODO: implement SubsetOverK, currently just a placeholder
-pub struct SubsetOverK<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> {
+pub struct SubsetOverK<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
-    _digest: PhantomData<D>,
+    _fs: PhantomData<FS>,
 }
 
-impl<F, PC, D> SubsetOverK<F, PC, D>
+impl<F, PC, FS> SubsetOverK<F, PC, FS>
 where
     F: PrimeField,
     PC: AdditivelyHomomorphicPCS<F>,
-    D: Digest,
+    FS: FiatShamirRng
 {
     pub fn prove() -> Proof {
         Proof {}

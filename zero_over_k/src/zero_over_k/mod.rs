@@ -8,15 +8,14 @@ use crate::zero_over_k::piop::PIOPforZeroOverK;
 use crate::zero_over_k::proof::Proof;
 use ark_ff::to_bytes;
 use ark_ff::PrimeField;
-use ark_marlin::rng::FiatShamirRng;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::Evaluations;
 use ark_poly_commit::{
     data_structures::{PCCommitterKey, PCVerifierKey},
     LabeledCommitment, LabeledPolynomial,
 };
+use fiat_shamir_rng::FiatShamirRng;
 use ark_std::marker::PhantomData;
-use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use rand::Rng;
 use rand_core::OsRng;
@@ -27,13 +26,13 @@ pub mod proof;
 mod tests;
 
 /// zk-SNARK to prove that a virtual oracle evaluates to 0 over a given domain
-pub struct ZeroOverK<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> {
+pub struct ZeroOverK<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> {
     _field: PhantomData<F>,
     _polynomial_commitment_scheme: PhantomData<PC>,
-    _digest: PhantomData<D>,
+    _fs: PhantomData<FS>,
 }
 
-impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> ZeroOverK<F, PC, D> {
+impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> ZeroOverK<F, PC, FS> {
     pub const PROTOCOL_NAME: &'static [u8] = b"Zero Over K";
 
     pub fn prove<R: Rng, VO: VirtualOracle<F>>(
@@ -71,7 +70,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> ZeroOverK<F, PC,
 
         let fs_bytes = &to_bytes![&Self::PROTOCOL_NAME, concrete_oracle_commitments, alphas]
             .map_err(|_| Error::ToBytesError)?;
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(fs_bytes);
+        let mut fs_rng = FS::initialize(fs_bytes);
 
         //------------------------------------------------------------------
         // First Round
@@ -274,7 +273,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> ZeroOverK<F, PC,
 
         let fs_bytes = &to_bytes![&Self::PROTOCOL_NAME, concrete_oracle_commitments, alphas]
             .map_err(|_| Error::ToBytesError)?;
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(fs_bytes);
+        let mut fs_rng = FS::initialize(fs_bytes);
 
         //------------------------------------------------------------------
         // First Round

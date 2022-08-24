@@ -7,15 +7,14 @@ use crate::{
     util::generate_sequence,
 };
 use ark_ff::{to_bytes, PrimeField, SquareRootField};
-use ark_marlin::rng::FiatShamirRng;
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
-use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use rand::Rng;
 use std::marker::PhantomData;
+use fiat_shamir_rng::FiatShamirRng;
 
 pub mod proof;
 mod tests;
@@ -23,18 +22,18 @@ mod tests;
 pub struct TStrictlyLowerTriangular<
     F: PrimeField + SquareRootField,
     PC: AdditivelyHomomorphicPCS<F>,
-    D: Digest,
+    FS: FiatShamirRng,
 > {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
-    _digest: PhantomData<D>,
+    _fs: PhantomData<FS>,
 }
 
-impl<F, PC, D> TStrictlyLowerTriangular<F, PC, D>
+impl<F, PC, FS> TStrictlyLowerTriangular<F, PC, FS>
 where
     F: PrimeField + SquareRootField,
     PC: AdditivelyHomomorphicPCS<F>,
-    D: Digest,
+    FS: FiatShamirRng,
 {
     pub const PROTOCOL_NAME: &'static [u8] = b"t-Strictly Lower Triangular Test";
 
@@ -50,7 +49,7 @@ where
         col_commit: &LabeledCommitment<PC::Commitment>,
         col_random: &PC::Randomness,
         enforced_degree_bound: Option<usize>,
-        fs_rng: &mut FiatShamirRng<D>,
+        fs_rng: &mut FS,
         rng: &mut R,
     ) -> Result<Proof<F, PC>, Error> {
         let fs_bytes = &to_bytes![&Self::PROTOCOL_NAME].map_err(|_| Error::ToBytesError)?;
@@ -82,15 +81,15 @@ where
         let h_commit = commitment[0].clone();
 
         // Step 2: Geometric sequence test on h
-        let geo_seq_proof = GeoSeqTest::<F, PC, D>::prove(
+        let geo_seq_proof = GeoSeqTest::<F, PC, FS>::prove(
             ck, r, &h, &h_commit, &rands[0], &a_s, &c_s, domain_k, rng,
         )?;
 
         // Step 3: Subset over K between row_M and h
-        let subset_proof = SubsetOverK::<F, PC, D>::prove();
+        let subset_proof = SubsetOverK::<F, PC, FS>::prove();
 
         // Step 4: Discrete Log Comparison between row_M and col_M
-        let dl_proof = DLComparison::<F, PC, D>::prove(
+        let dl_proof = DLComparison::<F, PC, FS>::prove(
             ck,
             domain_k,
             domain_h,
@@ -125,7 +124,7 @@ where
         col_commit: &LabeledCommitment<PC::Commitment>,
         enforced_degree_bound: Option<usize>,
         proof: Proof<F, PC>,
-        fs_rng: &mut FiatShamirRng<D>,
+        fs_rng: &mut FS,
     ) -> Result<(), Error> {
         // re-label the oracle commitments with the enforced degree bound
         let row_commit = LabeledCommitment::new(
@@ -152,7 +151,7 @@ where
         let h_commit =
             LabeledCommitment::new(String::from("h"), proof.h_commit, enforced_degree_bound);
 
-        GeoSeqTest::<F, PC, D>::verify(
+        GeoSeqTest::<F, PC, FS>::verify(
             domain_h.element(1),
             &a_s,
             &c_s,
@@ -164,10 +163,10 @@ where
         )?;
 
         // Step 3: Subset over K between row_M and h
-        SubsetOverK::<F, PC, D>::verify(proof.subset_proof)?;
+        SubsetOverK::<F, PC, FS>::verify(proof.subset_proof)?;
 
         // Step 4: Discrete Log Comparison between row_M and col_M
-        DLComparison::<F, PC, D>::verify(
+        DLComparison::<F, PC, FS>::verify(
             vk,
             ck,
             domain_k,

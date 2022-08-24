@@ -16,10 +16,12 @@ mod test {
     use ark_std::{rand::thread_rng, test_rng};
     use blake2::Blake2s;
     use homomorphic_poly_commit::marlin_kzg::KZG10;
+    use fiat_shamir_rng::SimpleHashFiatShamirRng;
+    use rand_chacha::ChaChaRng;
+    type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
 
     type F = Fr;
     type PC = KZG10<Bn254>;
-    type D = Blake2s;
 
     #[test]
     fn test_zero_over_k_inverse_check_oracle() {
@@ -83,7 +85,7 @@ mod test {
             GenericShiftingVO::new(&vec![0, 1], &alphas, presets::inverse_check).unwrap();
 
         // Step 7: prove
-        let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
+        let zero_over_k_proof = ZeroOverK::<F, PC, FS>::prove(
             &concrete_oracles,
             &commitments,
             &rands,
@@ -96,7 +98,7 @@ mod test {
         );
 
         // Step 8: verify
-        let is_valid = ZeroOverK::<F, PC, D>::verify(
+        let is_valid = ZeroOverK::<F, PC, FS>::verify(
             zero_over_k_proof.unwrap(),
             &commitments,
             Some(enforced_degree_bound),
@@ -171,7 +173,7 @@ mod test {
         let zero_over_k_vo =
             GenericShiftingVO::new(&[0, 1], &alphas, presets::equality_check).unwrap();
 
-        let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
+        let zero_over_k_proof = ZeroOverK::<F, PC, FS>::prove(
             &concrete_oracles,
             &commitments,
             &rands,
@@ -184,7 +186,7 @@ mod test {
         )
         .unwrap();
 
-        let res = ZeroOverK::<F, PC, D>::verify(
+        let res = ZeroOverK::<F, PC, FS>::verify(
             zero_over_k_proof,
             &commitments,
             Some(enforced_degree_bound),
@@ -263,7 +265,7 @@ mod test {
             GenericShiftingVO::new(&vec![0, 1], &alphas, presets::inverse_check).unwrap();
 
         // Step 7: prove
-        let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
+        let zero_over_k_proof = ZeroOverK::<F, PC, FS>::prove(
             &concrete_oracles,
             &commitments,
             &rands,
@@ -285,7 +287,7 @@ mod test {
                 LabeledCommitment::new(label, comm, Some(verifier_degree_bound))
             })
             .collect();
-        let res = ZeroOverK::<F, PC, D>::verify(
+        let res = ZeroOverK::<F, PC, FS>::verify(
             zero_over_k_proof,
             &verifier_commitments,
             Some(verifier_degree_bound),

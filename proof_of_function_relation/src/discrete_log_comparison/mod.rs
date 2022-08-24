@@ -6,13 +6,11 @@ use crate::{
     subset_over_k::SubsetOverK,
 };
 use ark_ff::{to_bytes, PrimeField, SquareRootField};
-use ark_marlin::rng::FiatShamirRng;
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
 use ark_std::marker::PhantomData;
-use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use rand::Rng;
 use std::iter;
@@ -24,22 +22,24 @@ use zero_over_k::{
     zero_over_k::ZeroOverK,
 };
 
+use fiat_shamir_rng::FiatShamirRng;
+
 pub mod piop;
 pub mod proof;
 mod tests;
 
-pub struct DLComparison<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>, D: Digest>
+pub struct DLComparison<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
 {
     _field: PhantomData<F>,
     _polynomial_commitment_scheme: PhantomData<PC>,
-    _digest: PhantomData<D>,
+    _fs: PhantomData<FS>,
 }
 
-impl<F, PC, D> DLComparison<F, PC, D>
+impl<F, PC, FS> DLComparison<F, PC, FS>
 where
     F: PrimeField + SquareRootField,
     PC: AdditivelyHomomorphicPCS<F>,
-    D: Digest,
+    FS: FiatShamirRng,
 {
     pub const PROTOCOL_NAME: &'static [u8] = b"Discrete-log Comparison";
 
@@ -54,7 +54,7 @@ where
         g_commit: &LabeledCommitment<PC::Commitment>,
         g_rand: &PC::Randomness,
         enforced_degree_bound: Option<usize>,
-        fs_rng: &mut FiatShamirRng<D>,
+        fs_rng: &mut FS,
         rng: &mut R,
     ) -> Result<Proof<F, PC>, Error> {
         let prover_initial_state =
@@ -92,7 +92,7 @@ where
         // Run sub-protocols
 
         // Step 4a: Zero over K for f = (f')^2
-        let f_prime_square_proof = ZeroOverK::<F, PC, D>::prove(
+        let f_prime_square_proof = ZeroOverK::<F, PC, FS>::prove(
             &[f.clone(), prover_first_oracles.f_prime.clone()],
             &[f_commit.clone(), commitments[1].clone()], // f and f'
             &[f_rand.clone(), rands[1].clone()],
@@ -105,7 +105,7 @@ where
         )?;
 
         // Step 4b: Zero over K for g = (g')^2
-        let g_prime_square_proof = ZeroOverK::<F, PC, D>::prove(
+        let g_prime_square_proof = ZeroOverK::<F, PC, FS>::prove(
             &[g.clone(), prover_first_oracles.g_prime.clone()],
             &[g_commit.clone(), commitments[2].clone()], // g and g'
             &[g_rand.clone(), rands[2].clone()],
@@ -118,7 +118,7 @@ where
         )?;
 
         // Step 4c: Zero over K for s = (s')^2
-        let s_prime_square_proof = ZeroOverK::<F, PC, D>::prove(
+        let s_prime_square_proof = ZeroOverK::<F, PC, FS>::prove(
             &[
                 prover_first_oracles.s.clone(),
                 prover_first_oracles.s_prime.clone(),
@@ -145,7 +145,7 @@ where
         let product_check_vo =
             GenericShiftingVO::new(&[0, 1, 2], &vec![F::one(); 3], presets::abc_product_check)?;
         let alphas = [F::one(), F::one(), F::one()];
-        let f_prime_product_proof = ZeroOverK::<F, PC, D>::prove(
+        let f_prime_product_proof = ZeroOverK::<F, PC, FS>::prove(
             &[
                 prover_first_oracles.f_prime.clone(),
                 prover_first_oracles.s_prime.clone(),
@@ -176,7 +176,7 @@ where
             .c_s
             .expect("\'c\' values should be computed in the prover's first round");
 
-        let h_proof = GeoSeqTest::<F, PC, D>::prove(
+        let h_proof = GeoSeqTest::<F, PC, FS>::prove(
             &ck,
             delta,
             &prover_first_oracles.h,
@@ -189,16 +189,16 @@ where
         )?;
 
         // Step 6a: Subset over K for f'
-        let f_prime_subset_proof = SubsetOverK::<F, PC, D>::prove();
+        let f_prime_subset_proof = SubsetOverK::<F, PC, FS>::prove();
 
         // Step 6b: Subset over K for g'
-        let g_prime_subset_proof = SubsetOverK::<F, PC, D>::prove();
+        let g_prime_subset_proof = SubsetOverK::<F, PC, FS>::prove();
 
         // Step 6c: Subset over K for s'
-        let s_prime_subset_proof = SubsetOverK::<F, PC, D>::prove();
+        let s_prime_subset_proof = SubsetOverK::<F, PC, FS>::prove();
 
         // Step 7a: Non-zero over K for f′
-        let nzk_f_prime_proof = NonZeroOverK::<F, PC, D>::prove(
+        let nzk_f_prime_proof = NonZeroOverK::<F, PC, FS>::prove(
             ck,
             domain_k,
             &prover_first_oracles.f_prime,
@@ -208,7 +208,7 @@ where
         )?;
 
         // Step 7b: Non-zero over K for g′
-        let nzk_g_prime_proof = NonZeroOverK::<F, PC, D>::prove(
+        let nzk_g_prime_proof = NonZeroOverK::<F, PC, FS>::prove(
             ck,
             domain_k,
             &prover_first_oracles.g_prime,
@@ -218,7 +218,7 @@ where
         )?;
 
         // Step 7c: Non-zero over K for s′
-        let nzk_s_prime_proof = NonZeroOverK::<F, PC, D>::prove(
+        let nzk_s_prime_proof = NonZeroOverK::<F, PC, FS>::prove(
             ck,
             domain_k,
             &prover_first_oracles.s_prime,
@@ -244,7 +244,7 @@ where
         )
         .unwrap();
 
-        let nzk_s_minus_one_proof = NonZeroOverK::<F, PC, D>::prove(
+        let nzk_s_minus_one_proof = NonZeroOverK::<F, PC, FS>::prove(
             ck,
             domain_k,
             &s_minus_one,
@@ -288,7 +288,7 @@ where
         g_commit: &LabeledCommitment<PC::Commitment>,
         enforced_degree_bound: Option<usize>,
         proof: Proof<F, PC>,
-        fs_rng: &mut FiatShamirRng<D>,
+        fs_rng: &mut FS,
     ) -> Result<(), Error> {
         // re-label f and g with the enforced degree bound
         let f_commit = LabeledCommitment::new(
@@ -330,7 +330,7 @@ where
         let square_check_vo = GenericShiftingVO::new(&[0, 1], &alphas, square_check)?;
 
         // Zero over K for f_prime
-        ZeroOverK::<F, PC, D>::verify(
+        ZeroOverK::<F, PC, FS>::verify(
             proof.f_prime_square_proof,
             &[f_commit.clone(), commitments[1].clone()],
             enforced_degree_bound,
@@ -341,7 +341,7 @@ where
         )?;
 
         // Zero over K for g_prime
-        ZeroOverK::<F, PC, D>::verify(
+        ZeroOverK::<F, PC, FS>::verify(
             proof.g_prime_square_proof,
             &[g_commit.clone(), commitments[2].clone()],
             enforced_degree_bound,
@@ -352,7 +352,7 @@ where
         )?;
 
         // Zero over K for s_prime
-        ZeroOverK::<F, PC, D>::verify(
+        ZeroOverK::<F, PC, FS>::verify(
             proof.s_prime_square_proof,
             &[commitments[0].clone(), commitments[3].clone()],
             enforced_degree_bound,
@@ -367,7 +367,7 @@ where
         let alphas = [F::one(), F::one(), F::one()];
 
         // Zero over K for f' = (s')*(g')
-        ZeroOverK::<F, PC, D>::verify(
+        ZeroOverK::<F, PC, FS>::verify(
             proof.f_prime_product_proof,
             &[
                 commitments[1].clone(),
@@ -399,7 +399,7 @@ where
             c_s.push(to_pad);
         }
 
-        GeoSeqTest::<F, PC, D>::verify(
+        GeoSeqTest::<F, PC, FS>::verify(
             delta,
             &mut a_s,
             &mut c_s,
@@ -411,16 +411,16 @@ where
         )?;
 
         // Subset over K for f'
-        SubsetOverK::<F, PC, D>::verify(proof.f_prime_subset_proof)?;
+        SubsetOverK::<F, PC, FS>::verify(proof.f_prime_subset_proof)?;
 
         // Subset over K for g'
-        SubsetOverK::<F, PC, D>::verify(proof.g_prime_subset_proof)?;
+        SubsetOverK::<F, PC, FS>::verify(proof.g_prime_subset_proof)?;
 
         // Subset over K for s'
-        SubsetOverK::<F, PC, D>::verify(proof.s_prime_subset_proof)?;
+        SubsetOverK::<F, PC, FS>::verify(proof.s_prime_subset_proof)?;
 
         // Non-zero over K for f′
-        NonZeroOverK::<F, PC, D>::verify(
+        NonZeroOverK::<F, PC, FS>::verify(
             &vk,
             &domain_k,
             commitments[1].commitment().clone(),
@@ -429,7 +429,7 @@ where
         )?;
 
         // Non-zero over K for g′
-        NonZeroOverK::<F, PC, D>::verify(
+        NonZeroOverK::<F, PC, FS>::verify(
             &vk,
             &domain_k,
             commitments[2].commitment().clone(),
@@ -438,7 +438,7 @@ where
         )?;
 
         // Non-zero over K for s′
-        NonZeroOverK::<F, PC, D>::verify(
+        NonZeroOverK::<F, PC, FS>::verify(
             &vk,
             &domain_k,
             commitments[3].commitment().clone(),
@@ -461,7 +461,7 @@ where
             &PIOPforDLComparison::s_minus_one_linear_combination(),
         )?;
 
-        NonZeroOverK::<F, PC, D>::verify(
+        NonZeroOverK::<F, PC, FS>::verify(
             &vk,
             &domain_k,
             s_minus_one_commitment.commitment().clone(),

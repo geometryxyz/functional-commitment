@@ -4,7 +4,6 @@ mod test {
 
     use ark_bn254::{Bn254, Fr};
     use ark_ff::to_bytes;
-    use ark_marlin::rng::FiatShamirRng;
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
     };
@@ -12,10 +11,12 @@ mod test {
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
     use homomorphic_poly_commit::marlin_kzg::KZG10;
+    use fiat_shamir_rng::{SimpleHashFiatShamirRng, FiatShamirRng};
+    use rand_chacha::ChaChaRng;
 
+    type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
     type F = Fr;
     type PC = KZG10<Bn254>;
-    type D = Blake2s;
 
     #[test]
     fn test_valid_matrix() {
@@ -101,9 +102,9 @@ mod test {
         let (commitments, rands) =
             PC::commit(&ck, &[row_poly.clone(), col_poly.clone()], Some(rng)).unwrap();
 
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
+        let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
 
-        let proof = TStrictlyLowerTriangular::<F, PC, D>::prove(
+        let proof = TStrictlyLowerTriangular::<F, PC, FS>::prove(
             &ck,
             t,
             &domain_k,
@@ -120,10 +121,10 @@ mod test {
         )
         .unwrap();
 
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
+        let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
 
         assert_eq!(
-            TStrictlyLowerTriangular::<F, PC, D>::verify(
+            TStrictlyLowerTriangular::<F, PC, FS>::verify(
                 &vk,
                 &ck,
                 t,
@@ -219,9 +220,9 @@ mod test {
         let (commitments, rands) =
             PC::commit(&ck, &[row_poly.clone(), col_poly.clone()], Some(rng)).unwrap();
 
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
+        let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
 
-        let proof = TStrictlyLowerTriangular::<F, PC, D>::prove(
+        let proof = TStrictlyLowerTriangular::<F, PC, FS>::prove(
             &ck,
             t,
             &domain_k,
@@ -301,9 +302,9 @@ mod test {
         let (commitments, rands) =
             PC::commit(&ck, &[row_poly.clone(), col_poly.clone()], Some(rng)).unwrap();
 
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
+        let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
 
-        let proof = TStrictlyLowerTriangular::<F, PC, D>::prove(
+        let proof = TStrictlyLowerTriangular::<F, PC, FS>::prove(
             &ck,
             t,
             &domain_k,
@@ -320,9 +321,9 @@ mod test {
         )
         .unwrap();
 
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
+        let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
 
-        let res = TStrictlyLowerTriangular::<F, PC, D>::verify(
+        let res = TStrictlyLowerTriangular::<F, PC, FS>::verify(
             &vk,
             &ck,
             t,
@@ -420,9 +421,9 @@ mod test {
         let (commitments, rands) =
             PC::commit(&ck, &[row_poly.clone(), col_poly.clone()], Some(rng)).unwrap();
 
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
+        let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
 
-        let proof = TStrictlyLowerTriangular::<F, PC, D>::prove(
+        let proof = TStrictlyLowerTriangular::<F, PC, FS>::prove(
             &ck,
             t,
             &domain_k,
@@ -439,10 +440,10 @@ mod test {
         )
         .unwrap();
 
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
+        let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
 
         assert_eq!(
-            TStrictlyLowerTriangular::<F, PC, D>::verify(
+            TStrictlyLowerTriangular::<F, PC, FS>::verify(
                 &vk,
                 &ck,
                 t,

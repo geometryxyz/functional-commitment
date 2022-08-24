@@ -2,7 +2,6 @@ use crate::{
     error::Error, t_diag::TDiag, t_functional_triple::proof::Proof,
     t_strictly_lower_triangular_test::TStrictlyLowerTriangular,
 };
-use ark_marlin::rng::FiatShamirRng;
 use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain};
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
 use rand::Rng;
@@ -10,24 +9,24 @@ use std::marker::PhantomData;
 
 use ark_ff::{PrimeField, SquareRootField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use std::io::BufReader;
+use fiat_shamir_rng::FiatShamirRng;
 
 pub mod proof;
 // mod tests;
 
-pub struct TFT<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> {
+pub struct TFT<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
-    _digest: PhantomData<D>,
+    _digest: PhantomData<FS>,
 }
 
-impl<F, PC, D> TFT<F, PC, D>
+impl<F, PC, FS> TFT<F, PC, FS>
 where
     F: PrimeField + SquareRootField,
     PC: AdditivelyHomomorphicPCS<F>,
-    D: Digest,
+    FS: FiatShamirRng,
 {
     pub const PROTOCOL_NAME: &'static [u8] = b"t-FT Test";
 
@@ -63,11 +62,11 @@ where
         col_c_random: &PC::Randomness,
         val_c_random: &PC::Randomness,
         //rands
-        fs_rng: &mut FiatShamirRng<D>,
+        fs_rng: &mut FS,
         rng: &mut R,
     ) -> Result<Vec<u8>, Error> {
         // 1. t-SLT test on A
-        let a_slt_proof = TStrictlyLowerTriangular::<F, PC, D>::prove(
+        let a_slt_proof = TStrictlyLowerTriangular::<F, PC, FS>::prove(
             ck,
             t,
             domain_k,
@@ -84,7 +83,7 @@ where
         )?;
 
         // 2. t-SLT test on B
-        let b_slt_proof = TStrictlyLowerTriangular::<F, PC, D>::prove(
+        let b_slt_proof = TStrictlyLowerTriangular::<F, PC, FS>::prove(
             ck,
             t,
             domain_k,
@@ -101,7 +100,7 @@ where
         )?;
 
         // 3. t-Diag test on C
-        let c_diag_proof = TDiag::<F, PC, D>::prove(
+        let c_diag_proof = TDiag::<F, PC, FS>::prove(
             ck,
             t,
             row_c_poly,
@@ -149,12 +148,12 @@ where
         domain_h: &GeneralEvaluationDomain<F>,
         domain_k: &GeneralEvaluationDomain<F>,
         proof_bytes: Vec<u8>,
-        fs_rng: &mut FiatShamirRng<D>,
+        fs_rng: &mut FS,
     ) -> Result<(), Error> {
         let reader = BufReader::new(proof_bytes.as_slice());
         let proof: Proof<F, PC> = Proof::<F, PC>::deserialize(reader).unwrap();
 
-        TStrictlyLowerTriangular::<F, PC, D>::verify(
+        TStrictlyLowerTriangular::<F, PC, FS>::verify(
             vk,
             ck,
             t,
@@ -167,7 +166,7 @@ where
             fs_rng,
         )?;
 
-        TStrictlyLowerTriangular::<F, PC, D>::verify(
+        TStrictlyLowerTriangular::<F, PC, FS>::verify(
             vk,
             ck,
             t,
@@ -180,7 +179,7 @@ where
             fs_rng,
         )?;
 
-        TDiag::<F, PC, D>::verify(
+        TDiag::<F, PC, FS>::verify(
             vk,
             t,
             row_c_commitment,

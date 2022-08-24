@@ -1,11 +1,9 @@
 use crate::error::{to_pc_error, Error};
 use crate::geo_seq::proof::Proof;
 use ark_ff::{to_bytes, PrimeField};
-use ark_marlin::rng::FiatShamirRng;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, QuerySet};
 use ark_std::marker::PhantomData;
-use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use rand::Rng;
 use rand_core::OsRng;
@@ -15,17 +13,18 @@ use zero_over_k::{
     zero_over_k::ZeroOverK,
     {geometric_seq_check, vo_constant},
 };
+use fiat_shamir_rng::FiatShamirRng;
 
 pub mod proof;
 mod tests;
 
-pub struct GeoSeqTest<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> {
+pub struct GeoSeqTest<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
-    _digest: PhantomData<D>,
+    _fs: PhantomData<FS>,
 }
 
-impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC, D> {
+impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> GeoSeqTest<F, PC, FS> {
     pub const PROTOCOL_NAME: &'static [u8] = b"Geometric Sequence Test";
     // TODO: for both prove() and verify:
     // TODO: have an assertion that domain is large enough given m
@@ -62,7 +61,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
             &alphas.to_vec()
         ]
         .map_err(|_| Error::ToBytesError)?;
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(fs_bytes);
+        let mut fs_rng = FS::initialize(fs_bytes);
 
         let mut query_set = QuerySet::new();
         let sequence_starting_indices = iter::once(0)
@@ -93,7 +92,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
         )
         .map_err(to_pc_error::<F, PC>)?;
 
-        let z_proof = ZeroOverK::<F, PC, D>::prove(
+        let z_proof = ZeroOverK::<F, PC, FS>::prove(
             &[f.clone()],
             &[f_commit.clone()],
             &[f_rand.clone()],
@@ -159,7 +158,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
             &alphas.to_vec()
         ]
         .map_err(|_| Error::ToBytesError)?;
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(fs_bytes);
+        let mut fs_rng = FS::initialize(fs_bytes);
 
         let mut query_set = QuerySet::new();
         for (i, &point_i) in points.iter().enumerate() {
@@ -195,7 +194,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
         // let f = DensePolynomial::<F>::from_coefficients_slice(&domain.ifft(&seq));
 
         // TODO: raise a different error?
-        ZeroOverK::<F, PC, D>::verify(
+        ZeroOverK::<F, PC, FS>::verify(
             proof.z_proof,
             &[bounded_f_commit.clone()],
             enforced_degree_bound,

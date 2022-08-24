@@ -19,3 +19,5 @@ rand = "0.8.4"
 blake2 = { version = "0.9", default-features = false }
 digest = { version = "0.9" }
 homomorphic_poly_commit = { path = "../homomorphic_poly_commit" }
+fiat_shamir_rng = { path = "../fiat_shamir_rng"}
+rand_chacha = { version = "0.3.0", default-features = false }

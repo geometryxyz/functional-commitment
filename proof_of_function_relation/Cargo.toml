@@ -20,4 +20,6 @@ blake2 = { version = "0.9", default-features = false }
 digest = { version = "0.9" }
 zero_over_k = { path = "../zero_over_k" }
 homomorphic_poly_commit = { path = "../homomorphic_poly_commit"}
+fiat_shamir_rng = { path = "../fiat_shamir_rng"}
+rand_chacha = { version = "0.3.0", default-features = false }
 

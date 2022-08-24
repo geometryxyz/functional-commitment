@@ -9,7 +9,10 @@ mod tests {
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
     use homomorphic_poly_commit::marlin_kzg::KZG10;
+    use fiat_shamir_rng::SimpleHashFiatShamirRng;
+    use rand_chacha::ChaChaRng;
 
+    type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
     type F = Fr;
     type PC = KZG10<Bn254>;
 
@@ -30,7 +33,7 @@ mod tests {
             assert_eq!(&expected[i], s);
         }
 
-        assert!(GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::naive_verify(
+        assert!(GeoSeqTest::<F, KZG10<Bn254>, FS>::naive_verify(
             &seq,
             common_ratio,
             sequence_initial_values,
@@ -53,7 +56,7 @@ mod tests {
         for (i, s) in seq.iter().enumerate() {
             assert_eq!(&expected[i], s);
         }
-        assert!(GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::naive_verify(
+        assert!(GeoSeqTest::<F, KZG10<Bn254>, FS>::naive_verify(
             &seq,
             common_ratio,
             sequence_initial_values,
@@ -120,7 +123,7 @@ mod tests {
 
         let (commitment, rands) = PC::commit(&ck, &[f.clone()], Some(rng)).unwrap();
 
-        let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(
+        let proof = GeoSeqTest::<F, KZG10<Bn254>, FS>::prove(
             &ck,
             common_ratio,
             &f,
@@ -133,7 +136,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::verify(
+        let res = GeoSeqTest::<F, KZG10<Bn254>, FS>::verify(
             common_ratio,
             &sequence_initial_values,
             &sequence_lengths,
@@ -209,7 +212,7 @@ mod tests {
 
         let wrong_common_ratio = Fr::from(2u64);
 
-        let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(
+        let proof = GeoSeqTest::<F, KZG10<Bn254>, FS>::prove(
             &ck,
             wrong_common_ratio,
             &f,
@@ -222,7 +225,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::verify(
+        let res = GeoSeqTest::<F, KZG10<Bn254>, FS>::verify(
             common_ratio,
             &sequence_initial_values,
             &sequence_lengths,
@@ -301,7 +304,7 @@ mod tests {
 
         let (commitment, rands) = PC::commit(&ck, &[f.clone()], Some(rng)).unwrap();
 
-        let proof = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::prove(
+        let proof = GeoSeqTest::<F, KZG10<Bn254>, FS>::prove(
             &ck,
             common_ratio,
             &f,
@@ -314,7 +317,7 @@ mod tests {
         )
         .unwrap();
 
-        let res = GeoSeqTest::<F, KZG10<Bn254>, Blake2s>::verify(
+        let res = GeoSeqTest::<F, KZG10<Bn254>, FS>::verify(
             common_ratio,
             &sequence_initial_values,
             &sequence_lengths,

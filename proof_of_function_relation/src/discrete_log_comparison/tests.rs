@@ -2,7 +2,6 @@
 mod tests {
     use ark_bn254::{Bn254, Fr};
     use ark_ff::{to_bytes, Field, SquareRootField};
-    use ark_marlin::rng::FiatShamirRng;
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
     };
@@ -12,10 +11,12 @@ mod tests {
     use homomorphic_poly_commit::marlin_kzg::KZG10;
 
     use crate::{discrete_log_comparison::DLComparison, error::Error};
+    use fiat_shamir_rng::{SimpleHashFiatShamirRng, FiatShamirRng};
+    use rand_chacha::ChaChaRng;
 
+    type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
     type F = Fr;
     type PC = KZG10<Bn254>;
-    type D = Blake2s;
 
     #[test]
     fn test_square_root_friendly() {
@@ -101,9 +102,9 @@ mod tests {
         let (commitments, rands) =
             PC::commit(&ck, &[f_poly.clone(), g_poly.clone()], Some(rng)).unwrap();
 
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
+        let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
 
-        let proof = DLComparison::<F, PC, D>::prove(
+        let proof = DLComparison::<F, PC, FS>::prove(
             &ck,
             &domain_k,
             &domain_h,
@@ -190,9 +191,9 @@ mod tests {
         let (commitments, rands) =
             PC::commit(&ck, &[f_poly.clone(), g_poly.clone()], Some(rng)).unwrap();
 
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
+        let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
 
-        let proof = DLComparison::<F, PC, D>::prove(
+        let proof = DLComparison::<F, PC, FS>::prove(
             &ck,
             &domain_k,
             &domain_h,
@@ -293,9 +294,9 @@ mod tests {
         let (commitments, rands) =
             PC::commit(&ck, &[f_poly.clone(), g_poly.clone()], Some(rng)).unwrap();
 
-        let mut fs_rng = FiatShamirRng::<D>::from_seed(&to_bytes!(b"Testing :)").unwrap());
+        let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
 
-        let proof = DLComparison::<F, PC, D>::prove(
+        let proof = DLComparison::<F, PC, FS>::prove(
             &ck,
             &domain_k,
             &domain_h,

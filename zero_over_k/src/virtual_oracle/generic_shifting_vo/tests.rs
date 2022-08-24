@@ -15,12 +15,14 @@ mod test {
     use ark_std::{rand::thread_rng, test_rng};
     use blake2::Blake2s;
     use homomorphic_poly_commit::marlin_kzg::KZG10;
+    use fiat_shamir_rng::SimpleHashFiatShamirRng;
+    use rand_chacha::ChaChaRng;
 
     use super::super::{GenericShiftingVO, VOTerm};
 
     type F = Fr;
     type PC = KZG10<Bn254>;
-    type D = Blake2s;
+    type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
 
     pub fn simple_addition(terms: &[VOTerm<F>]) -> VOTerm<F> {
         terms[1].clone() + vo_constant!(F::from(2u64)) * terms[2].clone()
@@ -257,7 +259,7 @@ mod test {
             GenericShiftingVO::new(&vec![0, 1], &alphas.clone(), presets::inverse_check).unwrap();
 
         // Step 7: prove
-        let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
+        let zero_over_k_proof = ZeroOverK::<F, PC, FS>::prove(
             &concrete_oracles,
             &commitments,
             &rands,
@@ -270,7 +272,7 @@ mod test {
         );
 
         // Step 8: verify
-        let is_valid = ZeroOverK::<F, PC, D>::verify(
+        let is_valid = ZeroOverK::<F, PC, FS>::verify(
             zero_over_k_proof.unwrap(),
             &commitments,
             Some(enforced_degree_bound),

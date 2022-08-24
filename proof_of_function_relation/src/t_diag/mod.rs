@@ -10,7 +10,6 @@ use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
-use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use rand::Rng;
 use std::marker::PhantomData;
@@ -21,6 +20,7 @@ use zero_over_k::{
     },
     zero_over_k::ZeroOverK,
 };
+use fiat_shamir_rng::FiatShamirRng;
 
 use self::piop::PIOPforTDiagTest;
 
@@ -28,17 +28,17 @@ pub mod piop;
 pub mod proof;
 mod tests;
 
-pub struct TDiag<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> {
+pub struct TDiag<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
-    _digest: PhantomData<D>,
+    _fs: PhantomData<FS>,
 }
 
-impl<F, PC, D> TDiag<F, PC, D>
+impl<F, PC, FS> TDiag<F, PC, FS>
 where
     F: PrimeField + SquareRootField,
     PC: AdditivelyHomomorphicPCS<F>,
-    D: Digest,
+    FS: FiatShamirRng
 {
     #[allow(dead_code)]
     pub const PROTOCOL_NAME: &'static [u8] = b"t-Diagonal Test";
@@ -98,7 +98,7 @@ where
             PC::commit(ck, &[h1.clone(), h2.clone()], Some(rng)).map_err(to_pc_error::<F, PC>)?;
 
         // Step 2: Geometric Sequence Test on h1
-        let h1_seq_proof = GeoSeqTest::<F, PC, D>::prove(
+        let h1_seq_proof = GeoSeqTest::<F, PC, FS>::prove(
             ck,
             r_h1,
             &h1,
@@ -111,7 +111,7 @@ where
         )?;
 
         // Step 3: Geometric Sequence Test on h2
-        let h2_seq_proof = GeoSeqTest::<F, PC, D>::prove(
+        let h2_seq_proof = GeoSeqTest::<F, PC, FS>::prove(
             ck,
             r_h2,
             &h2,
@@ -136,7 +136,7 @@ where
 
         // Step 4b: Zero over K for h = rowM
         let eq_vo = GenericShiftingVO::new(&vec![0, 1], &alphas, presets::equality_check)?;
-        let h_eq_row_m = ZeroOverK::<F, PC, D>::prove(
+        let h_eq_row_m = ZeroOverK::<F, PC, FS>::prove(
             &[h.clone(), row_m.clone()],
             &[h_commitment.clone(), row_m_commitment.clone()],
             &[h_rand.clone(), row_m_random.clone()],
@@ -149,7 +149,7 @@ where
         )?;
 
         // Step 4c: Zero over K for rowM = colM
-        let row_m_eq_col_m = ZeroOverK::<F, PC, D>::prove(
+        let row_m_eq_col_m = ZeroOverK::<F, PC, FS>::prove(
             &[row_m.clone(), col_m.clone()],
             &[row_m_commitment.clone(), col_m_commitment.clone()],
             &[row_m_random.clone(), col_m_random.clone()],
@@ -163,7 +163,7 @@ where
 
         // Step 5: Zero over K for valM * h2 = 0
         let prod_vo = GenericShiftingVO::new(&[0, 1], &[F::one(), F::one()], zero_product_check)?;
-        let val_m_times_h2_proof = ZeroOverK::<F, PC, D>::prove(
+        let val_m_times_h2_proof = ZeroOverK::<F, PC, FS>::prove(
             &[val_m.clone(), h2.clone()],
             &[val_m_commitment.clone(), h_commitments[1].clone()],
             &[val_m_random.clone(), h_rands[1].clone()],
@@ -191,7 +191,7 @@ where
             )),
         )?;
 
-        let val_plus_h2_proof = NonZeroOverK::<F, PC, D>::prove(
+        let val_plus_h2_proof = NonZeroOverK::<F, PC, FS>::prove(
             ck,
             domain_k,
             &val_plus_h2,
@@ -266,7 +266,7 @@ where
             ),
         ];
 
-        GeoSeqTest::<F, PC, D>::verify(
+        GeoSeqTest::<F, PC, FS>::verify(
             r_h1,
             &a_s_h1,
             &c_s_h1,
@@ -289,7 +289,7 @@ where
         }
 
         // Step 3: Geometric Sequence Test on h2
-        GeoSeqTest::<F, PC, D>::verify(
+        GeoSeqTest::<F, PC, FS>::verify(
             r_h2,
             &a_s_h2,
             &c_s_h2,
@@ -310,7 +310,7 @@ where
 
         // Step 4b: Zero over K for h = rowM
         let eq_vo = GenericShiftingVO::new(&vec![0, 1], &alphas, presets::equality_check)?;
-        ZeroOverK::<F, PC, D>::verify(
+        ZeroOverK::<F, PC, FS>::verify(
             proof.h_eq_row_m,
             vec![h_commit.clone(), row_m_commitment.clone()].as_slice(),
             enforced_degree_bound,
@@ -321,7 +321,7 @@ where
         )?;
 
         // Step 4c: Zero over K for rowM = colM
-        ZeroOverK::<F, PC, D>::verify(
+        ZeroOverK::<F, PC, FS>::verify(
             proof.row_m_eq_col_m,
             vec![row_m_commitment.clone(), col_m_commitment.clone()].as_slice(),
             enforced_degree_bound,
@@ -333,7 +333,7 @@ where
 
         // Step 5: Zero over K for valM * h2 = 0
         let prod_vo = GenericShiftingVO::new(&[0, 1], &[F::one(), F::one()], zero_product_check)?;
-        ZeroOverK::<F, PC, D>::verify(
+        ZeroOverK::<F, PC, FS>::verify(
             proof.val_m_times_h2_proof,
             vec![val_m_commitment.clone(), h_commitments[1].clone()].as_slice(),
             enforced_degree_bound,
@@ -350,7 +350,7 @@ where
             &PIOPforTDiagTest::generate_valM_plus_h2_linear_combination(val_m_commitment.label()),
         )?;
 
-        NonZeroOverK::<F, PC, D>::verify(
+        NonZeroOverK::<F, PC, FS>::verify(
             vk,
             domain_k,
             val_plus_h2_commit.commitment().clone(),

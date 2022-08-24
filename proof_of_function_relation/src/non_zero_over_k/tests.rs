@@ -16,9 +16,12 @@ mod test {
         util::sample_vector,
         virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO},
     };
+    use fiat_shamir_rng::SimpleHashFiatShamirRng;
+    use rand_chacha::ChaChaRng;
 
     type F = Fr;
     type PC = KZG10<Bn254>;
+    type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
 
     // This test should pass because it the randomly generated virtual oracle should
     // not evalute to 0 - if it does, just rerun the test
@@ -53,7 +56,7 @@ mod test {
 
         let (f_commit, f_rand) = PC::commit(&ck, &[f.clone()], Some(rng)).unwrap();
 
-        let proof = NonZeroOverK::<F, PC, Blake2s>::prove(
+        let proof = NonZeroOverK::<F, PC, FS>::prove(
             &ck,
             &domain_k,
             &f,
@@ -63,7 +66,7 @@ mod test {
         )
         .unwrap();
 
-        let res = NonZeroOverK::<F, PC, Blake2s>::verify(
+        let res = NonZeroOverK::<F, PC, FS>::verify(
             &vk,
             &domain_k,
             f_commit[0].commitment().clone(),
@@ -110,7 +113,7 @@ mod test {
 
         let (f_commit, f_rand) = PC::commit(&ck, &[f.clone()], Some(rng)).unwrap();
 
-        let proof = NonZeroOverK::<F, PC, Blake2s>::prove(
+        let proof = NonZeroOverK::<F, PC, FS>::prove(
             &ck,
             &domain_k,
             &f,
@@ -200,7 +203,7 @@ mod test {
 
         let (f_commit, f_rand) = PC::commit(&ck, &[f.clone()], Some(rng)).unwrap();
 
-        let proof = NonZeroOverK::<F, PC, Blake2s>::prove(
+        let proof = NonZeroOverK::<F, PC, FS>::prove(
             &ck,
             &domain_k,
             &f,
@@ -209,7 +212,7 @@ mod test {
             rng,
         )
         .unwrap();
-        let res = NonZeroOverK::<F, PC, Blake2s>::verify(
+        let res = NonZeroOverK::<F, PC, FS>::verify(
             &vk,
             &domain_k,
             f_commit[0].commitment().clone(),

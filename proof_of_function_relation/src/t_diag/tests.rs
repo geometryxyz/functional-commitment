@@ -8,10 +8,12 @@ mod test {
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
     use homomorphic_poly_commit::marlin_kzg::KZG10;
+    use fiat_shamir_rng::SimpleHashFiatShamirRng;
+    use rand_chacha::ChaChaRng;
 
+    type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
     type F = Fr;
     type PC = KZG10<Bn254>;
-    type D = Blake2s;
 
     #[test]
     fn test_diag_matrix() {
@@ -48,7 +50,7 @@ mod test {
         )
         .unwrap();
 
-        let proof = TDiag::<F, PC, D>::prove(
+        let proof = TDiag::<F, PC, FS>::prove(
             &ck,
             t,
             &row_poly,
@@ -67,7 +69,7 @@ mod test {
         )
         .unwrap();
 
-        let is_valid = TDiag::<F, PC, D>::verify(
+        let is_valid = TDiag::<F, PC, FS>::verify(
             &vk,
             t,
             &commitments[0],
@@ -123,7 +125,7 @@ mod test {
         )
         .unwrap();
 
-        let proof = TDiag::<F, PC, D>::prove(
+        let proof = TDiag::<F, PC, FS>::prove(
             &ck,
             t,
             &row_poly,
@@ -189,7 +191,7 @@ mod test {
         )
         .unwrap();
 
-        let proof = TDiag::<F, PC, D>::prove(
+        let proof = TDiag::<F, PC, FS>::prove(
             &ck,
             t,
             &row_poly,
@@ -208,7 +210,7 @@ mod test {
         )
         .unwrap();
 
-        let is_valid = TDiag::<F, PC, D>::verify(
+        let is_valid = TDiag::<F, PC, FS>::verify(
             &vk,
             t,
             &commitments[0],

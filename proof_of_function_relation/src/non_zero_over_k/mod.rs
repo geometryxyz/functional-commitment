@@ -3,7 +3,6 @@ use crate::non_zero_over_k::{piop::PIOPforNonZeroOverK, proof::Proof};
 use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain};
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
-use digest::Digest; // Note that in the latest Marlin commit, Digest has been replaced by an arkworks trait `FiatShamirRng`
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use rand::Rng;
 use std::marker::PhantomData;
@@ -11,18 +10,19 @@ use zero_over_k::{
     virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO},
     zero_over_k::ZeroOverK,
 };
+use fiat_shamir_rng::FiatShamirRng;
 
 pub mod piop;
 pub mod proof;
 mod tests;
 
-pub struct NonZeroOverK<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> {
+pub struct NonZeroOverK<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
-    _digest: PhantomData<D>,
+    _fs_rng: PhantomData<FS>,
 }
 
-impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> NonZeroOverK<F, PC, D> {
+impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> NonZeroOverK<F, PC, FS> {
     pub fn prove<R: Rng>(
         ck: &PC::CommitterKey,
         domain: &GeneralEvaluationDomain<F>,
@@ -51,7 +51,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> NonZeroOverK<F, 
         let inverse_check_oracle =
             GenericShiftingVO::new(&vec![0, 1], &alphas, presets::inverse_check)?;
 
-        let zero_over_k_proof = ZeroOverK::<F, PC, D>::prove(
+        let zero_over_k_proof = ZeroOverK::<F, PC, FS>::prove(
             &concrete_oracles,
             &[f_commit.clone(), commitments[0].clone()],
             &[f_rand.clone(), rands[0].clone()],
@@ -78,7 +78,6 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> NonZeroOverK<F, 
         enforced_degree_bound: Option<usize>,
         proof: Proof<F, PC>,
     ) -> Result<(), Error> {
-        //TODO check g bound
         let bounded_f_commit =
             LabeledCommitment::new(String::from("f"), f_commit, enforced_degree_bound);
         let g_commit = LabeledCommitment::new(
@@ -92,7 +91,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> NonZeroOverK<F, 
         let inverse_check_oracle =
             GenericShiftingVO::new(&vec![0, 1], &alphas, presets::inverse_check)?;
 
-        ZeroOverK::<F, PC, D>::verify(
+        ZeroOverK::<F, PC, FS>::verify(
             proof.zero_over_k_proof,
             &concrete_oracles_commitments,
             enforced_degree_bound,
