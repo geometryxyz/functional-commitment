@@ -28,7 +28,8 @@ where
         lc: &LinearCombination<F>,
     ) -> Result<(LabeledCommitment<Self::Commitment>, Self::Randomness), Error>;
 
-    /// ideal
+    /// Aggregate labeled commitments according to the linear combination. If hiding bounds are enforced, the committer is expected to provide
+    /// a vector of hiding randomness values, otherwise use `None`. A verifier can always aggregate with `None` for randomness.
     fn aggregate_commitments(
         commitments: &[LabeledCommitment<Self::Commitment>],
         randomness: Option<Vec<Self::Randomness>>,

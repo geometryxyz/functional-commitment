@@ -2,4 +2,5 @@
 
 members = [
     "homomorphic_poly_commit",
+    "zero_over_k",
 ]

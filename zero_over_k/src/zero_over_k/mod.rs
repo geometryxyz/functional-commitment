@@ -164,7 +164,9 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> ZeroOverK<F, PC,
             PIOPforZeroOverK::generate_q2_linear_combination(virtual_oracle, verifier_first_msg.c);
 
         let (q2_commit, q2_rand) =
-            PC::get_commitments_lc_with_rands(&r_commitments, &r_rands, &q2_linear_combination)?;
+            PC::aggregate_commitments(&r_commitments, Some(r_rands.to_vec()), &q2_linear_combination)?;
+        println!("q2 prover degree bound: {:?}", q2_commit.degree_bound());
+
 
         // Use commitments to each h and each m to homomorphically derive commitments to each h_prime
         let h_prime_lcs = PIOPforZeroOverK::generate_h_prime_linear_combinations(
@@ -187,7 +189,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> ZeroOverK<F, PC,
         let mut h_prime_rands = Vec::new();
         for lc in h_prime_lcs {
             let (comm, rand) =
-                PC::get_commitments_lc_with_rands(&h_and_m_commitments, &h_and_m_rands, &lc)?;
+                PC::aggregate_commitments(&h_and_m_commitments, Some(h_and_m_rands.to_vec()), &lc)?;
             h_prime_commitments.push(comm);
             h_prime_rands.push(rand);
         }
@@ -329,10 +331,13 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> ZeroOverK<F, PC,
             virtual_oracle,
             &get_labels!(concrete_oracle_commitments),
         );
-        let h_prime_commitments = h_prime_lcs
+        let (h_prime_commitments, _): (Vec<_>, Vec<_>) = h_prime_lcs
             .iter()
-            .map(|lc| PC::get_commitments_lc(&h_and_m_commitments, lc))
-            .collect::<Result<Vec<_>, _>>()?;
+            .map(|lc| PC::aggregate_commitments(&h_and_m_commitments, None, lc))
+            .collect::<Result<Vec<_>, _>>()?
+            .iter()
+            .cloned()
+            .unzip();
 
         let q1_commit = LabeledCommitment::new(String::from("q_1"), proof.q1_commit, None);
 
@@ -340,7 +345,8 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> ZeroOverK<F, PC,
         let q2_linear_combination =
             PIOPforZeroOverK::generate_q2_linear_combination(virtual_oracle, verifier_first_msg.c);
 
-        let q2_commit = PC::get_commitments_lc(&r_commitments, &q2_linear_combination)?;
+        let (q2_commit, _) = PC::aggregate_commitments(&r_commitments, None, &q2_linear_combination)?;
+        println!("q2 verifier degree bound: {:?}", q2_commit.degree_bound());
 
         let fs_bytes =
             &to_bytes![h_prime_commitments, q2_commit].map_err(|_| Error::ToBytesError)?;

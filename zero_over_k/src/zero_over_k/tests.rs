@@ -15,15 +15,11 @@ mod test {
     use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, PolynomialCommitment};
     use ark_std::{rand::thread_rng, test_rng};
     use blake2::Blake2s;
-    use homomorphic_poly_commit::kzg10::KZG10;
+    use homomorphic_poly_commit::marlin_kzg::KZG10;
 
     type F = Fr;
     type PC = KZG10<Bn254>;
     type D = Blake2s;
-
-    // TODO
-    // Write more tests. e.g. non_zero_over_k uses zero_over_k with an InverseCheckOracle.
-    // Try other virtual oracles like add_vo.
 
     #[test]
     fn test_zero_over_k_inverse_check_oracle() {
