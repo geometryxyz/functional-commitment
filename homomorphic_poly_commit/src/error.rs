@@ -8,6 +8,7 @@ pub enum Error {
     MissingCommitment(String),
     InputLengthError(String),
     MismatchedDegreeBounds(String),
+    ConstantTermInAggregation,
 }
 
 /// Convert an ark_poly_commit error

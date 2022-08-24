@@ -1,8 +1,10 @@
+use std::collections::BTreeMap;
+
 use ark_ec::PairingEngine;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::{
-    marlin_pc::MarlinKZG10, LCTerm, LabeledCommitment, LinearCombination, PCCommitment,
-    PCRandomness,
+    kzg10, marlin_pc::MarlinKZG10, LCTerm, LabeledCommitment, LinearCombination, PCCommitment,
+    PCRandomness, PolynomialCommitment,
 };
 
 use crate::{error::Error, AdditivelyHomomorphicPCS};
@@ -16,10 +18,10 @@ pub type KZG10<E> = MarlinKZG10<E, DensePolynomial<<E as PairingEngine>::Fr>>;
 //     DensePolynomial<<E as PairingEngine>::Fr>,
 // >>::Commitment;
 
-// pub type KZGRandomness<E> = <KZG10<E> as PolynomialCommitment<
-//     <E as PairingEngine>::Fr,
-//     DensePolynomial<<E as PairingEngine>::Fr>,
-// >>::Randomness;
+pub type KZGRandomness<E> = <KZG10<E> as PolynomialCommitment<
+    <E as PairingEngine>::Fr,
+    DensePolynomial<<E as PairingEngine>::Fr>,
+>>::Randomness;
 
 impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for MarlinKZG10<E, DensePolynomial<E::Fr>> {
     fn get_commitments_lc(
@@ -99,8 +101,6 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for MarlinKZG10<E, DenseP
         aggregate_commitment.shifted_comm = None;
 
         let mut aggregate_randomness = Self::Randomness::empty();
-        // aggregate_randomness.shifted_rand = None;
-
 
         for (coef, term) in lc.iter() {
             let (comm, rand) = if let LCTerm::PolyLabel(label) = term {
@@ -127,6 +127,101 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for MarlinKZG10<E, DenseP
             aggregate_randomness,
         ))
     }
+
+    fn aggregate_commitments(
+        commitments: &[LabeledCommitment<Self::Commitment>],
+        randomness: Option<Vec<Self::Randomness>>,
+        lc: &LinearCombination<E::Fr>,
+    ) -> Result<(LabeledCommitment<Self::Commitment>, Self::Randomness), Error> {
+        let degree_bound = commitments[0].degree_bound();
+
+        // create mapping of label -> commitment and fail if all degree bounds are not the same
+        let label_comm_mapping = commitments
+            .iter()
+            .zip(randomness.iter().flatten())
+            .map(|(comm, rand)| {
+                if comm.degree_bound() != degree_bound {
+                    // Can only accumulate commitments that have the same degree bound
+                    return Err(Error::MismatchedDegreeBounds(format!(
+                        "{} has degree bound {:?}, but {} has degree bound {:?}",
+                        commitments[0].label(),
+                        degree_bound,
+                        comm.label(),
+                        comm.degree_bound()
+                    )));
+                }
+                Ok((
+                    comm.label().clone(),
+                    (comm.commitment().clone(), rand.clone()),
+                ))
+            })
+            .collect::<Result<BTreeMap<_, (_, _)>, Error>>()?;
+
+        // initial values for the aggregate commitment
+        let mut aggregate_commitment = kzg10::Commitment::empty();
+        let mut aggregate_shifted_commitment = kzg10::Commitment::empty();
+
+        // initial values for the randomness
+        let mut aggregate_randomness = kzg10::Randomness::empty();
+        let mut aggregate_shifted_randomness = kzg10::Randomness::empty();
+
+        for (coef, term) in lc.iter() {
+            if let LCTerm::PolyLabel(label) = term {
+                if let Some((comm, rand)) = label_comm_mapping.get(label) {
+                    if degree_bound.is_some() {
+                        aggregate_shifted_commitment += (
+                            *coef,
+                            &comm
+                                .shifted_comm
+                                .expect("Degree bounded polynomial must have shifted commitment"),
+                        );
+                        aggregate_shifted_randomness += (
+                            *coef,
+                            &rand
+                                .shifted_rand
+                                .clone()
+                                .expect("Degree bounded polynomial must have shifted randomness"),
+                        );
+                    }
+
+                    aggregate_commitment += (*coef, &comm.comm);
+                    aggregate_randomness += (*coef, &rand.rand);
+                } else {
+                    return Err(Error::MissingCommitment(format!(
+                        "Could not find object with label '{}' when computing '{}'",
+                        label,
+                        lc.label()
+                    )));
+                }
+            } else {
+                return Err(Error::ConstantTermInAggregation);
+            };
+        }
+
+        let (agg_comm, agg_rand) = if degree_bound.is_some() {
+            (
+                Some(aggregate_shifted_commitment),
+                Some(aggregate_shifted_randomness),
+            )
+        } else {
+            (None, None)
+        };
+
+        let commitment = Self::Commitment {
+            comm: aggregate_commitment,
+            shifted_comm: agg_comm,
+        };
+
+        let randomness = Self::Randomness {
+            rand: aggregate_randomness,
+            shifted_rand: agg_rand,
+        };
+
+        Ok((
+            LabeledCommitment::new(lc.label().clone(), commitment, degree_bound),
+            randomness,
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -137,7 +232,7 @@ mod test {
     use ark_ff::UniformRand;
     use ark_poly::univariate::DensePolynomial;
     use ark_poly::UVPolynomial;
-    use ark_poly_commit::{LinearCombination};
+    use ark_poly_commit::LinearCombination;
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_std::rand::thread_rng;
     use rand_core::OsRng;
@@ -152,6 +247,7 @@ mod test {
         let maximum_degree: usize = 16;
         let hiding_bound = 1;
         let enforced_degree_bounds = [10];
+        let degree_bound = 10;
 
         // Setup the commitment scheme
         let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
@@ -165,32 +261,58 @@ mod test {
 
         // Define polynomials and a linear combination
         let a_unlabeled: DensePolynomial<F> = DensePolynomial::rand(7, rng);
-        let a_poly = LabeledPolynomial::new(String::from("a"), a_unlabeled, None, Some(hiding_bound));
+        let a_poly = LabeledPolynomial::new(
+            String::from("a"),
+            a_unlabeled,
+            Some(degree_bound),
+            Some(hiding_bound),
+        );
 
         let b_unlabeled: DensePolynomial<F> = DensePolynomial::rand(5, rng);
-        let b_poly = LabeledPolynomial::new(String::from("b"), b_unlabeled, None, Some(hiding_bound));
+        let b_poly = LabeledPolynomial::new(
+            String::from("b"),
+            b_unlabeled,
+            Some(degree_bound),
+            Some(hiding_bound),
+        );
 
         let a_plus_2b_poly = a_poly.polynomial().clone() + (b_poly.polynomial() * F::from(2u64));
-        let a_plus_2b_poly = LabeledPolynomial::new(String::from("a_plus_2b_poly"), a_plus_2b_poly, None, Some(hiding_bound));
+        let a_plus_2b_poly = LabeledPolynomial::new(
+            String::from("a_plus_2b_poly"),
+            a_plus_2b_poly,
+            Some(degree_bound),
+            Some(hiding_bound),
+        );
 
         let polynomials = vec![a_poly.clone(), b_poly.clone()];
         let linear_combination =
-            LinearCombination::new("a_plus_2b", vec![(F::one(), "a"), (F::from(2u64), "b".into())]);
+            LinearCombination::new("a_plus_2b", vec![(F::one(), "a"), (F::from(2u64), "b")]);
 
         // Commit Phase
         let (commitments, rands) = PC::commit(&ck, &polynomials, Some(rng)).unwrap();
         let (test_commitment, test_rand) =
-            PC::get_commitments_lc_with_rands(&commitments, &rands, &linear_combination).unwrap();
+            PC::aggregate_commitments(&commitments, Some(rands.to_vec()), &linear_combination)
+                .unwrap();
 
-        // for comm in &commitments {
-        //     println!("{}: {:?}", comm.label(), comm.commitment().shifted_comm);
-        // }
-        // println!("{}: {:?}", test_commitment.label(), test_commitment.commitment().shifted_comm);
+        for comm in &commitments {
+            println!("{}: {:?}", comm.label(), comm.commitment().shifted_comm);
+        }
+        println!(
+            "{}: {:?}",
+            test_commitment.label(),
+            test_commitment.commitment().shifted_comm
+        );
 
-        // let manual_commitment = commitments[0].commitment().comm + commitments[1].commitment().comm * F::from(2u64);
+        let mut manual_commitment = commitments[0].commitment().comm;
+        manual_commitment += (F::from(2u64), &commitments[1].commitment().comm);
 
-        // assert_eq!(test_commitment.commitment().comm, manual_commitment);
-        // println!("PASSED SANITY");
+        let mut manual_rand = rands[0].clone().rand;
+        manual_rand += (F::from(2u64), &rands[1].clone().rand);
+
+        assert_eq!(test_commitment.commitment().comm, manual_commitment);
+        assert_eq!(test_rand.rand, manual_rand);
+
+        println!("PASSED SANITY");
 
         // Derive evaluation point and generate a query set
         let evaluation_point = Fr::rand(rng);
@@ -199,25 +321,6 @@ mod test {
         let manual_eval = a_plus_2b_poly.evaluate(&evaluation_point);
 
         let opening_challenge = F::rand(rng);
-        // // sanity opening
-        // let normal_opening_proof = PC::open(
-        //     &ck,
-        //     &[a_plus_2b_poly.clone()],
-        //     &[],
-        //     &evaluation_point,
-        //     opening_challenge,
-        //     &[],
-        //     Some(rng),
-        // );
-        // let sanity_res = PC::check(
-        //     &vk,
-        //     &[test_commitment.clone()],
-        //     &evaluation_point,
-        //     iter::once(a_plus_2b_poly.evaluate(&evaluation_point)),
-        //     &normal_opening_proof.unwrap(),
-        //     opening_challenge,
-        //     Some(rng),
-        // ).unwrap();
 
         // Opening phase
         let lc_opening_proof = PC::open(

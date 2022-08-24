@@ -5,8 +5,8 @@ use ark_poly_commit::{LabeledCommitment, LinearCombination, PolynomialCommitment
 use crate::error::Error;
 
 pub mod error;
-pub mod kzg10;
 pub mod marlin_kzg;
+pub mod sonic_kzg;
 
 /// An additively homomorphic polynomial commitment scheme
 pub trait AdditivelyHomomorphicPCS<F>: PolynomialCommitment<F, DensePolynomial<F>>
@@ -25,6 +25,13 @@ where
     fn get_commitments_lc_with_rands(
         commitments: &[LabeledCommitment<Self::Commitment>],
         hiding_rands: &[Self::Randomness],
+        lc: &LinearCombination<F>,
+    ) -> Result<(LabeledCommitment<Self::Commitment>, Self::Randomness), Error>;
+
+    /// ideal
+    fn aggregate_commitments(
+        commitments: &[LabeledCommitment<Self::Commitment>],
+        randomness: Option<Vec<Self::Randomness>>,
         lc: &LinearCombination<F>,
     ) -> Result<(LabeledCommitment<Self::Commitment>, Self::Randomness), Error>;
 }

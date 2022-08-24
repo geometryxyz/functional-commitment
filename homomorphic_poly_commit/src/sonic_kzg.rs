@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use ark_ec::PairingEngine;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::{
@@ -121,11 +123,69 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePo
             aggregate_randomness,
         ))
     }
+
+    fn aggregate_commitments(
+        commitments: &[LabeledCommitment<Self::Commitment>],
+        randomness: Option<Vec<Self::Randomness>>,
+        lc: &LinearCombination<E::Fr>,
+    ) -> Result<(LabeledCommitment<Self::Commitment>, Self::Randomness), Error> {
+        let degree_bound = commitments[0].degree_bound();
+
+        // create mapping of label -> commitment and fail if all degree bounds are not the same
+        let label_comm_mapping = commitments
+            .iter()
+            .zip(randomness.iter().flatten())
+            .map(|(comm, rand)| {
+                if comm.degree_bound() != degree_bound {
+                    // Can only accumulate commitments that have the same degree bound
+                    return Err(Error::MismatchedDegreeBounds(format!(
+                        "{} has degree bound {:?}, but {} has degree bound {:?}",
+                        commitments[0].label(),
+                        degree_bound,
+                        comm.label(),
+                        comm.degree_bound()
+                    )));
+                }
+                Ok((
+                    comm.label().clone(),
+                    (comm.commitment().clone(), rand.clone()),
+                ))
+            })
+            .collect::<Result<BTreeMap<_, (_, _)>, Error>>()?;
+
+        // initial values for the aggregate commitment
+        let mut aggregate_commitment = Self::Commitment::empty();
+
+        // initial values for the randomness
+        let mut aggregate_randomness = Self::Randomness::empty();
+
+        for (coef, term) in lc.iter() {
+            if let LCTerm::PolyLabel(label) = term {
+                if let Some((comm, rand)) = label_comm_mapping.get(label) {
+                    aggregate_commitment += (*coef, &comm);
+                    aggregate_randomness += (*coef, rand);
+                } else {
+                    return Err(Error::MissingCommitment(format!(
+                        "Could not find object with label '{}' when computing '{}'",
+                        label,
+                        lc.label()
+                    )));
+                }
+            } else {
+                return Err(Error::ConstantTermInAggregation);
+            };
+        }
+
+        Ok((
+            LabeledCommitment::new(lc.label().clone(), aggregate_commitment, degree_bound),
+            aggregate_randomness,
+        ))
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::{kzg10::KZG10, AdditivelyHomomorphicPCS};
+    use crate::{sonic_kzg::KZG10, AdditivelyHomomorphicPCS};
     use ark_bn254::{Bn254, Fr};
     use ark_ff::One;
     use ark_ff::UniformRand;
@@ -138,6 +198,77 @@ mod test {
 
     type F = Fr;
     type PC = KZG10<Bn254>;
+
+    #[test]
+    fn test_old_aggregate_comm_with_rand() {
+        // Parameters
+        let rng = &mut thread_rng();
+        let maximum_degree: usize = 16;
+        let hiding_bound = 1;
+        let enforced_degree_bounds = [10];
+
+        // Setup the commitment scheme
+        let pp = PC::setup(maximum_degree, None, &mut OsRng).unwrap();
+        let (ck, vk) = PC::trim(
+            &pp,
+            maximum_degree,
+            hiding_bound,
+            Some(&enforced_degree_bounds),
+        )
+        .unwrap();
+
+        // Define polynomials and a linear combination
+        let a_unlabeled: DensePolynomial<F> = DensePolynomial::rand(7, rng);
+        let a_poly = LabeledPolynomial::new(String::from("a"), a_unlabeled, Some(10), Some(1));
+
+        let b_unlabeled: DensePolynomial<F> = DensePolynomial::rand(5, rng);
+        let b_poly = LabeledPolynomial::new(String::from("b"), b_unlabeled, Some(10), Some(1));
+
+        let a_plus_2b_poly = a_poly.polynomial().clone() + (b_poly.polynomial() * F::from(2u64));
+        let a_plus_2b_poly =
+            LabeledPolynomial::new(String::from("a_plus_2b"), a_plus_2b_poly, Some(10), Some(1));
+        let polynomials = vec![a_poly.clone(), b_poly.clone()];
+        let linear_combination =
+            LinearCombination::new("a_plus_2b", vec![(F::one(), "a"), (F::from(2u64), "b")]);
+
+        // Commit Phase
+        let (commitments, rands) = PC::commit(&ck, &polynomials, Some(rng)).unwrap();
+        let (test_commitment, test_rand) =
+            PC::get_commitments_lc_with_rands(&commitments, &rands, &linear_combination).unwrap();
+
+        // Derive evaluation point and generate a query set
+        let evaluation_point = Fr::rand(rng);
+
+        // Evaluation Phase, here we only output the evaluation of the linear combination
+        let manual_eval = a_plus_2b_poly.evaluate(&evaluation_point);
+
+        // Opening phase
+        let opening_challenge = F::rand(rng);
+        let lc_opening_proof = PC::open(
+            &ck,
+            &[a_plus_2b_poly],
+            &[test_commitment.clone()],
+            &evaluation_point,
+            opening_challenge,
+            &[test_rand],
+            Some(rng),
+        )
+        .unwrap();
+
+        // Verify
+        let res = PC::check(
+            &vk,
+            &[test_commitment],
+            &evaluation_point,
+            vec![manual_eval],
+            &lc_opening_proof,
+            opening_challenge,
+            Some(rng),
+        )
+        .unwrap();
+
+        assert_eq!(true, res)
+    }
 
     #[test]
     fn test_aggregate_comm_with_rand() {
@@ -174,7 +305,8 @@ mod test {
         // Commit Phase
         let (commitments, rands) = PC::commit(&ck, &polynomials, Some(rng)).unwrap();
         let (test_commitment, test_rand) =
-            PC::get_commitments_lc_with_rands(&commitments, &rands, &linear_combination).unwrap();
+            PC::aggregate_commitments(&commitments, Some(rands.to_vec()), &linear_combination)
+                .unwrap();
 
         // Derive evaluation point and generate a query set
         let evaluation_point = Fr::rand(rng);
