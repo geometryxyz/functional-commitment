@@ -181,7 +181,7 @@ impl<F: PrimeField, VO: VirtualOracle<F>> PIOPforZeroOverK<F, VO> {
                 acc_poly + (r.polynomial() * c_power)
             });
 
-        let q_2 = LabeledPolynomial::new(String::from("q_2"), q_2, None, None);
+        let q_2 = LabeledPolynomial::new(String::from("q_2"), q_2, Some(2), None);
 
         let msg = ProverMsg::EmptyMessage;
 

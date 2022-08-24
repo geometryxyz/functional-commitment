@@ -89,7 +89,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, D: Digest> GeoSeqTest<F, PC
             &query_set,
             separation_challenge,
             &[f_rand.clone()],
-            None,
+            Some(rng),
         )
         .map_err(to_pc_error::<F, PC>)?;
 

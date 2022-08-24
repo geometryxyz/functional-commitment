@@ -11,7 +11,7 @@ mod test {
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
-    use homomorphic_poly_commit::kzg10::KZG10;
+    use homomorphic_poly_commit::marlin_kzg::KZG10;
 
     type F = Fr;
     type PC = KZG10<Bn254>;
