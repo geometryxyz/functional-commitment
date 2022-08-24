@@ -153,27 +153,30 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePo
             })
             .collect::<Result<BTreeMap<_, (_, _)>, Error>>()?;
 
-        // initial values for the aggregate commitment
+        // initial values
         let mut aggregate_commitment = Self::Commitment::empty();
-
-        // initial values for the randomness
         let mut aggregate_randomness = Self::Randomness::empty();
 
         for (coef, term) in lc.iter() {
-            if let LCTerm::PolyLabel(label) = term {
-                if let Some((comm, rand)) = label_comm_mapping.get(label) {
-                    aggregate_commitment += (*coef, &comm);
-                    aggregate_randomness += (*coef, rand);
-                } else {
-                    return Err(Error::MissingCommitment(format!(
-                        "Could not find object with label '{}' when computing '{}'",
-                        label,
-                        lc.label()
-                    )));
-                }
-            } else {
-                return Err(Error::ConstantTermInAggregation);
-            };
+            match term {
+                // No support for constant terms
+                LCTerm::One => return Err(Error::ConstantTermInAggregation),
+
+                // Find the corresponding commitment and randomness in our map; aggregate.
+                LCTerm::PolyLabel(label) => match label_comm_mapping.get(label) {
+                    Some((comm, rand)) => {
+                        aggregate_commitment += (*coef, &comm);
+                        aggregate_randomness += (*coef, rand);
+                    }
+                    None => {
+                        return Err(Error::MissingCommitment(format!(
+                            "Could not find object with label '{}' when computing '{}'",
+                            label,
+                            lc.label()
+                        )))
+                    }
+                },
+            }
         }
 
         Ok((

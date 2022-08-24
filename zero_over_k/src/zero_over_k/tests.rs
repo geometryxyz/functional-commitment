@@ -106,7 +106,9 @@ mod test {
             &vk,
         );
 
-        assert!(is_valid.is_ok());
+        is_valid.unwrap()
+
+        // assert!(is_valid.is_ok());
     }
 
     #[test]

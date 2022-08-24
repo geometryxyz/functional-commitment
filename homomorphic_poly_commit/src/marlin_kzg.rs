@@ -115,7 +115,6 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for MarlinKZG10<E, DenseP
                     )))?;
                 (current_pair.0.commitment().clone(), current_pair.1.clone())
             } else {
-                println!("I'm here");
                 (Self::Commitment::empty(), Self::Randomness::empty())
             };
             aggregate_commitment.comm += (*coef, &comm.comm);
@@ -157,64 +156,65 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for MarlinKZG10<E, DenseP
             })
             .collect::<Result<BTreeMap<_, (_, _)>, Error>>()?;
 
-        // initial values for the aggregate commitment
+        // initial values
         let mut aggregate_commitment = kzg10::Commitment::empty();
         let mut aggregate_shifted_commitment = kzg10::Commitment::empty();
-
-        // initial values for the randomness
         let mut aggregate_randomness = kzg10::Randomness::empty();
         let mut aggregate_shifted_randomness = kzg10::Randomness::empty();
 
         for (coef, term) in lc.iter() {
-            if let LCTerm::PolyLabel(label) = term {
-                if let Some((comm, rand)) = label_comm_mapping.get(label) {
-                    if degree_bound.is_some() {
-                        aggregate_shifted_commitment += (
-                            *coef,
-                            &comm
-                                .shifted_comm
-                                .expect("Degree bounded polynomial must have shifted commitment"),
-                        );
-                        aggregate_shifted_randomness += (
-                            *coef,
-                            &rand
-                                .shifted_rand
-                                .clone()
-                                .expect("Degree bounded polynomial must have shifted randomness"),
-                        );
-                    }
+            match term {
+                // No support for constant terms
+                LCTerm::One => return Err(Error::ConstantTermInAggregation),
 
-                    aggregate_commitment += (*coef, &comm.comm);
-                    aggregate_randomness += (*coef, &rand.rand);
-                } else {
-                    return Err(Error::MissingCommitment(format!(
-                        "Could not find object with label '{}' when computing '{}'",
-                        label,
-                        lc.label()
-                    )));
-                }
-            } else {
-                return Err(Error::ConstantTermInAggregation);
-            };
+                // Find the corresponding commitment and randomness in our map; aggregate.
+                LCTerm::PolyLabel(label) => match label_comm_mapping.get(label) {
+                    Some((comm, rand)) => {
+                        if degree_bound.is_some() {
+                            aggregate_shifted_commitment += (
+                                *coef,
+                                &comm.shifted_comm.expect(
+                                    "Degree bounded polynomial must have shifted commitment",
+                                ),
+                            );
+                            aggregate_shifted_randomness += (
+                                *coef,
+                                &rand.shifted_rand.clone().expect(
+                                    "Degree bounded polynomial must have shifted randomness",
+                                ),
+                            );
+                        }
+
+                        aggregate_commitment += (*coef, &comm.comm);
+                        aggregate_randomness += (*coef, &rand.rand);
+                    }
+                    None => {
+                        return Err(Error::MissingCommitment(format!(
+                            "Could not find object with label '{}' when computing '{}'",
+                            label,
+                            lc.label()
+                        )))
+                    }
+                },
+            }
         }
 
-        let (agg_comm, agg_rand) = if degree_bound.is_some() {
-            (
+        let (shifted_comm, shifted_rand) = match degree_bound.is_some() {
+            true => (
                 Some(aggregate_shifted_commitment),
                 Some(aggregate_shifted_randomness),
-            )
-        } else {
-            (None, None)
+            ),
+            false => (None, None)
         };
 
         let commitment = Self::Commitment {
             comm: aggregate_commitment,
-            shifted_comm: agg_comm,
+            shifted_comm,
         };
 
         let randomness = Self::Randomness {
             rand: aggregate_randomness,
-            shifted_rand: agg_rand,
+            shifted_rand,
         };
 
         Ok((
