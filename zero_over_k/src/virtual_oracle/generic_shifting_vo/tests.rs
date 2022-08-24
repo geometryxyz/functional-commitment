@@ -14,7 +14,7 @@ mod test {
     use ark_poly_commit::{evaluate_query_set, LabeledPolynomial, PolynomialCommitment};
     use ark_std::{rand::thread_rng, test_rng};
     use blake2::Blake2s;
-    use homomorphic_poly_commit::sonic_kzg::KZG10;
+    use homomorphic_poly_commit::marlin_kzg::KZG10;
 
     use super::super::{GenericShiftingVO, VOTerm};
 

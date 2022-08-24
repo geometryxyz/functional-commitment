@@ -131,10 +131,15 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for SonicKZG10<E, DensePo
     ) -> Result<(LabeledCommitment<Self::Commitment>, Self::Randomness), Error> {
         let degree_bound = commitments[0].degree_bound();
 
+        let randomness = randomness.map_or(
+            vec![Self::Randomness::empty(); commitments.len()],
+            |rands| rands,
+        );
+
         // create mapping of label -> commitment and fail if all degree bounds are not the same
         let label_comm_mapping = commitments
             .iter()
-            .zip(randomness.iter().flatten())
+            .zip(randomness.iter())
             .map(|(comm, rand)| {
                 if comm.degree_bound() != degree_bound {
                     // Can only accumulate commitments that have the same degree bound

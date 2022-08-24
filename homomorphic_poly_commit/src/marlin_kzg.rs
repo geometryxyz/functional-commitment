@@ -132,12 +132,22 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for MarlinKZG10<E, DenseP
         randomness: Option<Vec<Self::Randomness>>,
         lc: &LinearCombination<E::Fr>,
     ) -> Result<(LabeledCommitment<Self::Commitment>, Self::Randomness), Error> {
-        let degree_bound = commitments[0].degree_bound();
+        let randomness = randomness.map_or(
+            vec![
+                Self::Randomness {
+                    rand: kzg10::Randomness::empty(),
+                    shifted_rand: Some(kzg10::Randomness::empty())
+                };
+                commitments.len()
+            ],
+            |rands| rands,
+        );
 
+        let degree_bound = commitments[0].degree_bound();
         // create mapping of label -> commitment and fail if all degree bounds are not the same
         let label_comm_mapping = commitments
             .iter()
-            .zip(randomness.iter().flatten())
+            .zip(randomness.iter())
             .map(|(comm, rand)| {
                 if comm.degree_bound() != degree_bound {
                     // Can only accumulate commitments that have the same degree bound
@@ -180,7 +190,7 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for MarlinKZG10<E, DenseP
                             aggregate_shifted_randomness += (
                                 *coef,
                                 &rand.shifted_rand.clone().expect(
-                                    "Degree bounded polynomial must have shifted randomness",
+                                    "Degree bounded polynomial must have shifted commitment",
                                 ),
                             );
                         }
@@ -204,7 +214,7 @@ impl<E: PairingEngine> AdditivelyHomomorphicPCS<E::Fr> for MarlinKZG10<E, DenseP
                 Some(aggregate_shifted_commitment),
                 Some(aggregate_shifted_randomness),
             ),
-            false => (None, None)
+            false => (None, None),
         };
 
         let commitment = Self::Commitment {
