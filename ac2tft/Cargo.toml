@@ -20,6 +20,5 @@ ark-serialize = "0.3.0"
 digest = { version = "0.9" }
 
 [dev-dependencies]
-holographic-lincheck = { path = "../../holographic-lincheck", version = "0.1.0" }
 proof_of_function_relation = { path = "../proof_of_function_relation" }
 ark-marlin = "0.3.0"
