@@ -10,8 +10,8 @@ use ark_std::{
     io::{Read, Write},
 };
 
-use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use ::zero_over_k::zero_over_k::proof::Proof as ZeroOverKProof;
+use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 
 /* ************************************************************************* */
 /* ************************************************************************* */
@@ -36,18 +36,14 @@ pub struct IndexVerifierKey<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> {
     pub verifier_key: PC::VerifierKey,
 }
 
-impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> ark_ff::ToBytes
-    for IndexVerifierKey<F, PC>
-{
+impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> ark_ff::ToBytes for IndexVerifierKey<F, PC> {
     fn write<W: Write>(&self, mut w: W) -> ark_std::io::Result<()> {
         self.index_info.write(&mut w)?;
         self.index_comms.write(&mut w)
     }
 }
 
-impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> Clone
-    for IndexVerifierKey<F, PC>
-{
+impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> Clone for IndexVerifierKey<F, PC> {
     fn clone(&self) -> Self {
         Self {
             index_comms: self.index_comms.clone(),
@@ -101,7 +97,8 @@ pub struct IndexPrivateProverKey<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>>
     /// The index verifier key.
     pub index_private_vk: IndexPrivateVerifierKey<F, PC>,
     /// The index itself.
-    pub index: Index<F>, /// TODO: this should be changed to just PrivateIndex
+    pub index: Index<F>,
+    /// TODO: this should be changed to just PrivateIndex
     /// The committer key for this index, trimmed from the universal SRS.
     pub committer_key: PC::CommitterKey,
 }
@@ -151,7 +148,7 @@ pub struct IndexPrivateVerifierKey<F: PrimeField, PC: AdditivelyHomomorphicPCS<F
     // /// matrix c val commitment
     // pub c_val_commit: PC::Commitment,
     /// a(row, col, val), b(row, col, val), c(row, col, val),
-    
+
     /// commitments of (row, col, val) for each matrix
     pub polys: Vec<PC::Commitment>,
 
@@ -163,9 +160,7 @@ pub struct IndexPrivateVerifierKey<F: PrimeField, PC: AdditivelyHomomorphicPCS<F
     pub index_info: IndexInfo<F>,
 }
 
-impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> Clone
-    for IndexPrivateVerifierKey<F, PC>
-{
+impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> Clone for IndexPrivateVerifierKey<F, PC> {
     fn clone(&self) -> Self {
         Self {
             polys: self.polys.clone(),
@@ -207,7 +202,6 @@ pub struct Proof<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> {
     /// An evaluation proof from the polynomial commitment.
     pub pc_proof: BatchLCProof<F, DensePolynomial<F>, PC>,
 }
-
 
 impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> Proof<F, PC> {
     /// Construct a new proof.
@@ -299,7 +293,7 @@ pub struct IndexPrivateProof<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> {
     /// An evaluation proof from the polynomial commitment.
     pub pc_proof: BatchLCProof<F, DensePolynomial<F>, PC>,
 
-    pub rational_sumcheck_zero_over_k_proof: ZeroOverKProof<F, PC>
+    pub rational_sumcheck_zero_over_k_proof: ZeroOverKProof<F, PC>,
 }
 
 impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> IndexPrivateProof<F, PC> {
@@ -309,15 +303,14 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> IndexPrivateProof<F, PC> {
         evaluations: Vec<F>,
         prover_messages: Vec<ProverMsg<F>>,
         pc_proof: BatchLCProof<F, DensePolynomial<F>, PC>,
-        rational_sumcheck_zero_over_k_proof: ZeroOverKProof<F, PC>
+        rational_sumcheck_zero_over_k_proof: ZeroOverKProof<F, PC>,
     ) -> Self {
         Self {
             commitments,
             evaluations,
             prover_messages,
             pc_proof,
-            rational_sumcheck_zero_over_k_proof
+            rational_sumcheck_zero_over_k_proof,
         }
     }
 }
-

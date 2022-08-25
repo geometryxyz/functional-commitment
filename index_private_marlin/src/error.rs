@@ -12,7 +12,7 @@ pub enum Error<E> {
     PolynomialCommitmentError(E),
 
     /// ZeroOverKError
-    ZeroOverKError(ZeroOverKError)
+    ZeroOverKError(ZeroOverKError),
 }
 
 impl<E> From<AHPError> for Error<E> {

@@ -20,7 +20,7 @@ extern crate ark_std;
 
 use core::iter;
 
-use ark_ff::{to_bytes, PrimeField, UniformRand, One};
+use ark_ff::{to_bytes, One, PrimeField, UniformRand};
 use ark_poly::UVPolynomial;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::{Evaluations, LabeledPolynomial, PCRandomness};
@@ -29,9 +29,13 @@ use ark_relations::r1cs::ConstraintSynthesizer;
 use ark_std::rand::RngCore;
 // use crate::virtual_oracle::rational_sumcheck_vo::RationalSumcheckVO;
 // use crate::virtual_oracle::{AddVO, rational_sumcheck_vo};
-use ::zero_over_k::{zero_over_k::ZeroOverK, virtual_oracle::{generic_shifting_vo::{GenericShiftingVO, vo_term::VOTerm}}, vo_constant};
+use ::zero_over_k::{
+    virtual_oracle::generic_shifting_vo::{vo_term::VOTerm, GenericShiftingVO},
+    vo_constant,
+    zero_over_k::ZeroOverK,
+};
+use fiat_shamir_rng::{FiatShamirRng, SimpleHashFiatShamirRng};
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
-use fiat_shamir_rng::{SimpleHashFiatShamirRng, FiatShamirRng};
 
 use ark_std::{
     collections::BTreeMap,
@@ -76,9 +80,7 @@ pub struct Marlin<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamir
     #[doc(hidden)] PhantomData<FS>,
 );
 
-impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
-    Marlin<F, PC, FS>
-{
+impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F, PC, FS> {
     /// The personalization string for this protocol. Used to personalize the
     /// Fiat-Shamir rng.
     pub const PROTOCOL_NAME: &'static [u8] = b"MARLIN-2019";
@@ -161,7 +163,8 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
     pub fn index_for_index_private<C: ConstraintSynthesizer<F>>(
         srs: &UniversalSRS<F, PC>,
         c: C,
-    ) -> Result<(IndexPrivateProverKey<F, PC>, IndexPrivateVerifierKey<F, PC>), Error<PC::Error>> {
+    ) -> Result<(IndexPrivateProverKey<F, PC>, IndexPrivateVerifierKey<F, PC>), Error<PC::Error>>
+    {
         let index_time = start_timer!(|| "Marlin::Index");
 
         // TODO: Add check that c is in the correct mode.
@@ -172,6 +175,11 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
         }
 
         let coeff_support = AHPForR1CS::get_degree_bounds(&index.index_info);
+        let mut coeff_support = coeff_support.as_slice().to_vec();
+        coeff_support.push(2);
+        // coeff_support.extend()
+        // let coeff_support = coeff_support.to_vec().push(2); // degree for masking polys
+        // println!("{:?}", coeff_support)
         // Marlin only needs degree 2 random polynomials
         let supported_hiding_bound = 1;
         let (committer_key, verifier_key) = PC::trim(
@@ -183,8 +191,8 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
         .map_err(Error::from_pc_err)?;
 
         let (individual_matrix_poly_commits, _): (_, _) =
-        PC::commit(&committer_key, index.iter_individual_matrices(), None)
-            .map_err(Error::from_pc_err)?;
+            PC::commit(&committer_key, index.iter_individual_matrices(), None)
+                .map_err(Error::from_pc_err)?;
 
         let individual_matrix_poly_commits = individual_matrix_poly_commits
             .iter()
@@ -383,7 +391,12 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
         let prover_init_state = AHPForR1CS::prover_init(&index_pk.index, c)?;
         let public_input = prover_init_state.public_input();
         let mut fs_rng = FS::initialize(
-            &to_bytes![&Self::PROTOCOL_NAME, &index_pk.index_private_vk, &public_input].unwrap(),
+            &to_bytes![
+                &Self::PROTOCOL_NAME,
+                &index_pk.index_private_vk,
+                &public_input
+            ]
+            .unwrap(),
         );
 
         // --------------------------------------------------------------------
@@ -531,40 +544,48 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
             index_pk.index.a_arith.row.clone(),
             index_pk.index.a_arith.col.clone(),
             index_pk.index.a_arith.val.clone(),
-
             index_pk.index.b_arith.row.clone(),
             index_pk.index.b_arith.col.clone(),
             index_pk.index.b_arith.val.clone(),
-
             index_pk.index.c_arith.row.clone(),
             index_pk.index.c_arith.col.clone(),
             index_pk.index.c_arith.val.clone(),
-            prover_third_oracles.f.clone() // f
+            prover_third_oracles.f.clone(), // f
         ];
 
         let rational_sumcheck_vo = GenericShiftingVO::new(
             &vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
             &vec![F::one(); 10],
-            rational_sumcheck_oracle!(verifier_first_msg, verifier_second_msg, domain_k)
+            rational_sumcheck_oracle!(verifier_first_msg, verifier_second_msg, domain_k),
         )?;
 
-        let labels = vec!["a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val"];
-        let mut rational_sumcheck_commitments = index_pk.index_private_vk.polys.iter().zip(labels.iter())
-            .map(|(commitment, &label)| 
+        let labels = vec![
+            "a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val",
+        ];
+        let mut rational_sumcheck_commitments = index_pk
+            .index_private_vk
+            .polys
+            .iter()
+            .zip(labels.iter())
+            .map(|(commitment, &label)| {
                 LabeledCommitment::new(label.into(), commitment.clone(), None)
-        ).collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
 
-        rational_sumcheck_commitments.push(LabeledCommitment::new("f".into(), third_comms[0].commitment().clone(), None));
+        rational_sumcheck_commitments.push(LabeledCommitment::new(
+            "f".into(),
+            third_comms[0].commitment().clone(),
+            None,
+        ));
 
         let empty_rands = vec![PC::Randomness::empty(); concrete_oracles.len()];
-            
+
         let rational_sumcheck_proof = ZeroOverK::<F, PC, FS>::prove(
             &concrete_oracles,
             &rational_sumcheck_commitments,
             empty_rands.as_slice(),
             None,
             &rational_sumcheck_vo,
-            &vec![F::one(); concrete_oracles.len()],
             &domain_k,
             &index_pk.committer_key,
             zk_rng,
@@ -585,7 +606,13 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
         // Gather prover messages together.
         let prover_messages = vec![prover_first_msg, prover_second_msg, prover_third_msg];
 
-        let proof = IndexPrivateProof::new(commitments, evaluations, prover_messages, pc_proof, rational_sumcheck_proof);
+        let proof = IndexPrivateProof::new(
+            commitments,
+            evaluations,
+            prover_messages,
+            pc_proof,
+            rational_sumcheck_proof,
+        );
         // proof.print_size_info();
         end_timer!(prover_time);
         Ok(proof)
@@ -596,7 +623,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
     pub fn verify<R: RngCore>(
         index_vk: &IndexVerifierKey<F, PC>,
         public_input: &[F],
-        proof: Proof<F, PC>,
+        proof: &Proof<F, PC>,
         rng: &mut R,
     ) -> Result<bool, Error<PC::Error>> {
         let verifier_time = start_timer!(|| "Marlin::Verify");
@@ -718,7 +745,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
     pub fn verify_index_private<R: RngCore>(
         index_vk: &IndexPrivateVerifierKey<F, PC>,
         public_input: &[F],
-        proof: &IndexPrivateProof<F, PC>,
+        proof: IndexPrivateProof<F, PC>,
         rng: &mut R,
     ) -> Result<bool, Error<PC::Error>> {
         let verifier_time = start_timer!(|| "Marlin::Verify");
@@ -753,7 +780,8 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
         let second_comms = &proof.commitments[1];
         fs_rng.absorb(&to_bytes![second_comms, proof.prover_messages[1]].unwrap());
 
-        let (verifier_second_msg, verifier_state) = AHPForR1CS::verifier_second_round(verifier_state, &mut fs_rng);
+        let (verifier_second_msg, verifier_state) =
+            AHPForR1CS::verifier_second_round(verifier_state, &mut fs_rng);
         // --------------------------------------------------------------------
 
         // --------------------------------------------------------------------
@@ -836,25 +864,33 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
         let rational_sumcheck_vo = GenericShiftingVO::new(
             &vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
             &vec![F::one(); 10],
-            rational_sumcheck_oracle!(verifier_first_msg, verifier_second_msg, domain_k)
+            rational_sumcheck_oracle!(verifier_first_msg, verifier_second_msg, domain_k),
         )?;
 
-        let labels = vec!["a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val"];
-        let mut rational_sumcheck_commitments = index_vk.polys.iter()
+        let labels = vec![
+            "a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val",
+        ];
+        let mut rational_sumcheck_commitments = index_vk
+            .polys
+            .iter()
             .zip(labels.iter())
-            .map(|(commitment, &label)| 
+            .map(|(commitment, &label)| {
                 LabeledCommitment::new(label.into(), commitment.clone(), None)
-        ).collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
 
-        rational_sumcheck_commitments.push(LabeledCommitment::new("f".into(), third_comms[0].clone(), None)); // TODO f should also be bounded with |K| -1
+        rational_sumcheck_commitments.push(LabeledCommitment::new(
+            "f".into(),
+            third_comms[0].clone(),
+            None,
+        )); // TODO f should also be bounded with |K| -1
 
         let is_valid = ZeroOverK::<F, PC, FS>::verify(
-            proof.clone().rational_sumcheck_zero_over_k_proof,
+            proof.rational_sumcheck_zero_over_k_proof,
             &rational_sumcheck_commitments,
             None,
             &rational_sumcheck_vo,
             &domain_k,
-            &vec![F::one(); 10],
             &index_vk.verifier_key,
         );
         println!("{:?}", is_valid);
@@ -895,9 +931,12 @@ macro_rules! rational_sumcheck_oracle {
             let vh_beta = $domain_k.evaluate_vanishing_polynomial($verifier_second_msg.beta);
             let v_H_alpha_v_H_beta = vh_alpha * vh_beta;
 
-            let eta_a_times_v_H_alpha_v_H_beta = vo_constant!($verifier_first_msg.eta_a * v_H_alpha_v_H_beta);
-            let eta_b_times_v_H_alpha_v_H_beta = vo_constant!($verifier_first_msg.eta_b * v_H_alpha_v_H_beta);
-            let eta_c_times_v_H_alpha_v_H_beta = vo_constant!($verifier_first_msg.eta_c * v_H_alpha_v_H_beta);
+            let eta_a_times_v_H_alpha_v_H_beta =
+                vo_constant!($verifier_first_msg.eta_a * v_H_alpha_v_H_beta);
+            let eta_b_times_v_H_alpha_v_H_beta =
+                vo_constant!($verifier_first_msg.eta_b * v_H_alpha_v_H_beta);
+            let eta_c_times_v_H_alpha_v_H_beta =
+                vo_constant!($verifier_first_msg.eta_c * v_H_alpha_v_H_beta);
 
             let alpha_beta = alpha.clone() * beta.clone();
 
@@ -914,9 +953,14 @@ macro_rules! rational_sumcheck_oracle {
             let f = terms[10].clone();
 
             // begin logic
-            let a_denom = alpha_beta.clone() - beta.clone()*a_col.clone() - alpha.clone()*a_row.clone() + a_col.clone()*a_row.clone();
-            let b_denom = alpha_beta.clone() - beta.clone()*b_col.clone() - alpha.clone()*b_row.clone() + b_col.clone()*b_row.clone();
-            let c_denom = alpha_beta - beta.clone()*c_col.clone() - alpha.clone()*c_row.clone() + c_col.clone()*c_row.clone();
+            let a_denom =
+                alpha_beta.clone() - beta.clone() * a_col.clone() - alpha.clone() * a_row.clone()
+                    + a_col.clone() * a_row.clone();
+            let b_denom =
+                alpha_beta.clone() - beta.clone() * b_col.clone() - alpha.clone() * b_row.clone()
+                    + b_col.clone() * b_row.clone();
+            let c_denom = alpha_beta - beta.clone() * c_col.clone() - alpha.clone() * c_row.clone()
+                + c_col.clone() * c_row.clone();
 
             let b_poly = a_denom.clone() * b_denom.clone() * c_denom.clone();
 

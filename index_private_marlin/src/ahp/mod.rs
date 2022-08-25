@@ -65,9 +65,9 @@ impl<F: PrimeField> AHPForR1CS<F> {
             .map(|s| s.to_string())
     }
 
-
     pub(crate) fn index_private_polynomial_labels() -> impl Iterator<Item = String> {
-            Self::INDEX_PRIVATE_PROVER_POLYNOMIALS.iter()
+        Self::INDEX_PRIVATE_PROVER_POLYNOMIALS
+            .iter()
             .map(|s| s.to_string())
     }
 
@@ -110,7 +110,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
             domain_h_size,
             domain_h_size,
             domain_k_size - 1,
-            8*domain_k_size // to commit to quotient of rational zeroover k sumcheck
+            8 * domain_k_size, // to commit to quotient of rational zeroover k sumcheck
         ]
         .iter()
         .max()
@@ -332,7 +332,6 @@ impl<F: PrimeField> AHPForR1CS<F> {
             vec![
                 (F::one(), "inner_mask_poly".into()),
                 (F::one(), "f".into()),
-
                 (-gamma * g_2_at_gamma, LCTerm::One),
                 (-(t_at_beta / k_size), LCTerm::One),
             ],

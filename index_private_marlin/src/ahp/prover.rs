@@ -196,7 +196,14 @@ pub struct ProverIndexPrivateFirstOracles<F: Field> {
 impl<F: Field> ProverIndexPrivateFirstOracles<F> {
     /// Iterate over the polynomials output by the prover in the index private first round.
     pub fn iter(&self) -> impl Iterator<Item = &LabeledPolynomial<F>> {
-        vec![&self.w, &self.z_a, &self.z_b, &self.mask_poly, &self.inner_mask_poly].into_iter()
+        vec![
+            &self.w,
+            &self.z_a,
+            &self.z_b,
+            &self.mask_poly,
+            &self.inner_mask_poly,
+        ]
+        .into_iter()
     }
 }
 
@@ -449,10 +456,17 @@ impl<F: PrimeField> AHPForR1CS<F> {
     pub fn prover_index_private_first_round<'a, R: RngCore>(
         mut state: ProverState<'a, F>,
         rng: &mut R,
-    ) -> Result<(ProverMsg<F>, ProverIndexPrivateFirstOracles<F>, ProverState<'a, F>), Error> {
+    ) -> Result<
+        (
+            ProverMsg<F>,
+            ProverIndexPrivateFirstOracles<F>,
+            ProverState<'a, F>,
+        ),
+        Error,
+    > {
         let round_time = start_timer!(|| "AHP::Prover::FirstRound");
         let domain_h = state.domain_h;
-        let domain_k =  state.domain_k;
+        let domain_k = state.domain_k;
         let zk_bound = state.zk_bound;
 
         let v_H = domain_h.vanishing_polynomial().into();
@@ -514,10 +528,14 @@ impl<F: PrimeField> AHPForR1CS<F> {
         mask_poly[0] -= &scaled_sigma_1;
         end_timer!(mask_poly_time);
 
-        let innter_mask_poly_time = start_timer!(|| "Computing mask polynomial for inner zk sumcheck");
+        let innter_mask_poly_time =
+            start_timer!(|| "Computing mask polynomial for inner zk sumcheck");
         let inner_mask_poly_degree = domain_k.size() - 1;
         let mut inner_mask_poly = DensePolynomial::rand(inner_mask_poly_degree, rng);
-        let scaled_sigma_inner = (inner_mask_poly.divide_by_vanishing_poly(domain_k).unwrap().1)[0];
+        let scaled_sigma_inner = (inner_mask_poly
+            .divide_by_vanishing_poly(domain_k)
+            .unwrap()
+            .1)[0];
         inner_mask_poly[0] -= &scaled_sigma_inner;
         end_timer!(innter_mask_poly_time);
 
@@ -533,15 +551,15 @@ impl<F: PrimeField> AHPForR1CS<F> {
         let z_b = LabeledPolynomial::new("z_b".to_string(), z_b_poly, None, Some(1));
         let mask_poly =
             LabeledPolynomial::new("mask_poly".to_string(), mask_poly.clone(), None, None);
-        let inner_mask_poly = LabeledPolynomial::new("inner_mask_poly".to_string(), inner_mask_poly, None, None);
-        
+        let inner_mask_poly =
+            LabeledPolynomial::new("inner_mask_poly".to_string(), inner_mask_poly, None, None);
 
         let oracles = ProverIndexPrivateFirstOracles {
             w: w.clone(),
             z_a: z_a.clone(),
             z_b: z_b.clone(),
             mask_poly: mask_poly.clone(),
-            inner_mask_poly: inner_mask_poly.clone()
+            inner_mask_poly: inner_mask_poly.clone(),
         };
 
         state.w_poly = Some(w);
@@ -841,7 +859,8 @@ impl<F: PrimeField> AHPForR1CS<F> {
         let h_2_poly_time = start_timer!(|| "Computing sumcheck h poly");
         let h_2 = (&a_poly - &(&b_poly * &f))
             .divide_by_vanishing_poly(domain_k)
-            .unwrap().0;
+            .unwrap()
+            .0;
 
         end_timer!(h_2_poly_time);
         drop(a_poly);
@@ -898,7 +917,8 @@ impl<F: PrimeField> AHPForR1CS<F> {
     }
 
     /// third round that is used for index private version
-    pub fn prover_index_private_third_round<'a, R: RngCore>( // PC: HomomorphicPolynomialCommitment<F>, FS: FiatShamirRng>
+    pub fn prover_index_private_third_round<'a, R: RngCore>(
+        // PC: HomomorphicPolynomialCommitment<F>, FS: FiatShamirRng>
         ver_message: &VerifierSecondMsg<F>,
         prover_state: ProverState<'a, F>,
         r: &mut R,
@@ -984,7 +1004,6 @@ impl<F: PrimeField> AHPForR1CS<F> {
 
         // sanity check
         assert_eq!(reminder, DensePolynomial::zero());
-
 
         let zk_f_poly = f_poly.clone() + inner_mask_poly.polynomial().clone();
         let g_2 = DensePolynomial::from_coefficients_slice(&zk_f_poly.coeffs[1..]);
