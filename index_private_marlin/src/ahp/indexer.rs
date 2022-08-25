@@ -138,6 +138,48 @@ pub struct Index<F: PrimeField> {
     pub(crate) c_arith: IndividualMatrixArithmetization<F>,
 }
 
+#[derive(Derivative)]
+#[derivative(Clone(bound = "F: PrimeField"))]
+/// The index-private version of the constraint system.
+/// TODO: rename it
+#[derive(CanonicalSerialize, CanonicalDeserialize)]
+pub struct IndexPrivateIndex<F: PrimeField> {
+    /// Information about the index.
+    pub index_info: IndexInfo<F>,
+
+    /// The A matrix arithmetization
+    pub a_arith: IndividualMatrixArithmetization<F>,
+
+    /// The B matrix arithmetization
+    pub b_arith: IndividualMatrixArithmetization<F>,
+
+    /// The C matrix arithmetization
+    pub c_arith: IndividualMatrixArithmetization<F>,
+}
+
+impl<F: PrimeField> IndexPrivateIndex<F> {
+    /// The maximum degree required to represent polynomials of this index.
+    pub fn max_degree(&self) -> usize {
+        self.index_info.max_degree()
+    }
+
+    /// Iterate individual matrix polys
+    pub fn iter_individual_matrices(&self) -> impl Iterator<Item = &LabeledPolynomial<F>> {
+        ark_std::vec![
+            &self.a_arith.row,
+            &self.a_arith.col,
+            &self.a_arith.val,
+            &self.b_arith.row,
+            &self.b_arith.col,
+            &self.b_arith.val,
+            &self.c_arith.row,
+            &self.c_arith.col,
+            &self.c_arith.val,
+        ]
+        .into_iter()
+    }
+}
+
 impl<F: PrimeField> Index<F> {
     /// The maximum degree required to represent polynomials of this index.
     pub fn max_degree(&self) -> usize {
@@ -271,6 +313,57 @@ impl<F: PrimeField> AHPForR1CS<F> {
             a_arith,
             b_arith,
             c_arith,
+        })
+    }
+
+    /// Produce an index for the provided functional triple
+    pub fn index_from_functional_triple(
+        matrix_a: Matrix<F>,
+        matrix_b: Matrix<F>,
+        matrix_c: Matrix<F>,
+        num_formatted_input_variables: usize,
+    ) -> Result<IndexPrivateIndex<F>, Error> {
+        assert_eq!(matrix_a.len(), matrix_b.len());
+        assert_eq!(matrix_b.len(), matrix_c.len());
+
+        let joint_matrix = sum_matrices(&matrix_a, &matrix_b, &matrix_c);
+        let num_non_zero = num_non_zero(&joint_matrix);
+        let num_constraints = matrix_a.len();
+
+        if !Self::num_formatted_public_inputs_is_admissible(num_formatted_input_variables) {
+            return Err(Error::InvalidPublicInputLength);
+        }
+
+        let index_info = IndexInfo {
+            num_variables: num_formatted_input_variables,
+            num_constraints,
+            num_non_zero,
+            num_instance_variables: num_formatted_input_variables,
+
+            f: PhantomData,
+        };
+
+        let domain_h = GeneralEvaluationDomain::<F>::new(num_constraints)
+            .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
+        let domain_k = GeneralEvaluationDomain::<F>::new(num_non_zero)
+            .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
+        let x_domain = GeneralEvaluationDomain::<F>::new(num_formatted_input_variables)
+            .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
+
+        let a_arith: IndividualMatrixArithmetization<F> =
+            arithmetize_individual_matrix(&matrix_a, domain_k, domain_h, x_domain, "a");
+
+        let b_arith: IndividualMatrixArithmetization<F> =
+            arithmetize_individual_matrix(&matrix_b, domain_k, domain_h, x_domain, "b");
+
+        let c_arith: IndividualMatrixArithmetization<F> =
+            arithmetize_individual_matrix(&matrix_c, domain_k, domain_h, x_domain, "c");
+
+        Ok(IndexPrivateIndex {
+            a_arith,
+            b_arith,
+            c_arith,
+            index_info,
         })
     }
 }

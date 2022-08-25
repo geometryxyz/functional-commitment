@@ -1,4 +1,5 @@
 pub mod example_circuits;
+pub use example_circuits::{sample_gates_0, sample_matrices};
 
 mod tests;
 mod error;

@@ -126,27 +126,27 @@ pub struct MatrixArithmetization<F: PrimeField> {
 /// over the same domain.
 #[derive(Derivative, CanonicalSerialize, CanonicalDeserialize)]
 #[derivative(Debug(bound = "F: PrimeField"), Clone(bound = "F: PrimeField"))]
-pub(crate) struct IndividualMatrixEvals<F: PrimeField> {
+pub struct IndividualMatrixEvals<F: PrimeField> {
     /// Evaluations of the `row` polynomial.
-    pub(crate) row: EvaluationsOnDomain<F>,
+    pub row: EvaluationsOnDomain<F>,
     /// Evaluations of the `col` polynomial.
-    pub(crate) col: EvaluationsOnDomain<F>,
+    pub col: EvaluationsOnDomain<F>,
     /// Evaluations of the `val_a` polynomial.
-    pub(crate) val: EvaluationsOnDomain<F>,
+    pub val: EvaluationsOnDomain<F>,
 }
 
 #[derive(Derivative, CanonicalSerialize, CanonicalDeserialize)]
 #[derivative(Debug(bound = "F: PrimeField"), Clone(bound = "F: PrimeField"))]
-pub(crate) struct IndividualMatrixArithmetization<F: PrimeField> {
+pub struct IndividualMatrixArithmetization<F: PrimeField> {
     /// LDE of the row indices of M^*.
-    pub(crate) row: LabeledPolynomial<F>,
+    pub row: LabeledPolynomial<F>,
     /// LDE of the column indices of M^*.
-    pub(crate) col: LabeledPolynomial<F>,
+    pub col: LabeledPolynomial<F>,
     /// LDE of the non-zero entries of A^*.
-    pub(crate) val: LabeledPolynomial<F>,
+    pub val: LabeledPolynomial<F>,
 
     /// Evaluation of `self.row`, `self.col`, and `self.val` on the domain `K`.
-    pub(crate) evals_on_K: IndividualMatrixEvals<F>,
+    pub evals_on_K: IndividualMatrixEvals<F>,
 }
 
 pub(crate) fn arithmetize_individual_matrix<F: PrimeField>(
