@@ -115,7 +115,7 @@ impl<F: Field> ConstraintSynthesizer<F> for OutlineTestCircuit<F> {
 
 mod marlin {
     use super::*;
-    use crate::{Marlin, SimpleHashFiatShamirRng};
+    use crate::Marlin;
 
     use ark_bls12_381::{Bls12_381, Fr};
     use ark_ff::UniformRand;
@@ -123,6 +123,7 @@ mod marlin {
     use ark_poly_commit::marlin_pc::MarlinKZG10;
     use ark_std::ops::MulAssign;
     use blake2::Blake2s;
+    use fiat_shamir_rng::SimpleHashFiatShamirRng;
     use rand_chacha::ChaChaRng;
 
     type MultiPC = MarlinKZG10<Bls12_381, DensePolynomial<Fr>>;

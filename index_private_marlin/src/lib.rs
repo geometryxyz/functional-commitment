@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(non_snake_case)]
 //! A crate for the Marlin preprocessing zkSNARK for R1CS.
 //!
 //! # Note
@@ -18,23 +19,18 @@
 #[macro_use]
 extern crate ark_std;
 
-use core::iter;
-
-use ark_ff::{to_bytes, One, PrimeField, UniformRand};
-use ark_poly::UVPolynomial;
-use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
-use ark_poly_commit::{Evaluations, LabeledPolynomial, PCRandomness};
-use ark_poly_commit::{LabeledCommitment, PCUniversalParams, PolynomialCommitment};
-use ark_relations::r1cs::ConstraintSynthesizer;
-use ark_std::rand::RngCore;
-// use crate::virtual_oracle::rational_sumcheck_vo::RationalSumcheckVO;
-// use crate::virtual_oracle::{AddVO, rational_sumcheck_vo};
 use ::zero_over_k::{
     virtual_oracle::generic_shifting_vo::{vo_term::VOTerm, GenericShiftingVO},
     vo_constant,
     zero_over_k::ZeroOverK,
 };
-use fiat_shamir_rng::{FiatShamirRng, SimpleHashFiatShamirRng};
+use ark_ff::{to_bytes, PrimeField, UniformRand};
+use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
+use ark_poly_commit::{Evaluations, PCRandomness};
+use ark_poly_commit::{LabeledCommitment, PCUniversalParams};
+use ark_relations::r1cs::ConstraintSynthesizer;
+use ark_std::rand::RngCore;
+use fiat_shamir_rng::FiatShamirRng;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 
 use ark_std::{
@@ -52,11 +48,6 @@ macro_rules! eprintln {
     ($($arg: tt)*) => {};
 }
 
-// /// Implements a Fiat-Shamir based Rng that allows one to incrementally update
-// /// the seed based on new messages in the proof transcript.
-// use rng::FiatShamirRng;
-// pub use rng::SimpleHashFiatShamirRng;
-
 mod error;
 pub use error::*;
 
@@ -67,8 +58,6 @@ pub use data_structures::*;
 pub mod ahp;
 pub use ahp::AHPForR1CS;
 use ahp::EvaluationsProvider;
-
-// mod rational_sumcheck_vo;
 
 #[cfg(test)]
 mod test;
@@ -446,11 +435,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         // --------------------------------------------------------------------
         // Third round
         let (prover_third_msg, prover_third_oracles) =
-            AHPForR1CS::prover_index_private_third_round(
-                &verifier_second_msg,
-                prover_state,
-                zk_rng,
-            )?;
+            AHPForR1CS::prover_index_private_third_round(&verifier_second_msg, prover_state)?;
 
         let third_round_comm_time = start_timer!(|| "Committing to third round polys");
         let (third_comms, third_comm_rands) = PC::commit(

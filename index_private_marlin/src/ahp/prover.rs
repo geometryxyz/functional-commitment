@@ -917,11 +917,10 @@ impl<F: PrimeField> AHPForR1CS<F> {
     }
 
     /// third round that is used for index private version
-    pub fn prover_index_private_third_round<'a, R: RngCore>(
+    pub fn prover_index_private_third_round<'a>(
         // PC: HomomorphicPolynomialCommitment<F>, FS: FiatShamirRng>
         ver_message: &VerifierSecondMsg<F>,
         prover_state: ProverState<'a, F>,
-        r: &mut R,
     ) -> Result<(ProverMsg<F>, ProverIndexPrivateThirdOracles<F>), Error> {
         let ProverState {
             index,
