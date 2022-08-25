@@ -7,8 +7,8 @@ mod test {
     use ark_poly_commit::PolynomialCommitment;
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
-    use homomorphic_poly_commit::marlin_kzg::KZG10;
     use fiat_shamir_rng::SimpleHashFiatShamirRng;
+    use homomorphic_poly_commit::marlin_kzg::KZG10;
     use rand_chacha::ChaChaRng;
 
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;

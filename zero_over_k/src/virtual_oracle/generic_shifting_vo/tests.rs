@@ -265,7 +265,6 @@ mod test {
             &rands,
             Some(enforced_degree_bound),
             &inverse_check_oracle,
-            &alphas,
             &domain_k,
             &ck,
             rng,
@@ -278,7 +277,6 @@ mod test {
             Some(enforced_degree_bound),
             &inverse_check_oracle,
             &domain_k,
-            &alphas,
             &vk,
         );
 

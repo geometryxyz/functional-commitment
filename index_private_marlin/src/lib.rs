@@ -546,7 +546,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
             &vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
             &vec![F::one(); 10],
             rational_sumcheck_oracle!(verifier_first_msg, verifier_second_msg, domain_k)
-        );
+        )?;
 
         let labels = vec!["a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val"];
         let mut rational_sumcheck_commitments = index_pk.index_private_vk.polys.iter().zip(labels.iter())
@@ -562,6 +562,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
             &concrete_oracles,
             &rational_sumcheck_commitments,
             empty_rands.as_slice(),
+            None,
             &rational_sumcheck_vo,
             &vec![F::one(); concrete_oracles.len()],
             &domain_k,
@@ -595,7 +596,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
     pub fn verify<R: RngCore>(
         index_vk: &IndexVerifierKey<F, PC>,
         public_input: &[F],
-        proof: &Proof<F, PC>,
+        proof: Proof<F, PC>,
         rng: &mut R,
     ) -> Result<bool, Error<PC::Error>> {
         let verifier_time = start_timer!(|| "Marlin::Verify");
@@ -836,7 +837,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
             &vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
             &vec![F::one(); 10],
             rational_sumcheck_oracle!(verifier_first_msg, verifier_second_msg, domain_k)
-        );
+        )?;
 
         let labels = vec!["a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val"];
         let mut rational_sumcheck_commitments = index_vk.polys.iter()
@@ -848,15 +849,14 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
         rational_sumcheck_commitments.push(LabeledCommitment::new("f".into(), third_comms[0].clone(), None)); // TODO f should also be bounded with |K| -1
 
         let is_valid = ZeroOverK::<F, PC, FS>::verify(
-            &proof.rational_sumcheck_zero_over_k_proof,
+            proof.clone().rational_sumcheck_zero_over_k_proof,
             &rational_sumcheck_commitments,
+            None,
             &rational_sumcheck_vo,
             &domain_k,
             &vec![F::one(); 10],
             &index_vk.verifier_key,
-            rng
         );
-
         println!("{:?}", is_valid);
 
         if !evaluations_are_correct {
@@ -893,41 +893,41 @@ macro_rules! rational_sumcheck_oracle {
 
             let vh_alpha = $domain_k.evaluate_vanishing_polynomial($verifier_first_msg.alpha);
             let vh_beta = $domain_k.evaluate_vanishing_polynomial($verifier_second_msg.beta);
-            let v_H_alpha_v_H_beta = vo_constant!(vh_alpha * vh_beta);
+            let v_H_alpha_v_H_beta = vh_alpha * vh_beta;
 
-            let eta_a_times_v_H_alpha_v_H_beta = vo_constant!($verifier_first_msg.eta_a) * v_H_alpha_v_H_beta;
-            let eta_b_times_v_H_alpha_v_H_beta = vo_constant!($verifier_first_msg.eta_b) * v_H_alpha_v_H_beta;
-            let eta_c_times_v_H_alpha_v_H_beta = vo_constant!($verifier_first_msg.eta_c) * v_H_alpha_v_H_beta;
+            let eta_a_times_v_H_alpha_v_H_beta = vo_constant!($verifier_first_msg.eta_a * v_H_alpha_v_H_beta);
+            let eta_b_times_v_H_alpha_v_H_beta = vo_constant!($verifier_first_msg.eta_b * v_H_alpha_v_H_beta);
+            let eta_c_times_v_H_alpha_v_H_beta = vo_constant!($verifier_first_msg.eta_c * v_H_alpha_v_H_beta);
 
-            let alpha_beta = alpha * beta;
+            let alpha_beta = alpha.clone() * beta.clone();
 
             // define terms
-            let a_row = terms[1];
-            let a_col = terms[2];
-            let a_val = terms[3];
-            let b_row = terms[4];
-            let b_col = terms[5];
-            let b_val = terms[6];
-            let c_row = terms[7];
-            let c_col = terms[8];
-            let c_val = terms[9];
-            let f = terms[10];
+            let a_row = terms[1].clone();
+            let a_col = terms[2].clone();
+            let a_val = terms[3].clone();
+            let b_row = terms[4].clone();
+            let b_col = terms[5].clone();
+            let b_val = terms[6].clone();
+            let c_row = terms[7].clone();
+            let c_col = terms[8].clone();
+            let c_val = terms[9].clone();
+            let f = terms[10].clone();
 
             // begin logic
-            let a_denom = alpha_beta - beta*a_col - alpha*a_row + a_col*a_row;
-            let b_denom = alpha_beta - beta*b_col - alpha*b_row + b_col*b_row;
-            let c_denom = alpha_beta - beta*c_col - alpha*c_row + c_col*c_row;
+            let a_denom = alpha_beta.clone() - beta.clone()*a_col.clone() - alpha.clone()*a_row.clone() + a_col.clone()*a_row.clone();
+            let b_denom = alpha_beta.clone() - beta.clone()*b_col.clone() - alpha.clone()*b_row.clone() + b_col.clone()*b_row.clone();
+            let c_denom = alpha_beta - beta.clone()*c_col.clone() - alpha.clone()*c_row.clone() + c_col.clone()*c_row.clone();
 
-            let b_poly = a_denom * b_denom * c_denom;
+            let b_poly = a_denom.clone() * b_denom.clone() * c_denom.clone();
 
             let a_part_nom = eta_a_times_v_H_alpha_v_H_beta * a_val;
             let b_part_nom = eta_b_times_v_H_alpha_v_H_beta * b_val;
             let c_part_nom = eta_c_times_v_H_alpha_v_H_beta * c_val;
 
             let a_poly = {
-                let summand_0 = a_part_nom * b_denom * c_denom;
-                let summand_1 = b_part_nom * b_denom * c_denom;
-                let summand_2 = c_part_nom * b_denom * c_denom;
+                let summand_0 = a_part_nom * b_denom.clone() * c_denom.clone();
+                let summand_1 = b_part_nom * b_denom.clone() * c_denom.clone();
+                let summand_2 = c_part_nom * b_denom.clone() * c_denom.clone();
 
                 summand_0 + summand_1 + summand_2
             };

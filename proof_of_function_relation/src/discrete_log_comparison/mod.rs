@@ -28,8 +28,11 @@ pub mod piop;
 pub mod proof;
 mod tests;
 
-pub struct DLComparison<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
-{
+pub struct DLComparison<
+    F: PrimeField + SquareRootField,
+    PC: AdditivelyHomomorphicPCS<F>,
+    FS: FiatShamirRng,
+> {
     _field: PhantomData<F>,
     _polynomial_commitment_scheme: PhantomData<PC>,
     _fs: PhantomData<FS>,
@@ -98,7 +101,6 @@ where
             &[f_rand.clone(), rands[1].clone()],
             enforced_degree_bound,
             &square_check_vo,
-            &alphas.to_vec(),
             &domain_k,
             &ck,
             rng,
@@ -111,7 +113,6 @@ where
             &[g_rand.clone(), rands[2].clone()],
             enforced_degree_bound,
             &square_check_vo,
-            &alphas.to_vec(),
             &domain_k,
             &ck,
             rng,
@@ -127,7 +128,6 @@ where
             &[rands[0].clone(), rands[3].clone()],
             enforced_degree_bound,
             &square_check_vo,
-            &alphas.to_vec(),
             &domain_k,
             &ck,
             rng,
@@ -144,7 +144,6 @@ where
         // Step 4d: Zero over K for f' = (s')*(g')
         let product_check_vo =
             GenericShiftingVO::new(&[0, 1, 2], &vec![F::one(); 3], presets::abc_product_check)?;
-        let alphas = [F::one(), F::one(), F::one()];
         let f_prime_product_proof = ZeroOverK::<F, PC, FS>::prove(
             &[
                 prover_first_oracles.f_prime.clone(),
@@ -159,7 +158,6 @@ where
             &[rands[1].clone(), rands[3].clone(), rands[2].clone()],
             enforced_degree_bound,
             &product_check_vo,
-            &alphas.to_vec(),
             &domain_k,
             &ck,
             rng,
@@ -336,7 +334,6 @@ where
             enforced_degree_bound,
             &square_check_vo,
             &domain_k,
-            &alphas,
             vk,
         )?;
 
@@ -347,7 +344,6 @@ where
             enforced_degree_bound,
             &square_check_vo,
             &domain_k,
-            &alphas,
             vk,
         )?;
 
@@ -358,13 +354,11 @@ where
             enforced_degree_bound,
             &square_check_vo,
             &domain_k,
-            &alphas,
             vk,
         )?;
 
         let product_check_vo =
             GenericShiftingVO::new(&[0, 1, 2], &vec![F::one(); 3], presets::abc_product_check)?;
-        let alphas = [F::one(), F::one(), F::one()];
 
         // Zero over K for f' = (s')*(g')
         ZeroOverK::<F, PC, FS>::verify(
@@ -377,7 +371,6 @@ where
             enforced_degree_bound,
             &product_check_vo,
             &domain_k,
-            &alphas,
             vk,
         )?;
 

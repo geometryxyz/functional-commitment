@@ -41,7 +41,6 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> ZeroOver
         concrete_oracle_commit_rands: &[PC::Randomness],
         maximum_oracle_degree_bound: Option<usize>,
         virtual_oracle: &VO,
-        alphas: &Vec<F>,
         domain: &GeneralEvaluationDomain<F>,
         ck: &PC::CommitterKey,
         rng: &mut R,
@@ -55,12 +54,14 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> ZeroOver
             }
         };
 
+        let alphas = virtual_oracle.shifting_coefficients();
+
         let prover_initial_state = PIOPforZeroOverK::prover_init(
             domain,
             concrete_oracles,
             maximum_oracle_degree_bound,
             virtual_oracle,
-            alphas,
+            &alphas,
         )?;
         let verifier_initial_state = PIOPforZeroOverK::<F, VO>::verifier_init(
             virtual_oracle,
@@ -107,7 +108,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> ZeroOver
         let (_prover_second_msg, prover_second_oracles, prover_state) =
             PIOPforZeroOverK::prover_second_round(&verifier_first_msg, prover_state, rng);
 
-        let query_set = PIOPforZeroOverK::<F, VO>::verifier_query_set(&verifier_state, alphas)?;
+        let query_set = PIOPforZeroOverK::<F, VO>::verifier_query_set(&verifier_state, &alphas)?;
         //------------------------------------------------------------------
 
         let h_primes = prover_state
@@ -253,7 +254,6 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> ZeroOver
         maximum_oracle_degree_bound: Option<usize>,
         virtual_oracle: &VO,
         domain: &GeneralEvaluationDomain<F>,
-        alphas: &[F],
         vk: &PC::VerifierKey,
     ) -> Result<(), Error> {
         if let Some(degree) = maximum_oracle_degree_bound {
@@ -264,6 +264,8 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> ZeroOver
                 )));
             }
         };
+
+        let alphas = virtual_oracle.shifting_coefficients();
 
         let verifier_initial_state = PIOPforZeroOverK::<F, VO>::verifier_init(
             virtual_oracle,
@@ -295,7 +297,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> ZeroOver
         .map_err(|_| Error::ToBytesError)?;
         fs_rng.absorb(fs_bytes);
 
-        let query_set = PIOPforZeroOverK::<F, VO>::verifier_query_set(&verifier_state, alphas)?;
+        let query_set = PIOPforZeroOverK::<F, VO>::verifier_query_set(&verifier_state, &alphas)?;
 
         let beta_1 = verifier_state
             .beta_1

@@ -3,6 +3,7 @@ use crate::non_zero_over_k::{piop::PIOPforNonZeroOverK, proof::Proof};
 use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain};
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
+use fiat_shamir_rng::FiatShamirRng;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use rand::Rng;
 use std::marker::PhantomData;
@@ -10,7 +11,6 @@ use zero_over_k::{
     virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO},
     zero_over_k::ZeroOverK,
 };
-use fiat_shamir_rng::FiatShamirRng;
 
 pub mod piop;
 pub mod proof;
@@ -57,7 +57,6 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> NonZeroO
             &[f_rand.clone(), rands[0].clone()],
             f.degree_bound(),
             &inverse_check_oracle,
-            &alphas,
             &domain,
             ck,
             rng,
@@ -97,7 +96,6 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> NonZeroO
             enforced_degree_bound,
             &inverse_check_oracle,
             &domain,
-            &alphas,
             &vk,
         )
         .map_err(Error::from)

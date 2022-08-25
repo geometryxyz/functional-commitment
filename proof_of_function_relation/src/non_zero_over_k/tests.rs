@@ -11,13 +11,13 @@ mod test {
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_std::rand::thread_rng;
     use blake2::Blake2s;
+    use fiat_shamir_rng::SimpleHashFiatShamirRng;
     use homomorphic_poly_commit::marlin_kzg::KZG10;
+    use rand_chacha::ChaChaRng;
     use zero_over_k::{
         util::sample_vector,
         virtual_oracle::generic_shifting_vo::{presets, GenericShiftingVO},
     };
-    use fiat_shamir_rng::SimpleHashFiatShamirRng;
-    use rand_chacha::ChaChaRng;
 
     type F = Fr;
     type PC = KZG10<Bn254>;

@@ -9,14 +9,15 @@ use std::marker::PhantomData;
 
 use ark_ff::{PrimeField, SquareRootField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use fiat_shamir_rng::FiatShamirRng;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use std::io::BufReader;
-use fiat_shamir_rng::FiatShamirRng;
 
 pub mod proof;
 // mod tests;
 
-pub struct TFT<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> {
+pub struct TFT<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
+{
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
     _digest: PhantomData<FS>,

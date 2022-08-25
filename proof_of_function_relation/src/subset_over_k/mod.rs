@@ -1,8 +1,8 @@
 use crate::{error::Error, subset_over_k::proof::Proof};
 use ark_ff::PrimeField;
 use ark_std::marker::PhantomData;
-use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use fiat_shamir_rng::FiatShamirRng;
+use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 
 pub mod proof;
 
@@ -17,7 +17,7 @@ impl<F, PC, FS> SubsetOverK<F, PC, FS>
 where
     F: PrimeField,
     PC: AdditivelyHomomorphicPCS<F>,
-    FS: FiatShamirRng
+    FS: FiatShamirRng,
 {
     pub fn prove() -> Proof {
         Proof {}

@@ -91,7 +91,6 @@ mod test {
             &rands,
             Some(enforced_degree_bound),
             &inverse_check_oracle,
-            &alphas,
             &domain_k,
             &ck,
             rng,
@@ -104,7 +103,6 @@ mod test {
             Some(enforced_degree_bound),
             &inverse_check_oracle,
             &domain_k,
-            &alphas,
             &vk,
         );
 
@@ -179,7 +177,6 @@ mod test {
             &rands,
             Some(enforced_degree_bound),
             &zero_over_k_vo,
-            &alphas,
             &domain_k,
             &ck,
             rng,
@@ -192,7 +189,6 @@ mod test {
             Some(enforced_degree_bound),
             &zero_over_k_vo,
             &domain_k,
-            &alphas,
             &vk,
         );
 
@@ -271,7 +267,6 @@ mod test {
             &rands,
             Some(prover_degree_bound),
             &inverse_check_oracle,
-            &alphas,
             &domain_k,
             &ck,
             rng,
@@ -293,7 +288,6 @@ mod test {
             Some(verifier_degree_bound),
             &inverse_check_oracle,
             &domain_k,
-            &alphas,
             &vk,
         );
 

@@ -11,7 +11,7 @@ mod tests {
     use homomorphic_poly_commit::marlin_kzg::KZG10;
 
     use crate::{discrete_log_comparison::DLComparison, error::Error};
-    use fiat_shamir_rng::{SimpleHashFiatShamirRng, FiatShamirRng};
+    use fiat_shamir_rng::{FiatShamirRng, SimpleHashFiatShamirRng};
     use rand_chacha::ChaChaRng;
 
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;

@@ -4,6 +4,7 @@ use ark_ff::{to_bytes, PrimeField};
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, QuerySet};
 use ark_std::marker::PhantomData;
+use fiat_shamir_rng::FiatShamirRng;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use rand::Rng;
 use rand_core::OsRng;
@@ -13,7 +14,6 @@ use zero_over_k::{
     zero_over_k::ZeroOverK,
     {geometric_seq_check, vo_constant},
 };
-use fiat_shamir_rng::FiatShamirRng;
 
 pub mod proof;
 mod tests;
@@ -98,7 +98,6 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> GeoSeqTe
             &[f_rand.clone()],
             f.degree_bound(),
             &geo_seq_vo,
-            &alphas.to_vec(),
             &domain,
             &ck,
             rng,
@@ -200,7 +199,6 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> GeoSeqTe
             enforced_degree_bound,
             &geo_seq_vo,
             &domain,
-            &alphas,
             vk,
         )?;
 

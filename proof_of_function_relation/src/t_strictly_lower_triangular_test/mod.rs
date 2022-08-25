@@ -11,10 +11,10 @@ use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
+use fiat_shamir_rng::FiatShamirRng;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use rand::Rng;
 use std::marker::PhantomData;
-use fiat_shamir_rng::FiatShamirRng;
 
 pub mod proof;
 mod tests;

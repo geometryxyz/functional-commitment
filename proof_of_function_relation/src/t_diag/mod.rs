@@ -10,6 +10,7 @@ use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
 };
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
+use fiat_shamir_rng::FiatShamirRng;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use rand::Rng;
 use std::marker::PhantomData;
@@ -20,7 +21,6 @@ use zero_over_k::{
     },
     zero_over_k::ZeroOverK,
 };
-use fiat_shamir_rng::FiatShamirRng;
 
 use self::piop::PIOPforTDiagTest;
 
@@ -28,7 +28,11 @@ pub mod piop;
 pub mod proof;
 mod tests;
 
-pub struct TDiag<F: PrimeField + SquareRootField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> {
+pub struct TDiag<
+    F: PrimeField + SquareRootField,
+    PC: AdditivelyHomomorphicPCS<F>,
+    FS: FiatShamirRng,
+> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
     _fs: PhantomData<FS>,
@@ -38,7 +42,7 @@ impl<F, PC, FS> TDiag<F, PC, FS>
 where
     F: PrimeField + SquareRootField,
     PC: AdditivelyHomomorphicPCS<F>,
-    FS: FiatShamirRng
+    FS: FiatShamirRng,
 {
     #[allow(dead_code)]
     pub const PROTOCOL_NAME: &'static [u8] = b"t-Diagonal Test";
@@ -142,7 +146,6 @@ where
             &[h_rand.clone(), row_m_random.clone()],
             enforced_degree_bound,
             &eq_vo,
-            &alphas,
             domain_k,
             ck,
             rng,
@@ -155,7 +158,6 @@ where
             &[row_m_random.clone(), col_m_random.clone()],
             enforced_degree_bound,
             &eq_vo,
-            &alphas,
             domain_k,
             ck,
             rng,
@@ -169,7 +171,6 @@ where
             &[val_m_random.clone(), h_rands[1].clone()],
             enforced_degree_bound,
             &prod_vo,
-            &alphas,
             domain_k,
             ck,
             rng,
@@ -316,7 +317,6 @@ where
             enforced_degree_bound,
             &eq_vo,
             domain_k,
-            &alphas,
             vk,
         )?;
 
@@ -327,7 +327,6 @@ where
             enforced_degree_bound,
             &eq_vo,
             domain_k,
-            &alphas,
             vk,
         )?;
 
@@ -339,7 +338,6 @@ where
             enforced_degree_bound,
             &prod_vo,
             domain_k,
-            &alphas,
             vk,
         )?;
 
