@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
 ark-poly-commit = "0.3.0"
 ark-ff = "0.3.0"
 ark-poly = "0.3.0" 
@@ -22,4 +23,4 @@ zero_over_k = { path = "../zero_over_k" }
 homomorphic_poly_commit = { path = "../homomorphic_poly_commit"}
 fiat_shamir_rng = { path = "../fiat_shamir_rng"}
 rand_chacha = { version = "0.3.0", default-features = false }
-
+ac2tft = { path = "../ac2tft" }
