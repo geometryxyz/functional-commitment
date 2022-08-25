@@ -4,5 +4,6 @@ members = [
     "homomorphic_poly_commit",
     "zero_over_k",
     "proof_of_function_relation",
-    "fiat_shamir_rng"
+    "fiat_shamir_rng",
+    "index_private_marlin"
 ]

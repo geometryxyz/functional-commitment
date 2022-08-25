@@ -542,61 +542,10 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
             prover_third_oracles.f.clone() // f
         ];
 
-        let the_closure = {
-            |terms: &[VOTerm<F>]| {
-                // define consts
-                let alpha = vo_constant!(verifier_first_msg.alpha);
-                let beta = vo_constant!(verifier_second_msg.beta);
-                let vh_alpha = vo_constant!(domain_k.evaluate_vanishing_polynomial(verifier_first_msg.alpha));
-                let vh_beta = vo_constant!(domain_k.evaluate_vanishing_polynomial(verifier_second_msg.beta));
-
-                let v_H_alpha_v_H_beta = vh_alpha * vh_beta;
-                let eta_a_times_v_H_alpha_v_H_beta = vo_constant!(verifier_first_msg.eta_a) * v_H_alpha_v_H_beta;
-                let eta_b_times_v_H_alpha_v_H_beta = vo_constant!(verifier_first_msg.eta_b) * v_H_alpha_v_H_beta;
-                let eta_c_times_v_H_alpha_v_H_beta = vo_constant!(verifier_first_msg.eta_c) * v_H_alpha_v_H_beta;
-
-                let alpha_beta = alpha * beta;
-
-                // define terms
-                let a_row = terms[1];
-                let a_col = terms[2];
-                let a_val = terms[3];
-                let b_row = terms[4];
-                let b_col = terms[5];
-                let b_val = terms[6];
-                let c_row = terms[7];
-                let c_col = terms[8];
-                let c_val = terms[9];
-                let f = terms[10];
-
-                // begin logic
-                let a_denom = alpha_beta - beta*a_col - alpha*a_row + a_col*a_row;
-                let b_denom = alpha_beta - beta*b_col - alpha*b_row + b_col*b_row;
-                let c_denom = alpha_beta - beta*c_col - alpha*c_row + c_col*c_row;
-
-                let b_poly = a_denom * b_denom * c_denom;
-
-                let a_part_nom = eta_a_times_v_H_alpha_v_H_beta * a_val;
-                let b_part_nom = eta_b_times_v_H_alpha_v_H_beta * b_val;
-                let c_part_nom = eta_c_times_v_H_alpha_v_H_beta * c_val;
-
-                let a_poly = {
-                    let summand_0 = a_part_nom * b_denom * c_denom;
-                    let summand_1 = b_part_nom * b_denom * c_denom;
-                    let summand_2 = c_part_nom * b_denom * c_denom;
-
-                    summand_0 + summand_1 + summand_2
-                };
-
-                a_poly - b_poly - f
-            }
-            
-        };
-
         let rational_sumcheck_vo = GenericShiftingVO::new(
             &vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
             &vec![F::one(); 10],
-            the_closure
+            rational_sumcheck_oracle!(verifier_first_msg, verifier_second_msg, domain_k)
         );
 
         let labels = vec!["a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val"];
@@ -883,61 +832,10 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
 
         let domain_k = verifier_state.domain_k.clone();
 
-        let the_closure = {
-            |terms: &[VOTerm<F>]| {
-                // define consts
-                let alpha = vo_constant!(verifier_first_msg.alpha);
-                let beta = vo_constant!(verifier_second_msg.beta);
-                let vh_alpha = vo_constant!(domain_k.evaluate_vanishing_polynomial(verifier_first_msg.alpha));
-                let vh_beta = vo_constant!(domain_k.evaluate_vanishing_polynomial(verifier_second_msg.beta));
-
-                let v_H_alpha_v_H_beta = vh_alpha * vh_beta;
-                let eta_a_times_v_H_alpha_v_H_beta = vo_constant!(verifier_first_msg.eta_a) * v_H_alpha_v_H_beta;
-                let eta_b_times_v_H_alpha_v_H_beta = vo_constant!(verifier_first_msg.eta_b) * v_H_alpha_v_H_beta;
-                let eta_c_times_v_H_alpha_v_H_beta = vo_constant!(verifier_first_msg.eta_c) * v_H_alpha_v_H_beta;
-
-                let alpha_beta = alpha * beta;
-
-                // define terms
-                let a_row = terms[1];
-                let a_col = terms[2];
-                let a_val = terms[3];
-                let b_row = terms[4];
-                let b_col = terms[5];
-                let b_val = terms[6];
-                let c_row = terms[7];
-                let c_col = terms[8];
-                let c_val = terms[9];
-                let f = terms[10];
-
-                // begin logic
-                let a_denom = alpha_beta - beta*a_col - alpha*a_row + a_col*a_row;
-                let b_denom = alpha_beta - beta*b_col - alpha*b_row + b_col*b_row;
-                let c_denom = alpha_beta - beta*c_col - alpha*c_row + c_col*c_row;
-
-                let b_poly = a_denom * b_denom * c_denom;
-
-                let a_part_nom = eta_a_times_v_H_alpha_v_H_beta * a_val;
-                let b_part_nom = eta_b_times_v_H_alpha_v_H_beta * b_val;
-                let c_part_nom = eta_c_times_v_H_alpha_v_H_beta * c_val;
-
-                let a_poly = {
-                    let summand_0 = a_part_nom * b_denom * c_denom;
-                    let summand_1 = b_part_nom * b_denom * c_denom;
-                    let summand_2 = c_part_nom * b_denom * c_denom;
-
-                    summand_0 + summand_1 + summand_2
-                };
-
-                a_poly - b_poly - f
-            }
-            
-        };
-
         let rational_sumcheck_vo = GenericShiftingVO::new(
             &vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
             &vec![F::one(); 10],
-            the_closure
+            rational_sumcheck_oracle!(verifier_first_msg, verifier_second_msg, domain_k)
         );
 
         let labels = vec!["a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val"];
@@ -971,4 +869,70 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>
 
         Ok(evaluations_are_correct)
     }
+}
+
+/// A closure to be used for the Marlin rational sumcheck virtual oracle. The expected terms are:
+/// terms[0]: ignore, this by default becomes X
+/// terms[1]: a_row(X)
+/// terms[2]: a_col(X)
+/// terms[3]: a_val(X)
+/// terms[4]: b_row(X)
+/// terms[5]: b_col(X)
+/// terms[6]: b_val(X)
+/// terms[7]: c_row(X)
+/// terms[8]: c_col(X)
+/// terms[9]: c_val(X)
+/// terms[10]: f(X)
+#[macro_export]
+macro_rules! rational_sumcheck_oracle {
+    ($verifier_first_msg:expr, $verifier_second_msg:expr, $domain_k:expr) => {
+        |terms: &[VOTerm<F>]| {
+            // define consts
+            let alpha = vo_constant!($verifier_first_msg.alpha);
+            let beta = vo_constant!($verifier_second_msg.beta);
+
+            let vh_alpha = $domain_k.evaluate_vanishing_polynomial($verifier_first_msg.alpha);
+            let vh_beta = $domain_k.evaluate_vanishing_polynomial($verifier_second_msg.beta);
+            let v_H_alpha_v_H_beta = vo_constant!(vh_alpha * vh_beta);
+
+            let eta_a_times_v_H_alpha_v_H_beta = vo_constant!($verifier_first_msg.eta_a) * v_H_alpha_v_H_beta;
+            let eta_b_times_v_H_alpha_v_H_beta = vo_constant!($verifier_first_msg.eta_b) * v_H_alpha_v_H_beta;
+            let eta_c_times_v_H_alpha_v_H_beta = vo_constant!($verifier_first_msg.eta_c) * v_H_alpha_v_H_beta;
+
+            let alpha_beta = alpha * beta;
+
+            // define terms
+            let a_row = terms[1];
+            let a_col = terms[2];
+            let a_val = terms[3];
+            let b_row = terms[4];
+            let b_col = terms[5];
+            let b_val = terms[6];
+            let c_row = terms[7];
+            let c_col = terms[8];
+            let c_val = terms[9];
+            let f = terms[10];
+
+            // begin logic
+            let a_denom = alpha_beta - beta*a_col - alpha*a_row + a_col*a_row;
+            let b_denom = alpha_beta - beta*b_col - alpha*b_row + b_col*b_row;
+            let c_denom = alpha_beta - beta*c_col - alpha*c_row + c_col*c_row;
+
+            let b_poly = a_denom * b_denom * c_denom;
+
+            let a_part_nom = eta_a_times_v_H_alpha_v_H_beta * a_val;
+            let b_part_nom = eta_b_times_v_H_alpha_v_H_beta * b_val;
+            let c_part_nom = eta_c_times_v_H_alpha_v_H_beta * c_val;
+
+            let a_poly = {
+                let summand_0 = a_part_nom * b_denom * c_denom;
+                let summand_1 = b_part_nom * b_denom * c_denom;
+                let summand_2 = c_part_nom * b_denom * c_denom;
+
+                summand_0 + summand_1 + summand_2
+            };
+
+            a_poly - b_poly - f
+        }
+    };
 }
