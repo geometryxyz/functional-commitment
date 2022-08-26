@@ -166,3 +166,14 @@ pub fn gates_to_sparse_matrices<F: PrimeField>(
 
     (matrix_a, matrix_b, matrix_c)
 }
+
+#[macro_export]
+macro_rules! printmatrix {
+    ($matrix:expr) => {
+        for (row_index, row) in $matrix.iter().enumerate() {
+            for (value, col_index) in row {
+                println!("row {}, col {}: {}", row_index, col_index, value)
+            }
+        }
+    };
+}

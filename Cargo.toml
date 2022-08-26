@@ -6,6 +6,6 @@ members = [
     "fiat_shamir_rng",
     "proof_of_function_relation",
     "index_private_marlin",
-    "ac2ft",
+    "ac2tft",
     "functional_commitment"
 ]

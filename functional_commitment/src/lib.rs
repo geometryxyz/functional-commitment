@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use ac2ft::{sample_matrices, SparseMatrices};
+    use ac2tft::{sample_matrices, SparseMatrices, printmatrix};
     use ark_poly_commit::PolynomialCommitment;
     use ark_std::rand::thread_rng;
     use ark_ff::{PrimeField, to_bytes};
@@ -24,7 +24,7 @@ mod tests {
         let rng = &mut thread_rng();        
         let matrices: SparseMatrices<F> = sample_matrices::<F>();
 
-        let number_of_public_variables = 1;
+        let number_of_public_variables = 8;
 
         let index = AHPForR1CS::index_from_functional_triple(
             matrices.0, 
@@ -127,37 +127,56 @@ mod tests {
                 ).is_ok());
 
 
-            let c_proof = TDiag::<F, PC, FS>::prove(
-                &ck,
-                number_of_public_variables,
-                &index.c_arith.row,
-                &index.c_arith.col,
-                &index.c_arith.val,
-                &commits[6],
-                &commits[7],
-                &commits[8],
-                &rands[6],
-                &rands[7],
-                &rands[8],
-                None,
-                &domain_k,
-                &domain_h, 
-                rng
-            ).unwrap();
+            // let c_proof = TDiag::<F, PC, FS>::prove(
+            //     &ck,
+            //     number_of_public_variables,
+            //     &index.c_arith.row,
+            //     &index.c_arith.col,
+            //     &index.c_arith.val,
+            //     &commits[6],
+            //     &commits[7],
+            //     &commits[8],
+            //     &rands[6],
+            //     &rands[7],
+            //     &rands[8],
+            //     None,
+            //     &domain_k,
+            //     &domain_h, 
+            //     rng
+            // ).unwrap();
 
-            let is_valid = TDiag::<F, PC, FS>::verify(
-                &vk,
-                number_of_public_variables,
-                &commits[6],
-                &commits[7],
-                &commits[8],
-                None,
-                &domain_h,
-                &domain_k,
-                c_proof,
-            );
+            // let is_valid = TDiag::<F, PC, FS>::verify(
+            //     &vk,
+            //     number_of_public_variables,
+            //     &commits[6],
+            //     &commits[7],
+            //     &commits[8],
+            //     None,
+            //     &domain_h,
+            //     &domain_k,
+            //     c_proof,
+            // );
     
-            assert!(is_valid.is_ok());
+            // assert!(is_valid.is_ok());
 
+    }
+
+    #[test]
+    fn reindex_test() {
+        let domain_big = GeneralEvaluationDomain::<F>::new(8).unwrap();
+        let domain_small = GeneralEvaluationDomain::<F>::new(1).unwrap();
+
+        for i in 0..8 {
+            let reindexed = domain_big.reindex_by_subdomain(domain_small, i);
+            println!("for index: {}, reindexed is : {}", i, reindexed);
+        }
+
+    }
+
+    #[test]
+    fn read_matrices() {
+        let matrices: SparseMatrices<F> = sample_matrices::<F>();
+
+        printmatrix!(matrices.1)
     }
 }
