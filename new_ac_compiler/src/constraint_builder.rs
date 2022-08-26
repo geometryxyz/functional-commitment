@@ -8,30 +8,35 @@ use crate::{
 use ark_ff::Field;
 
 pub struct ConstraintBuilder<F: Field> {
-    gates: Vec<Gate>,
+    pub(crate) gates: Vec<Gate>,
     label_to_var_index: BTreeMap<String, usize>,
     curr_index: usize,
+    pub(crate) number_of_inputs: usize, 
+    pub(crate) number_of_ouputs: usize, // this will be hardcoded as argument for now
     _f: PhantomData<F>, // label_to_index: BTreeMap<String, >
 }
 
 impl<F: Field> ConstraintBuilder<F> {
-    pub fn new() -> Self {
+    pub fn new(number_of_ouputs: usize) -> Self {
         Self {
             gates: Vec::new(),
             label_to_var_index: BTreeMap::new(),
             curr_index: 0,
+            number_of_inputs: 0, 
+            number_of_ouputs,
             _f: PhantomData,
         }
     }
 
     pub fn new_input_variable(&mut self, label: &str, value: F) -> Result<Variable<F>, Error> {
+        self.number_of_inputs += 1;
         self.register_new_var(label, value, VariableType::Input)
     }
 
     pub fn enforce_constraint(
         &mut self,
-        lhs: Variable<F>,
-        rhs: Variable<F>,
+        lhs: &Variable<F>,
+        rhs: &Variable<F>,
         constraint_type: GateType,
     ) -> Result<Variable<F>, Error> {
         let lhs_index = match self.label_to_var_index.get(&lhs.label) {

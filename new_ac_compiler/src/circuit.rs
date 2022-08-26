@@ -1,4 +1,6 @@
-use crate::gate::Gate;
+use ark_ff::Field;
+
+use crate::{gate::Gate, constraint_builder::ConstraintBuilder, error::Error};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Circuit {
@@ -14,5 +16,23 @@ impl Circuit {
             number_of_inputs,
             number_of_outputs,
         }
+    }
+
+    pub fn from_constraint_builder<F: Field>(cb: &ConstraintBuilder<F>) -> Self {
+        Self {
+            gates: cb.gates.clone(), 
+            number_of_inputs: cb.number_of_inputs, 
+            number_of_outputs: cb.number_of_ouputs
+        }
+    }
+
+    pub fn synthesize<Func, F>(f: Func, cb: &mut ConstraintBuilder<F>) -> Result<Self, Error>
+    where
+        F: Field,
+        Func: FnOnce(&mut ConstraintBuilder<F>) -> Result<(), Error>,
+    {
+        // let mut cb = ConstraintBuilder::new(number_of_outputs);
+        f(cb)?;
+        Ok(Self::from_constraint_builder(&cb))
     }
 }

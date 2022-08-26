@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 ark-bls12-381 = "0.3.0"
 ark-ff = "0.3.0"
-ark-bn254 = "0.3.0"
 ark-poly = "0.3.0"
 ark-poly-commit = "0.3.0"
 ark-relations = "0.3.0"
@@ -24,3 +23,4 @@ digest = { version = "0.9" }
 [dev-dependencies]
 proof_of_function_relation = { path = "../proof_of_function_relation" }
 ark-marlin = "0.3.0"
+ark-bn254 = "0.3.0"

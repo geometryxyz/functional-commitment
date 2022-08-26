@@ -1,23 +1,29 @@
-pub trait ConstraintSynthesizer {}
+// use ark_ff::Field;
 
-/*
-    Circuit
+// use crate::{
+//     error::Error, constraint_builder::ConstraintBuilder, circuit::Circuit, gate::GateType
+// };
 
-    impl ConstraintSynthesizer for circuit
+// pub trait ConstraintSynthesizer<F: Field> {
+//     fn synthesize(cb: &mut ConstraintBuilder<F>) -> Result<Circuit, Error>;
+// }
 
-        fn build_constraints(
-            constraint_builder: &mut ConstraintBuilder
-        ) {
-            let x = constraint_builder.new_input(x, 7)?;
-            let twp = constraint_builder.new_input(two, 2)?;
-            let five = constraint_builder.new_input(five, 5)?;
+// pub struct SimpleCirc {}
 
-            x_sq = cs.enforce_constraint(x, x, mul)?;
-            x_qubed = cs.enforce_constraint(x_sq, x, mul)?;
+// impl<F: Field> ConstraintSynthesizer<F> for SimpleCirc {
+//     fn synthesize(cb: &mut ConstraintBuilder<F>) -> Result<Circuit, Error> {
+//         let x = cb.new_input_variable("x", F::from(7u64))?;
+//         let two = cb.new_input_variable("two", F::from(2u64))?;
+//         let five = cb.new_input_variable("five", F::from(5u64))?;
 
-            two_x = cs.enforce_constraint(x, two, mul)?;
+//         let x_sqare = cb.enforce_constraint(&x, &x, GateType::Mul)?;
+//         let x_qube = cb.enforce_constraint(&x, &x_sqare, GateType::Mul)?;
 
-            x_qubed_plus_2x = cs.enforce_constraint(x_qubed, two_x, plus)?;
-            output = cs.enforce_constraint(x_qubed_plus_2x, five, plus)?;
-        }
-*/
+//         let two_x = cb.enforce_constraint(&two, &x, GateType::Mul)?;
+//         let x_qubed_plus_2x = cb.enforce_constraint(&x_qube, &two_x, GateType::Add)?;
+
+//         let _ = cb.enforce_constraint(&x_qubed_plus_2x, &five, GateType::Add)?;
+
+//         Ok(Circuit::from_constraint_builder(cb))
+//     }
+// }
