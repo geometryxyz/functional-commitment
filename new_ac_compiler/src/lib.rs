@@ -1,12 +1,14 @@
 use ark_ff::Field;
 use ark_relations::r1cs::Matrix;
+use std::iter;
 
+pub mod example_circuits;
 mod tests;
 
 /// A structure containing the output-final R1CS encoding of an arithmetic circuit. There are `t` input rows,
 /// the first is always reserved for the constant 1. All other input rows are for public data, regardless of
 /// whether this is a public variable or public constant.
-pub struct R1CSfIndex<F> {
+pub struct R1CSfIndex<F: Field> {
     /// Number of constrains (this is also the length of the matrices)
     pub number_of_constraints: usize,
 
@@ -20,6 +22,15 @@ pub struct R1CSfIndex<F> {
     pub a: Matrix<F>,
     pub b: Matrix<F>,
     pub c: Matrix<F>,
+}
+
+impl<F: Field> R1CSfIndex<F> {
+    /// Iterate through the matrices of the index: A, B, C
+    pub fn iter_matrices(&self) -> impl Iterator<Item = &Matrix<F>> {
+        iter::once(&self.a)
+            .chain(iter::once(&self.b))
+            .chain(iter::once(&self.c))
+    }
 }
 
 /// Type of an arithmetic gate
@@ -36,11 +47,31 @@ pub struct Gate {
     symbol: GateType,
 }
 
+impl Gate {
+    pub fn new(left_index: usize, right_index: usize, symbol: GateType) -> Self {
+        Self {
+            left_index,
+            right_index,
+            symbol,
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Circuit {
     gates: Vec<Gate>,
     number_of_inputs: usize,
     number_of_outputs: usize,
+}
+
+impl Circuit {
+    pub fn new(gates: Vec<Gate>, number_of_inputs: usize, number_of_outputs: usize) -> Self {
+        Self {
+            gates,
+            number_of_inputs,
+            number_of_outputs,
+        }
+    }
 }
 
 /// A compiler from arithmetic circuit to t-functional triple as described in Construction 2 of the functional
@@ -86,4 +117,16 @@ fn empty_matrix<F: Field>(length: usize) -> Matrix<F> {
         matrix.push(vec![]);
     }
     matrix
+}
+
+#[macro_export]
+/// Print a Matrix
+macro_rules! printmatrix {
+    ($matrix:expr) => {
+        for (row_index, row) in $matrix.iter().enumerate() {
+            for (value, col_index) in row {
+                println!("row {}, col {}: {}", row_index, col_index, value)
+            }
+        }
+    };
 }
