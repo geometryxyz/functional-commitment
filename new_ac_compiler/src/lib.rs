@@ -7,15 +7,22 @@ mod tests;
 /// the first is always reserved for the constant 1. All other input rows are for public data, regardless of
 /// whether this is a public variable or public constant.
 pub struct R1CSfIndex<F> {
+    /// Number of constrains (this is also the length of the matrices)
     pub number_of_constraints: usize,
+
+    /// Number of rows that are reserved for the inputs. This is the `t` value in a t-functional triple.
+    /// Note that this is the **number of public inputs to the circuit plus 1** (this is by construction)
     pub number_of_input_rows: usize,
+
+    /// Number of outputs
     pub number_of_outputs: usize,
+
     pub a: Matrix<F>,
     pub b: Matrix<F>,
     pub c: Matrix<F>,
 }
 
-/// Type of each gate
+/// Type of an arithmetic gate
 #[derive(Clone, PartialEq, Eq, Debug, Ord, PartialOrd)]
 pub enum GateType {
     Add,
