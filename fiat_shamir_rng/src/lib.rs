@@ -4,9 +4,7 @@ use ark_std::marker::PhantomData;
 use ark_std::rand::{RngCore, SeedableRng};
 use digest::Digest;
 
-use ark_std::{
-    vec::Vec,
-};
+use ark_std::vec::Vec;
 
 /// An RNG suitable for Fiat-Shamir transforms
 pub trait FiatShamirRng: RngCore {

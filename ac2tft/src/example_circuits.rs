@@ -1,5 +1,5 @@
+use crate::{gates_to_sparse_matrices, Gate, GateInput, GateType, SparseMatrices};
 use ark_ff::PrimeField;
-use crate::{ GateInput, GateType, Gate, SparseMatrices, gates_to_sparse_matrices };
 
 pub fn sample_gates_0<F: PrimeField>() -> Vec<Gate<F>> {
     // Encodes x^3 + 2x + 5

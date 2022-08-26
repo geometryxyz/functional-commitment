@@ -2,19 +2,19 @@ use std::{collections::BTreeMap, marker::PhantomData};
 
 use crate::{
     error::Error,
+    gate::{Gate, GateType},
     variable::{Variable, VariableType},
-    Gate, GateType,
 };
-use ark_ff::PrimeField;
+use ark_ff::Field;
 
-pub struct ConstraintBuilder<F: PrimeField> {
+pub struct ConstraintBuilder<F: Field> {
     gates: Vec<Gate>,
     label_to_var_index: BTreeMap<String, usize>,
     curr_index: usize,
     _f: PhantomData<F>, // label_to_index: BTreeMap<String, >
 }
 
-impl<F: PrimeField> ConstraintBuilder<F> {
+impl<F: Field> ConstraintBuilder<F> {
     pub fn new() -> Self {
         Self {
             gates: Vec::new(),
@@ -25,7 +25,7 @@ impl<F: PrimeField> ConstraintBuilder<F> {
     }
 
     pub fn new_input_variable(&mut self, label: &str, value: F) -> Result<Variable<F>, Error> {
-        self.register_new_var(label, value, VariableType::INPUT)
+        self.register_new_var(label, value, VariableType::Input)
     }
 
     pub fn enforce_constraint(
@@ -71,7 +71,7 @@ impl<F: PrimeField> ConstraintBuilder<F> {
 
         // for now automatically assign wtns_prefix to intermidiate valies
         let new_label = format!("w_{}", self.curr_index);
-        self.register_new_var(&new_label, new_value, VariableType::WITNESS)
+        self.register_new_var(&new_label, new_value, VariableType::Witness)
     }
 
     fn register_new_var(

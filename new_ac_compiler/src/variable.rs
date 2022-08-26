@@ -1,13 +1,12 @@
-use ark_ff::PrimeField;
+use ark_ff::Field;
 
 #[derive(Clone)]
 pub enum VariableType {
-    INPUT,
-    WITNESS,
-    OUTPUT,
+    Input,
+    Witness,
 }
 #[derive(Clone)]
-pub struct Variable<F: PrimeField> {
+pub struct Variable<F: Field> {
     pub label: String,
     pub variable_type: VariableType,
     pub value: F,
