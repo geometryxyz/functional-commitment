@@ -3,6 +3,11 @@ use ark_relations::r1cs::Matrix;
 
 mod tests;
 
+mod constraint_builder;
+mod constraint_syntesizer;
+mod error;
+mod variable;
+
 /// A structure containing the output-final R1CS encoding of an arithmetic circuit. There are `t` input rows,
 /// the first is always reserved for the constant 1. All other input rows are for public data, regardless of
 /// whether this is a public variable or public constant.
@@ -31,9 +36,9 @@ pub enum GateType {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Gate {
-    left_index: usize,
-    right_index: usize,
-    symbol: GateType,
+    pub left_index: usize,
+    pub right_index: usize,
+    pub symbol: GateType,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
