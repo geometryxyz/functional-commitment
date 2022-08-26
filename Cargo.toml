@@ -7,5 +7,6 @@ members = [
     "proof_of_function_relation",
     "index_private_marlin",
     "ac2tft",
-    "functional_commitment"
+    "functional_commitment",
+    "new_ac_compiler"
 ]
