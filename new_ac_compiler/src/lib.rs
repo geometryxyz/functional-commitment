@@ -24,6 +24,9 @@ pub struct R1CSfIndex<F: Field> {
     /// Number of outputs
     pub number_of_outputs: usize,
 
+    /// The maximum number of non-zero entries
+    pub number_of_non_zero_entries: usize,
+
     pub a: Matrix<F>,
     pub b: Matrix<F>,
     pub c: Matrix<F>,
@@ -85,6 +88,7 @@ pub fn vanilla_ac2tft<F: Field>(circuit: Circuit) -> R1CSfIndex<F> {
     let number_of_constraints = circuit.gates.len() + circuit.number_of_inputs + 1;
     let number_of_input_rows = circuit.number_of_inputs + 1; // this is the `t` value in a t-functional triple
     let number_of_outputs = circuit.number_of_outputs;
+    let mut number_of_non_zero_entries = 0;
 
     let mut a_matrix = empty_matrix(number_of_constraints);
     let mut b_matrix = empty_matrix(number_of_constraints);
@@ -98,10 +102,12 @@ pub fn vanilla_ac2tft<F: Field>(circuit: Circuit) -> R1CSfIndex<F> {
                 a_matrix[1 + circuit.number_of_inputs + i].push((F::one(), 1));
                 b_matrix[1 + circuit.number_of_inputs + i].push((F::one(), 1 + gate.left_index));
                 b_matrix[1 + circuit.number_of_inputs + i].push((F::one(), 1 + gate.right_index));
+                number_of_non_zero_entries += 2;
             }
             GateType::Mul => {
                 a_matrix[1 + circuit.number_of_inputs + i].push((F::one(), 1 + gate.left_index));
                 b_matrix[1 + circuit.number_of_inputs + i].push((F::one(), 1 + gate.right_index));
+                number_of_non_zero_entries += 1;
             }
         }
     }
@@ -110,6 +116,7 @@ pub fn vanilla_ac2tft<F: Field>(circuit: Circuit) -> R1CSfIndex<F> {
         number_of_constraints,
         number_of_input_rows,
         number_of_outputs,
+        number_of_non_zero_entries,
         a: a_matrix,
         b: b_matrix,
         c: c_matrix,
