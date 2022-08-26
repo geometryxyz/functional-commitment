@@ -35,7 +35,7 @@ impl<F: Field> R1CSfIndex<F> {
 /// Given: an arithmetic circuit with ng gates, ni inputs, and no <= ng outputs, where gates are triples of (left_input_index, right_input_index, (add/mul))
 /// Produces: An index for R_R1CS-f(ng + ni + 1, ni + 1, no)
 pub trait CircuitCompiler<F: Field> {
-    fn ac2tft(circuit: Circuit) -> R1CSfIndex<F>;
+    fn ac2tft(circuit: &Circuit) -> R1CSfIndex<F>;
 }
 
 pub struct VanillaCompiler<F: Field> {
@@ -43,7 +43,7 @@ pub struct VanillaCompiler<F: Field> {
 }
 
 impl<F: Field> CircuitCompiler<F> for VanillaCompiler<F> {
-    fn ac2tft(circuit: Circuit) -> R1CSfIndex<F> {
+    fn ac2tft(circuit: &Circuit) -> R1CSfIndex<F> {
         let number_of_constraints = circuit.gates.len() + circuit.number_of_inputs + 1;
         let number_of_input_rows = circuit.number_of_inputs + 1; // this is the `t` value in a t-functional triple
         let number_of_outputs = circuit.number_of_outputs;

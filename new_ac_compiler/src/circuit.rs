@@ -29,7 +29,7 @@ impl Circuit {
     pub fn synthesize<Func, F>(f: Func, cb: &mut ConstraintBuilder<F>) -> Result<Self, Error>
     where
         F: Field,
-        Func: FnOnce(&mut ConstraintBuilder<F>) -> Result<(), Error>,
+        Func: Fn(&mut ConstraintBuilder<F>) -> Result<(), Error>,
     {
         // let mut cb = ConstraintBuilder::new(number_of_outputs);
         f(cb)?;
