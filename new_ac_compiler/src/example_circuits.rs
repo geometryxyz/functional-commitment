@@ -1,4 +1,7 @@
-use crate::{Circuit, Gate, GateType};
+use crate::{
+    circuit::Circuit,
+    gate::{Gate, GateType},
+};
 
 /// Encode the circuit x^2 + 5
 pub fn sample_circuit_1() -> Circuit {
@@ -24,7 +27,7 @@ pub fn sample_circuit_2() -> Circuit {
     let gate_0 = Gate::new(2, 2, GateType::Mul); // produce x^2
     let gate_1 = Gate::new(3, 2, GateType::Mul); // produce x^3
     let gate_2 = Gate::new(0, 2, GateType::Mul); // produce 2x
-    let gate_3 = Gate::new(4, 2, GateType::Add); // produce x^3 + 2x
+    let gate_3 = Gate::new(4, 5, GateType::Add); // produce x^3 + 2x
     let gate_4 = Gate::new(6, 1, GateType::Add); // produce the output
 
     Circuit::new(vec![gate_0, gate_1, gate_2, gate_3, gate_4], 3, 1)
