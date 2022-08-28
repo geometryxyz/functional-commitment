@@ -1,13 +1,13 @@
 pub mod example_circuits;
 pub use example_circuits::{sample_gates_0, sample_matrices};
 
-mod tests;
 mod error;
+mod tests;
 
-use std::fmt;
-use std::collections::BTreeMap;
 use ark_ff::PrimeField;
 use ark_relations::r1cs::Matrix;
+use std::collections::BTreeMap;
+use std::fmt;
 
 /// A compiler from arithmetic gates to t-FT sparse matrices, which can be converted into
 /// polynomicals using Marlin's `arithmetize_matrix()` function.
@@ -43,7 +43,7 @@ impl<F: PrimeField> GateInput<F> {
         match self {
             GateInput::Constant(_) => Err(error::Error::GateInputNotGate),
             GateInput::Input(_) => Err(error::Error::GateInputNotGate),
-            GateInput::Gate::<F>(x) => Ok(*x.clone())
+            GateInput::Gate::<F>(x) => Ok(*x.clone()),
         }
     }
 }
@@ -86,9 +86,7 @@ impl<F: PrimeField> fmt::Display for Gate<F> {
     }
 }
 
-pub fn empty_matrix<F: PrimeField>(
-    length: usize,
-) -> Matrix<F> {
+pub fn empty_matrix<F: PrimeField>(length: usize) -> Matrix<F> {
     let mut matrix = vec![];
     for _ in 0..length {
         matrix.push(vec![]);
@@ -96,15 +94,9 @@ pub fn empty_matrix<F: PrimeField>(
     matrix
 }
 
-pub type SparseMatrices<F> = (
-    Matrix<F>,
-    Matrix<F>,
-    Matrix<F>,
-);
+pub type SparseMatrices<F> = (Matrix<F>, Matrix<F>, Matrix<F>);
 
-pub fn gates_to_sparse_matrices<F: PrimeField>(
-    gates: Vec<Gate<F>>,
-) -> SparseMatrices<F> {
+pub fn gates_to_sparse_matrices<F: PrimeField>(gates: Vec<Gate<F>>) -> SparseMatrices<F> {
     let mut left_input_map = BTreeMap::<GateInput<F>, usize>::new();
     let mut right_input_map = BTreeMap::<GateInput<F>, usize>::new();
 
@@ -136,7 +128,7 @@ pub fn gates_to_sparse_matrices<F: PrimeField>(
     let mut matrix_a = empty_matrix::<F>(matrix_width);
     let mut matrix_b = empty_matrix::<F>(matrix_width);
     let mut matrix_c = empty_matrix::<F>(matrix_width);
- 
+
     // TODO: check for off-by-one errors here! the paper uses matrices which start from 1, but
     // in Rust we start from 0.
     for (i, gate) in gates.iter().enumerate() {

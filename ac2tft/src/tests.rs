@@ -130,7 +130,7 @@
 //         x: Option<F>,
 //         out: Option<F>,
 //     }
-    
+
 //     impl<F: Field> ConstraintSynthesizer<F> for SampleCircuit0<F> {
 //         fn generate_constraints(
 //             self,
@@ -155,7 +155,7 @@
 //                 x3.mul_assign(&x2);
 //                 Ok(x3)
 //             })?;
-            
+
 //             // Enforce that x3 = x2 * x
 //             cs.enforce_constraint(lc!() + x, lc!() + x2, lc!() + x3)?;
 
@@ -235,7 +235,7 @@
 //     //     //print_polynomial("gates_matrix_a cols", &result.col_poly);
 //     //     //print_polynomial("gates_matrix_a vals", &result.vals_poly);
 //     //     //print_polynomial("gates_matrix_a row_col", &result.row_col_poly);
-        
+
 //     //     let num_constraints = matrices.0.len();
 
 //     //     // TODO: this may be wrong, but setting the size of domain_h to num_constraints and

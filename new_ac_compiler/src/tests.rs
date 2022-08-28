@@ -76,7 +76,7 @@ mod tests {
         let circuit = sample_circuit_2();
         let index: R1CSfIndex<F> = VanillaCompiler::ac2tft(&circuit);
 
-        // let domain_k = GeneralEvaluationDomain::new(index.number_of_non_zero_entries).unwrap();
+        let domain_k = GeneralEvaluationDomain::new(index.number_of_non_zero_entries).unwrap();
         let domain_h = GeneralEvaluationDomain::new(index.number_of_constraints).unwrap();
 
         let concrete_oracles = naive_matrix_encoding(&index, domain_k, domain_h);
@@ -113,27 +113,27 @@ mod tests {
             &domain_k,
             &domain_h,
             None,
-            &concrete_oracles[0],       // a_row_poly
-            &concrete_oracles[1],       // a_col_poly
-            &commitments[0], // a_row_commit
-            &commitments[1], // a_col_commit
-            &rands[0],       // a_row_rand
-            &rands[1],       // a_col_rand
-            &concrete_oracles[3],       // b_row_poly
-            &concrete_oracles[4],       // b_col_poly
-            &commitments[3], // b_row_commit
-            &commitments[4], // b_col_commit
-            &rands[3],       // b_row_rand
-            &rands[4],       // b_col_rand
-            &concrete_oracles[6],       // c_row_poly
-            &concrete_oracles[7],       // c_row_poly
-            &concrete_oracles[8],       // c_row_poly
-            &commitments[6], // c_row_commit
-            &commitments[7], // c_row_commit
-            &commitments[8], // c_row_commit
-            &rands[6],       // c_row_rand
-            &rands[7],       // c_row_rand
-            &rands[8],       // c_row_rand
+            &concrete_oracles[0], // a_row_poly
+            &concrete_oracles[1], // a_col_poly
+            &commitments[0],      // a_row_commit
+            &commitments[1],      // a_col_commit
+            &rands[0],            // a_row_rand
+            &rands[1],            // a_col_rand
+            &concrete_oracles[3], // b_row_poly
+            &concrete_oracles[4], // b_col_poly
+            &commitments[3],      // b_row_commit
+            &commitments[4],      // b_col_commit
+            &rands[3],            // b_row_rand
+            &rands[4],            // b_col_rand
+            &concrete_oracles[6], // c_row_poly
+            &concrete_oracles[7], // c_row_poly
+            &concrete_oracles[8], // c_row_poly
+            &commitments[6],      // c_row_commit
+            &commitments[7],      // c_row_commit
+            &commitments[8],      // c_row_commit
+            &rands[6],            // c_row_rand
+            &rands[7],            // c_row_rand
+            &rands[8],            // c_row_rand
             &mut fs_rng,
             rng,
         )

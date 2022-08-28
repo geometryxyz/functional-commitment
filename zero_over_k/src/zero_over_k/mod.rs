@@ -14,8 +14,8 @@ use ark_poly_commit::{
     data_structures::{PCCommitterKey, PCVerifierKey},
     LabeledCommitment, LabeledPolynomial,
 };
-use fiat_shamir_rng::FiatShamirRng;
 use ark_std::marker::PhantomData;
+use fiat_shamir_rng::FiatShamirRng;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use rand::Rng;
 use rand_core::OsRng;
