@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::tests::naive_matrix_encoding;
+    use crate::variable::VariableType;
     use crate::{
         circuit::Circuit,
         circuit_compiler::{CircuitCompiler, VanillaCompiler},
@@ -9,6 +10,7 @@ mod tests {
         example_circuits::sample_circuit_2,
         gate::GateType,
         printmatrix, R1CSfIndex,
+        slt_test, diag_test
     };
     use ark_bn254::Bn254;
     use ark_bn254::Fr;
@@ -33,38 +35,29 @@ mod tests {
             let five = cb.new_input_variable("five", F::from(5u64))?;
             let x = cb.new_input_variable("x", F::from(7u64))?;
 
-            let x_square = cb.enforce_constraint(&x, &x, GateType::Mul)?;
-            let x_cube = cb.enforce_constraint(&x_square, &x, GateType::Mul)?;
+            let x_square = cb.enforce_constraint(&x, &x, GateType::Mul, VariableType::Witness)?;
+            let x_cube = cb.enforce_constraint(&x_square, &x, GateType::Mul, VariableType::Witness)?;
 
-            let two_x = cb.enforce_constraint(&two, &x, GateType::Mul)?;
-            let x_qubed_plus_2x = cb.enforce_constraint(&x_cube, &two_x, GateType::Add)?;
+            let two_x = cb.enforce_constraint(&two, &x, GateType::Mul, VariableType::Witness)?;
+            let x_qubed_plus_2x = cb.enforce_constraint(&x_cube, &two_x, GateType::Add, VariableType::Witness)?;
 
-            let _ = cb.enforce_constraint(&x_qubed_plus_2x, &five, GateType::Add)?;
+            let _ = cb.enforce_constraint(&x_qubed_plus_2x, &five, GateType::Add, VariableType::Output)?;
 
             Ok(())
         };
 
-        let mut cb = ConstraintBuilder::<F>::new(1);
+        let mut cb = ConstraintBuilder::<F>::new();
 
         let synthesized_circuit = Circuit::synthesize(constraints, &mut cb).unwrap();
         let r1csf_index_from_synthesized = VanillaCompiler::<F>::ac2tft(&synthesized_circuit);
-        // printmatrix!(r1csf_index_from_synthesized.a);
-        // println!("====================================");
-        // printmatrix!(r1csf_index_from_synthesized.b);
-        // println!("====================================");
-        // printmatrix!(r1csf_index_from_synthesized.c);
 
-        // println!("====================================");
-        // println!("====================================");
-        // println!("====================================");
+        slt_test!(r1csf_index_from_synthesized.a, 4);
+        slt_test!(r1csf_index_from_synthesized.b, 4);
+        diag_test!(r1csf_index_from_synthesized.c);
+
 
         let manual_circuit = sample_circuit_2();
         let r1csf_index_from_manual = VanillaCompiler::<F>::ac2tft(&manual_circuit);
-        // printmatrix!(r1csf_index_from_manual.a);
-        // println!("====================================");
-        // printmatrix!(r1csf_index_from_manual.b);
-        // println!("====================================");
-        // printmatrix!(r1csf_index_from_manual.c);
 
         assert_eq!(r1csf_index_from_manual, r1csf_index_from_synthesized)
     }

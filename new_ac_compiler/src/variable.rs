@@ -1,9 +1,10 @@
 use ark_ff::Field;
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum VariableType {
     Input,
     Witness,
+    Output,
 }
 #[derive(Clone)]
 pub struct Variable<F: Field> {

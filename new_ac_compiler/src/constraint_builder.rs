@@ -12,24 +12,24 @@ pub struct ConstraintBuilder<F: Field> {
     label_to_var_index: BTreeMap<String, usize>,
     curr_index: usize,
     pub(crate) number_of_inputs: usize,
-    pub(crate) number_of_ouputs: usize, // this will be hardcoded as argument for now
-    _f: PhantomData<F>,                 // label_to_index: BTreeMap<String, >
+    pub(crate) number_of_ouputs: usize,
+    _f: PhantomData<F>,
 }
 
 impl<F: Field> ConstraintBuilder<F> {
-    pub fn new(number_of_ouputs: usize) -> Self {
+    pub fn new() -> Self {
         Self {
             gates: Vec::new(),
             label_to_var_index: BTreeMap::new(),
             curr_index: 0,
             number_of_inputs: 0,
-            number_of_ouputs,
+            number_of_ouputs: 0,
             _f: PhantomData,
         }
     }
 
     pub fn new_input_variable(&mut self, label: &str, value: F) -> Result<Variable<F>, Error> {
-        self.number_of_inputs += 1;
+        // self.number_of_inputs += 1;
         self.register_new_var(label, value, VariableType::Input)
     }
 
@@ -38,6 +38,7 @@ impl<F: Field> ConstraintBuilder<F> {
         lhs: &Variable<F>,
         rhs: &Variable<F>,
         constraint_type: GateType,
+        variable_type: VariableType
     ) -> Result<Variable<F>, Error> {
         let lhs_index = match self.label_to_var_index.get(&lhs.label) {
             Some(index) => Ok(*index),
@@ -76,7 +77,7 @@ impl<F: Field> ConstraintBuilder<F> {
 
         // for now automatically assign wtns_prefix to intermidiate valies
         let new_label = format!("w_{}", self.curr_index);
-        self.register_new_var(&new_label, new_value, VariableType::Witness)
+        self.register_new_var(&new_label, new_value, variable_type)
     }
 
     fn register_new_var(
@@ -105,6 +106,12 @@ impl<F: Field> ConstraintBuilder<F> {
         // whenever new var is added, global index is incremented by one
         // this follows from the fact that each gate introduces another intermidiate var
         self.curr_index += 1;
+
+        match variable_type {
+            VariableType::Input => { self.number_of_inputs += 1; },
+            VariableType::Witness => { },
+            VariableType::Output => { self.number_of_ouputs += 1; },
+        };
 
         Ok(var)
     }

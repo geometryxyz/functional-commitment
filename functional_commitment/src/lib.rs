@@ -2,10 +2,12 @@
 mod tests {
     use ac2tft::{printmatrix, sample_matrices, SparseMatrices};
     use ark_bn254::{Bn254, Fr};
-    use ark_ff::{to_bytes, PrimeField};
-    use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
+    use ark_ff::{to_bytes, PrimeField, Zero};
+    use ark_poly::univariate::DensePolynomial;
+    use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, UVPolynomial, Polynomial};
     use ark_poly_commit::PolynomialCommitment;
     use ark_std::rand::thread_rng;
+    use ark_std::test_rng;
     use blake2::Blake2s;
     use fiat_shamir_rng::{FiatShamirRng, SimpleHashFiatShamirRng};
     use homomorphic_poly_commit::{marlin_kzg::KZG10, AdditivelyHomomorphicPCS};
@@ -183,12 +185,5 @@ mod tests {
             let reindexed = domain_big.reindex_by_subdomain(domain_small, i);
             println!("for index: {}, reindexed is : {}", i, reindexed);
         }
-    }
-
-    #[test]
-    fn read_matrices() {
-        let matrices: SparseMatrices<F> = sample_matrices::<F>();
-
-        printmatrix!(matrices.1)
     }
 }
