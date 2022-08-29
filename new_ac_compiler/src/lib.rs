@@ -82,7 +82,7 @@ macro_rules! slt_test {
 macro_rules! diag_test {
     ($matrix:expr) => {
         for (row_index, row) in $matrix.iter().enumerate() {
-            for (value, col_index) in row {
+            for (_, col_index) in row {
                 assert_eq!(row_index, *col_index);
             }
         }
