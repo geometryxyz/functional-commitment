@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod tests {
+    use std::cmp::max;
+
     use ac2tft::{printmatrix, sample_matrices, SparseMatrices};
     use ark_bn254::{Bn254, Fr};
     use ark_ff::{to_bytes, PrimeField, Zero};
@@ -11,38 +13,60 @@ mod tests {
     use blake2::Blake2s;
     use fiat_shamir_rng::{FiatShamirRng, SimpleHashFiatShamirRng};
     use homomorphic_poly_commit::{marlin_kzg::KZG10, AdditivelyHomomorphicPCS};
-    use index_private_marlin::AHPForR1CS;
+    use index_private_marlin::{AHPForR1CS, fc_arith};
+    use new_ac_compiler::circuit::Circuit;
+    use new_ac_compiler::constraint_builder::ConstraintBuilder;
+    use new_ac_compiler::gate::GateType;
+    use new_ac_compiler::variable::VariableType;
+    use new_ac_compiler::error::Error;
     use proof_of_function_relation::t_diag::TDiag;
     use proof_of_function_relation::t_strictly_lower_triangular_test::TStrictlyLowerTriangular;
     use rand_chacha::ChaChaRng;
 
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
+    use new_ac_compiler::circuit_compiler::{VanillaCompiler, CircuitCompiler};
 
     type F = Fr;
     type PC = KZG10<Bn254>;
 
     #[test]
-    fn test_matrix_arithmetization() {
-        let rng = &mut thread_rng();
-        let matrices: SparseMatrices<F> = sample_matrices::<F>();
+    fn test_airth() {
+        let constraints = |cb: &mut ConstraintBuilder<F>| -> Result<(), Error> {
+            let two = cb.new_input_variable("two", F::from(2u64))?;
+            let five = cb.new_input_variable("five", F::from(5u64))?;
+            let x = cb.new_input_variable("x", F::from(7u64))?;
 
-        let number_of_public_variables = 8;
+            let x_square = cb.enforce_constraint(&x, &x, GateType::Mul, VariableType::Witness)?;
+            let x_cube = cb.enforce_constraint(&x_square, &x, GateType::Mul, VariableType::Witness)?;
 
-        let index = AHPForR1CS::index_from_functional_triple(
-            matrices.0,
-            matrices.1,
-            matrices.2,
-            number_of_public_variables,
-        )
-        .unwrap();
+            let two_x = cb.enforce_constraint(&two, &x, GateType::Mul, VariableType::Witness)?;
+            let x_qubed_plus_2x = cb.enforce_constraint(&x_cube, &two_x, GateType::Add, VariableType::Witness)?;
 
-        let domain_h = GeneralEvaluationDomain::<F>::new(index.index_info.num_constraints).unwrap();
-        let domain_k = GeneralEvaluationDomain::<F>::new(index.index_info.num_non_zero).unwrap();
+            let _ = cb.enforce_constraint(&x_qubed_plus_2x, &five, GateType::Add, VariableType::Output)?;
+
+            Ok(())
+        };
+
+        let mut cb = ConstraintBuilder::<F>::new();
+
+        let synthesized_circuit = Circuit::synthesize(constraints, &mut cb).unwrap();
+        let r1csf_index_from_synthesized = VanillaCompiler::<F>::ac2tft(&synthesized_circuit);
+
+        // interpolation domain must be greater or equal to output domain (dl comparison constraint)
+        let interpolation_domain_size = max(r1csf_index_from_synthesized.number_of_non_zero_entries, r1csf_index_from_synthesized.number_of_constraints);
+
+        let domain_k = GeneralEvaluationDomain::<F>::new(interpolation_domain_size).unwrap();
+        let domain_h = GeneralEvaluationDomain::<F>::new(r1csf_index_from_synthesized.number_of_constraints).unwrap();
+
+        println!("num non zero: {}, num of constraints: {}", r1csf_index_from_synthesized.number_of_non_zero_entries, r1csf_index_from_synthesized.number_of_constraints);
+        println!("interpolation: {}, output size: {}", domain_k.size(), domain_h.size());
 
         let enforced_degree_bound = domain_k.size() + 1;
         let enforced_hiding_bound = 1;
 
-        let max_degree = 20;
+        let rng = &mut thread_rng();
+
+        let max_degree = 200;
         let pp = PC::setup(max_degree, None, rng).unwrap();
         let (ck, vk) = PC::trim(
             &pp,
@@ -52,33 +76,31 @@ mod tests {
         )
         .unwrap();
 
-        let (commits, rands) = PC::commit(&ck, index.iter_individual_matrices(), None).unwrap();
+        /*
+        
+        BEGIN A TEST
+
+        */
+        let a_arith = fc_arith(&r1csf_index_from_synthesized.a, domain_k, domain_h, "a", false);
+
+        let polys = [
+            a_arith.row.clone(), 
+            a_arith.col.clone(), 
+        ];
+
+        let (commits, rands) = PC::commit(&ck, &polys, None).unwrap();
 
         let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
 
-        let row_evals = index.a_arith.evals_on_K.row;
-        let col_evals = index.a_arith.evals_on_K.col;
-
-        row_evals
-            .evals
-            .iter()
-            .zip(col_evals.evals.iter())
-            .enumerate()
-            .for_each(|(i, (row, col))| {
-                if row == col {
-                    println!("equal at gamma_{}", i)
-                }
-            });
-
         let a_proof = TStrictlyLowerTriangular::<F, PC, FS>::prove(
             &ck,
-            number_of_public_variables,
+            r1csf_index_from_synthesized.number_of_input_rows,
             &domain_k,
             &domain_h,
-            &index.a_arith.col,
+            &a_arith.col,
             &commits[1],
             &rands[1],
-            &index.a_arith.row,
+            &a_arith.row,
             &commits[0],
             &rands[0],
             None,
@@ -94,7 +116,7 @@ mod tests {
             TStrictlyLowerTriangular::verify(
                 &vk,
                 &ck,
-                number_of_public_variables,
+                r1csf_index_from_synthesized.number_of_input_rows,
                 &domain_k,
                 &domain_h,
                 &commits[1],
@@ -106,19 +128,40 @@ mod tests {
             .is_ok()
         );
 
+        /*
+        
+        END A TEST
+        
+        */
+
+        /*
+        
+        BEGIN B TEST
+        
+        */
+
+        let b_arith = fc_arith(&r1csf_index_from_synthesized.b, domain_k, domain_h, "b", false);
+
+        let polys = [
+            b_arith.row.clone(), 
+            b_arith.col.clone(), 
+        ];
+
+        let (commits, rands) = PC::commit(&ck, &polys, None).unwrap();
+
         let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
 
         let b_proof = TStrictlyLowerTriangular::<F, PC, FS>::prove(
             &ck,
-            number_of_public_variables,
+            r1csf_index_from_synthesized.number_of_input_rows,
             &domain_k,
             &domain_h,
-            &index.b_arith.col,
-            &commits[4],
-            &rands[4],
-            &index.b_arith.row,
-            &commits[3],
-            &rands[3],
+            &b_arith.col,
+            &commits[1],
+            &rands[1],
+            &b_arith.row,
+            &commits[0],
+            &rands[0],
             None,
             &mut fs_rng,
             rng,
@@ -126,16 +169,17 @@ mod tests {
         .unwrap();
 
         let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
+
         assert_eq!(
             true,
             TStrictlyLowerTriangular::verify(
                 &vk,
                 &ck,
-                number_of_public_variables,
+                r1csf_index_from_synthesized.number_of_input_rows,
                 &domain_k,
                 &domain_h,
-                &commits[4],
-                &commits[3],
+                &commits[1],
+                &commits[0],
                 None,
                 b_proof,
                 &mut fs_rng
@@ -143,47 +187,74 @@ mod tests {
             .is_ok()
         );
 
-        // let c_proof = TDiag::<F, PC, FS>::prove(
-        //     &ck,
-        //     number_of_public_variables,
-        //     &index.c_arith.row,
-        //     &index.c_arith.col,
-        //     &index.c_arith.val,
-        //     &commits[6],
-        //     &commits[7],
-        //     &commits[8],
-        //     &rands[6],
-        //     &rands[7],
-        //     &rands[8],
-        //     None,
-        //     &domain_k,
-        //     &domain_h,
-        //     rng
-        // ).unwrap();
 
-        // let is_valid = TDiag::<F, PC, FS>::verify(
-        //     &vk,
-        //     number_of_public_variables,
-        //     &commits[6],
-        //     &commits[7],
-        //     &commits[8],
-        //     None,
-        //     &domain_h,
-        //     &domain_k,
-        //     c_proof,
-        // );
+        /*
+        
+        END B TEST
+        
+        */
 
-        // assert!(is_valid.is_ok());
-    }
+        /*
+        
+        BEGIN C TEST
+        
+        */
 
-    #[test]
-    fn reindex_test() {
-        let domain_big = GeneralEvaluationDomain::<F>::new(8).unwrap();
-        let domain_small = GeneralEvaluationDomain::<F>::new(1).unwrap();
+        let c_arith = fc_arith(&r1csf_index_from_synthesized.c, domain_k, domain_h, "c", true);
 
-        for i in 0..8 {
-            let reindexed = domain_big.reindex_by_subdomain(domain_small, i);
-            println!("for index: {}, reindexed is : {}", i, reindexed);
-        }
+        // for val in c_arith.evals_on_K.val.evals {
+        //     println!("{}", val);
+        // }
+
+        let polys = [
+            c_arith.row.clone(), 
+            c_arith.col.clone(), 
+            c_arith.val.clone(), 
+        ];
+
+        let (commits, rands) = PC::commit(&ck, &polys, None).unwrap();
+
+        let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
+
+        let c_proof = TDiag::<F, PC, FS>::prove(
+            &ck,
+            r1csf_index_from_synthesized.number_of_input_rows,
+            &c_arith.row,
+            &c_arith.col,
+            &c_arith.val,
+            &commits[0],
+            &commits[1],
+            &commits[2],
+            &rands[0],
+            &rands[1],
+            &rands[2],
+            None,
+            &domain_k,
+            &domain_h,
+            r1csf_index_from_synthesized.number_of_constraints,
+            rng
+        ).unwrap();
+
+
+        let is_valid = TDiag::<F, PC, FS>::verify(
+            &vk,
+            r1csf_index_from_synthesized.number_of_input_rows,
+            &commits[0],
+            &commits[1],
+            &commits[2],
+            None,
+            &domain_h,
+            &domain_k,
+            r1csf_index_from_synthesized.number_of_constraints,
+            c_proof,
+        );
+
+        assert!(is_valid.is_ok());
+
+        /*
+        
+        END C TEST
+        
+        */
     }
 }

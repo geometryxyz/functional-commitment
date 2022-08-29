@@ -2,7 +2,7 @@ use crate::{
     error::Error, t_diag::TDiag, t_functional_triple::proof::Proof,
     t_strictly_lower_triangular_test::TStrictlyLowerTriangular,
 };
-use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain};
+use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain, EvaluationDomain};
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
 use rand::Rng;
 use std::marker::PhantomData;
@@ -116,6 +116,7 @@ where
             enforced_degree_bound,
             domain_k,
             domain_h,
+            domain_h.size(),
             rng,
         )?;
 
@@ -189,6 +190,7 @@ where
             enforced_degree_bound,
             domain_h,
             domain_k,
+            domain_h.size(),
             proof.c_diag_proof,
         )?;
 

@@ -65,6 +65,7 @@ mod test {
             Some(enforced_degree_bound),
             &domain_k,
             &domain_h,
+            domain_h.size(),
             rng,
         )
         .unwrap();
@@ -78,6 +79,7 @@ mod test {
             Some(enforced_degree_bound),
             &domain_h,
             &domain_k,
+            domain_h.size(),
             proof,
         );
 
@@ -140,6 +142,7 @@ mod test {
             Some(enforced_degree_bound),
             &domain_k,
             &domain_h,
+            domain_h.size(),
             rng,
         );
 
@@ -206,6 +209,7 @@ mod test {
             Some(other_degree_bound),
             &domain_k,
             &domain_h,
+            domain_h.size(),
             rng,
         )
         .unwrap();
@@ -219,6 +223,7 @@ mod test {
             Some(enforced_degree_bound),
             &domain_h,
             &domain_k,
+            domain_h.size(),
             proof,
         );
 

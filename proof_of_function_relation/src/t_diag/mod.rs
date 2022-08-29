@@ -62,6 +62,7 @@ where
         enforced_degree_bound: Option<usize>,
         domain_k: &GeneralEvaluationDomain<F>,
         domain_h: &GeneralEvaluationDomain<F>,
+        number_of_constraints: usize,
         rng: &mut R,
     ) -> Result<Proof<F, PC>, Error> {
         if t > domain_h.size() {
@@ -71,9 +72,9 @@ where
         // Step 1a produce h1 = w^t, w^(t+1), ..., w^(n-1), 0, 0, ..., 0
         let r_h1 = domain_h.element(1);
         let mut a_s_h1 = vec![domain_h.element(t)];
-        let mut c_s_h1 = vec![domain_h.size() - t];
+        let mut c_s_h1 = vec![number_of_constraints - t];
 
-        let to_pad = domain_k.size() - (domain_h.size() - t);
+        let to_pad = domain_k.size() - (number_of_constraints - t);
         if to_pad > 0 {
             a_s_h1.push(F::zero());
             c_s_h1.push(to_pad);
@@ -86,9 +87,9 @@ where
         // Step 1b produce h2 = 0, 0, ..., 0, 1, 1, ..., 1
         let r_h2 = domain_h.element(0);
         let mut a_s_h2 = vec![F::zero()];
-        let mut c_s_h2 = vec![domain_h.size() - t];
+        let mut c_s_h2 = vec![number_of_constraints - t];
 
-        let to_pad = domain_k.size() - (domain_h.size() - t);
+        let to_pad = domain_k.size() - (number_of_constraints - t);
         if to_pad > 0 {
             a_s_h2.push(F::one());
             c_s_h2.push(to_pad);
@@ -192,6 +193,14 @@ where
             )),
         )?;
 
+        println!("ALIVEEEEE");
+
+        let val_evals = domain_k.fft(val_m);
+        
+        for (val, h2) in val_evals.iter().zip(seq.iter()) {
+            println!("val: {}, h2: {}", val, h2);
+        }
+
         let val_plus_h2_proof = NonZeroOverK::<F, PC, FS>::prove(
             ck,
             domain_k,
@@ -224,6 +233,7 @@ where
         enforced_degree_bound: Option<usize>,
         domain_h: &GeneralEvaluationDomain<F>,
         domain_k: &GeneralEvaluationDomain<F>,
+        number_of_constraints: usize,
         proof: Proof<F, PC>,
     ) -> Result<(), Error> {
         // re-label the oracle commitments with the enforced degree bound
@@ -246,9 +256,9 @@ where
         // Step 2: Geometric Sequence Test on h1
         let r_h1 = domain_h.element(1);
         let mut a_s_h1 = vec![domain_h.element(t)];
-        let mut c_s_h1 = vec![domain_h.size() - t];
+        let mut c_s_h1 = vec![number_of_constraints - t];
 
-        let to_pad = domain_k.size() - (domain_h.size() - t);
+        let to_pad = domain_k.size() - (number_of_constraints - t);
         if to_pad > 0 {
             a_s_h1.push(F::zero());
             c_s_h1.push(to_pad);
@@ -281,9 +291,9 @@ where
         // h2 params
         let r_h2 = F::one();
         let mut a_s_h2 = vec![F::zero()];
-        let mut c_s_h2 = vec![domain_h.size() - t];
+        let mut c_s_h2 = vec![number_of_constraints - t];
 
-        let to_pad = domain_k.size() - (domain_h.size() - t);
+        let to_pad = domain_k.size() - (number_of_constraints - t);
         if to_pad > 0 {
             a_s_h2.push(F::one());
             c_s_h2.push(to_pad);
