@@ -14,7 +14,7 @@ mod tests {
     };
     use ark_bn254::Bn254;
     use ark_bn254::Fr;
-    use ark_ff::to_bytes;
+    use ark_ff::{to_bytes, Zero};
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
     use ark_poly_commit::PolynomialCommitment;
     use ark_std::rand::thread_rng;
@@ -64,6 +64,67 @@ mod tests {
 
     #[test]
     fn test_matrix_correctness() {
+        let constraints = |cb: &mut ConstraintBuilder<F>| -> Result<(), Error> {
+            let two = cb.new_input_variable("two", F::from(2u64))?;
+            let five = cb.new_input_variable("five", F::from(5u64))?;
+            let x = cb.new_input_variable("x", F::from(7u64))?;
+
+            let x_square = cb.enforce_constraint(&x, &x, GateType::Mul, VariableType::Witness)?;
+            let x_cube = cb.enforce_constraint(&x_square, &x, GateType::Mul, VariableType::Witness)?;
+
+            let two_x = cb.enforce_constraint(&two, &x, GateType::Mul, VariableType::Witness)?;
+            let x_qubed_plus_2x = cb.enforce_constraint(&x_cube, &two_x, GateType::Add, VariableType::Witness)?;
+
+            let _ = cb.enforce_constraint(&x_qubed_plus_2x, &five, GateType::Add, VariableType::Output)?;
+
+            Ok(())
+        };
+
+        let mut cb = ConstraintBuilder::<F>::new();
+
+        let synthesized_circuit = Circuit::synthesize(constraints, &mut cb).unwrap();
+        let r1csf_index_from_synthesized = VanillaCompiler::<F>::ac2tft(&synthesized_circuit);
+
+        for val in &cb.assignment {
+            println!("{}", val);
+        }
+        println!("====================");
+        printmatrix!(r1csf_index_from_synthesized.a);
+        println!("====================");
+        printmatrix!(r1csf_index_from_synthesized.b);
+        println!("====================");
+        printmatrix!(r1csf_index_from_synthesized.c);
+
+
+        // Perform matrix multiplications
+        let inner_prod_fn = |row: &[(F, usize)]| {
+            let mut acc = F::zero();
+            for &(_, i) in row {
+                // coeff is always one
+                acc += cb.assignment[i];
+
+                // let tmp = if i < num_input_variables {
+                //     formatted_input_assignment[i]
+                // } else {
+                //     witness_assignment[i - num_input_variables]
+                // };
+
+                // acc += &(if coeff.is_one() { tmp } else { tmp * coeff });
+            }
+            acc
+        };
+
+        let z_a: Vec<F> = r1csf_index_from_synthesized.a.iter().map(|row| inner_prod_fn(row)).collect();
+        let z_b: Vec<F> = r1csf_index_from_synthesized.b.iter().map(|row| inner_prod_fn(row)).collect();
+        let z_c: Vec<F> = r1csf_index_from_synthesized.c.iter().map(|row| inner_prod_fn(row)).collect();
+
+        assert_eq!(z_a.len(), z_b.len());
+        assert_eq!(z_b.len(), z_c.len());
+        for ((&za_i, &zb_i), &zc_i) in z_a.iter().zip(z_b.iter()).zip(z_c.iter()) {
+            println!("za: {}, zb: {}, zc: {}", za_i, zb_i, zc_i);
+            assert_eq!(za_i * zb_i, zc_i);
+        }
+
         
     }
 

@@ -29,25 +29,26 @@ impl<F: Field> CircuitCompiler<F> for VanillaCompiler<F> {
         let mut b_matrix = empty_matrix(number_of_constraints);
         let mut c_matrix = empty_matrix(number_of_constraints);
 
+        // 0 + var_index is intentionaly left to notate that indices from the compiler are already shifted by one (because of the dummy selector)
         for (i, gate) in circuit.gates.iter().enumerate() {
             c_matrix[1 + circuit.number_of_inputs + i]
                 .push((F::one(), 1 + circuit.number_of_inputs + i));
                 number_of_non_zero_entries_c += 1; 
             match gate.symbol {
                 GateType::Add => {
-                    a_matrix[1 + circuit.number_of_inputs + i].push((F::one(), 1));
+                    a_matrix[1 + circuit.number_of_inputs + i].push((F::one(), 0));
                     b_matrix[1 + circuit.number_of_inputs + i]
-                        .push((F::one(), 1 + gate.left_index));
+                        .push((F::one(), 0 + gate.left_index));
                     b_matrix[1 + circuit.number_of_inputs + i]
-                        .push((F::one(), 1 + gate.right_index));
+                        .push((F::one(), 0 + gate.right_index));
                     number_of_non_zero_entries_a += 1; 
                     number_of_non_zero_entries_b += 2;
                 }
                 GateType::Mul => {
                     a_matrix[1 + circuit.number_of_inputs + i]
-                        .push((F::one(), 1 + gate.left_index));
+                        .push((F::one(), 0 + gate.left_index));
                     b_matrix[1 + circuit.number_of_inputs + i]
-                        .push((F::one(), 1 + gate.right_index));
+                        .push((F::one(), 0 + gate.right_index));
                     number_of_non_zero_entries_a += 1; 
                     number_of_non_zero_entries_b += 1;
                 }

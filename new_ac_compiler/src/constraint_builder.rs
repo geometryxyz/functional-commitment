@@ -13,6 +13,7 @@ pub struct ConstraintBuilder<F: Field> {
     curr_index: usize,
     pub(crate) number_of_inputs: usize,
     pub(crate) number_of_ouputs: usize,
+    pub assignment: Vec<F>,
     _f: PhantomData<F>,
 }
 
@@ -21,15 +22,15 @@ impl<F: Field> ConstraintBuilder<F> {
         Self {
             gates: Vec::new(),
             label_to_var_index: BTreeMap::new(),
-            curr_index: 0,
+            curr_index: 1, // we reserve first input to be dummy selector constraint for addition
             number_of_inputs: 0,
             number_of_ouputs: 0,
+            assignment: vec![F::one()], // we add 1 to be the value of dummy selector
             _f: PhantomData,
         }
     }
 
     pub fn new_input_variable(&mut self, label: &str, value: F) -> Result<Variable<F>, Error> {
-        // self.number_of_inputs += 1;
         self.register_new_var(label, value, VariableType::Input)
     }
 
@@ -112,6 +113,8 @@ impl<F: Field> ConstraintBuilder<F> {
             VariableType::Witness => { },
             VariableType::Output => { self.number_of_ouputs += 1; },
         };
+
+        self.assignment.push(value);
 
         Ok(var)
     }

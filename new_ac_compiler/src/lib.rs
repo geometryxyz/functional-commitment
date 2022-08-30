@@ -7,7 +7,6 @@ pub mod circuit_compiler;
 pub mod constraint_builder;
 pub mod example_circuits;
 pub mod tests;
-// mod constraint_syntesizer;
 pub mod error;
 pub mod gate;
 pub mod variable;
