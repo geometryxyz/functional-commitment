@@ -63,6 +63,11 @@ mod tests {
     }
 
     #[test]
+    fn test_matrix_correctness() {
+        
+    }
+
+    #[test]
     fn test_arithmetization() {
         let rng = &mut thread_rng();
 

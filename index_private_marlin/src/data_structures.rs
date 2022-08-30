@@ -97,7 +97,7 @@ pub struct IndexPrivateProverKey<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>>
     /// The index verifier key.
     pub index_private_vk: IndexPrivateVerifierKey<F, PC>,
     /// The index itself.
-    pub index: Index<F>,
+    pub index: IndexPrivateIndex<F>,
     /// TODO: this should be changed to just PrivateIndex
     /// The committer key for this index, trimmed from the universal SRS.
     pub committer_key: PC::CommitterKey,

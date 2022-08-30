@@ -42,7 +42,7 @@ pub struct IndexInfo<F> {
     pub num_instance_variables: usize,
 
     #[doc(hidden)]
-    f: PhantomData<F>,
+    pub(crate) f: PhantomData<F>,
 }
 
 impl<F> IndexInfo<F> {
@@ -155,6 +155,11 @@ pub struct IndexPrivateIndex<F: PrimeField> {
 
     /// The C matrix arithmetization
     pub c_arith: IndividualMatrixArithmetization<F>,
+
+    /// tmp store matrices
+    pub a: Matrix<F>,
+    pub b: Matrix<F>,
+    pub c: Matrix<F>
 }
 
 impl<F: PrimeField> IndexPrivateIndex<F> {
@@ -364,6 +369,10 @@ impl<F: PrimeField> AHPForR1CS<F> {
             b_arith,
             c_arith,
             index_info,
+
+            a: matrix_a, 
+            b: matrix_b, 
+            c: matrix_c
         })
     }
 }
