@@ -5,10 +5,10 @@ use std::iter;
 pub mod circuit;
 pub mod circuit_compiler;
 pub mod constraint_builder;
-pub mod example_circuits;
-pub mod tests;
 pub mod error;
+pub mod example_circuits;
 pub mod gate;
+pub mod tests;
 pub mod variable;
 
 /// A structure containing the output-final R1CS encoding of an arithmetic circuit. There are `t` input rows,
@@ -87,4 +87,3 @@ macro_rules! diag_test {
         }
     };
 }
-

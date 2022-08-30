@@ -21,7 +21,6 @@ extern crate ark_std;
 
 use core::cmp::max;
 
-use new_ac_compiler::R1CSfIndex;
 use ::zero_over_k::{
     virtual_oracle::generic_shifting_vo::{vo_term::VOTerm, GenericShiftingVO},
     vo_constant,
@@ -35,6 +34,7 @@ use ark_relations::r1cs::ConstraintSynthesizer;
 use ark_std::rand::RngCore;
 use fiat_shamir_rng::FiatShamirRng;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
+use new_ac_compiler::R1CSfIndex;
 
 use ark_std::{
     collections::BTreeMap,
@@ -59,9 +59,12 @@ pub use data_structures::*;
 
 /// Implements an Algebraic Holographic Proof (AHP) for the R1CS indexed relation.
 pub mod ahp;
-pub use ahp::AHPForR1CS;
 pub use ahp::constraint_systems::fc_arith;
-use ahp::{EvaluationsProvider, indexer::{IndexInfo, IndexPrivateIndex}};
+pub use ahp::AHPForR1CS;
+use ahp::{
+    indexer::{IndexInfo, IndexPrivateIndex},
+    EvaluationsProvider,
+};
 
 #[cfg(test)]
 mod test;
@@ -204,9 +207,9 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
             b_arith: index.b_arith,
             c_arith: index.c_arith,
 
-            a: index.a, 
-            b: index.b, 
-            c: index.c
+            a: index.a,
+            b: index.b,
+            c: index.c,
         };
 
         let index_private_pk = IndexPrivateProverKey {
@@ -226,30 +229,35 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         Ok((index_private_pk, index_private_vk))
     }
 
-    fn index_from_new_compiler(
+    pub fn index_from_new_compiler(
         srs: &UniversalSRS<F, PC>,
-        r1csf_index: R1CSfIndex<F>
-    ) ->  Result<(), Error<PC::Error>> {
-        let mut degree_bounds = [0usize; 4];
+        r1csf_index: R1CSfIndex<F>,
+    ) -> Result<(IndexPrivateProverKey<F, PC>, IndexPrivateVerifierKey<F, PC>), Error<PC::Error>>
+    {
+        let mut degree_bounds = [0usize; 5];
         let num_constraints = r1csf_index.number_of_constraints;
         let num_non_zero = r1csf_index.number_of_non_zero_entries;
         // interpolation domain must be greater or equal to output domain (dl comparison constraint)
-        let interpolation_domain_size = max(r1csf_index.number_of_non_zero_entries, r1csf_index.number_of_constraints);
+        let interpolation_domain_size = max(
+            r1csf_index.number_of_non_zero_entries,
+            r1csf_index.number_of_constraints,
+        );
 
         let domain_k = GeneralEvaluationDomain::<F>::new(interpolation_domain_size).unwrap();
-        let domain_h = GeneralEvaluationDomain::<F>::new(r1csf_index.number_of_constraints).unwrap();
+        let domain_h =
+            GeneralEvaluationDomain::<F>::new(r1csf_index.number_of_constraints).unwrap();
 
         // TODO make sure about which bounds are needed and which aren't
         degree_bounds[0] = domain_k.size() - 2;
         degree_bounds[1] = domain_h.size() - 2;
         degree_bounds[2] = 2; // for masking
-        degree_bounds[4] = domain_k.size() + 1; // for poly + masking
+        degree_bounds[3] = domain_k.size() + 1; // for poly + masking
+        degree_bounds[4] = 6; // for poly + masking
 
         let supported_hiding_bound = 1;
         let zk_bound = 1;
 
-        let max_degree = 
-        *[
+        let max_degree = *[
             6 * domain_k.size() - 6,
             2 * domain_h.size() + zk_bound - 2,
             3 * domain_h.size() + 2 * zk_bound - 3, //  mask_poly
@@ -270,26 +278,27 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         )
         .map_err(Error::from_pc_err)?;
 
+        let input_domain = GeneralEvaluationDomain::new(r1csf_index.number_of_input_rows).unwrap();
+
         // arith
-        let a_arith = fc_arith(&r1csf_index.a, domain_k, domain_h, "a", false);
-        let b_arith = fc_arith(&r1csf_index.b, domain_k, domain_h, "b", false);
-        let c_arith = fc_arith(&r1csf_index.c, domain_k, domain_h, "c", true);
+        let a_arith = fc_arith(&r1csf_index.a, domain_k, domain_h, input_domain, "a", false);
+        let b_arith = fc_arith(&r1csf_index.b, domain_k, domain_h, input_domain, "b", false);
+        let c_arith = fc_arith(&r1csf_index.c, domain_k, domain_h, input_domain, "c", true);
 
         let polys = [
-            a_arith.row.clone(), 
-            a_arith.col.clone(), 
-            a_arith.val.clone(), 
-            b_arith.row.clone(), 
-            b_arith.col.clone(), 
-            b_arith.val.clone(), 
-            c_arith.row.clone(), 
-            c_arith.col.clone(), 
-            c_arith.val.clone(), 
+            a_arith.row.clone(),
+            a_arith.col.clone(),
+            a_arith.val.clone(),
+            b_arith.row.clone(),
+            b_arith.col.clone(),
+            b_arith.val.clone(),
+            c_arith.row.clone(),
+            c_arith.col.clone(),
+            c_arith.val.clone(),
         ];
 
         let (individual_matrix_poly_commits, _): (_, _) =
-            PC::commit(&committer_key, &polys, None)
-                .map_err(Error::from_pc_err)?;
+            PC::commit(&committer_key, &polys, None).map_err(Error::from_pc_err)?;
 
         let individual_matrix_poly_commits = individual_matrix_poly_commits
             .iter()
@@ -316,9 +325,9 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
             b_arith,
             c_arith,
 
-            a: r1csf_index.a, 
-            b: r1csf_index.b, 
-            c: r1csf_index.c
+            a: r1csf_index.a,
+            b: r1csf_index.b,
+            c: r1csf_index.c,
         };
 
         let index_private_pk = IndexPrivateProverKey {
@@ -327,11 +336,9 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
             committer_key: committer_key.clone(),
         };
 
-        Ok(())
-        
+        Ok((index_private_pk, index_private_vk))
         // arith matrices
     }
-
 
     /// Create a zkSNARK asserting that the constraint system is satisfied.
     pub fn prove<C: ConstraintSynthesizer<F>, R: RngCore>(
@@ -541,7 +548,11 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         // Second round
 
         let (prover_second_msg, prover_second_oracles, prover_state) =
-            AHPForR1CS::index_private_prover_second_round(&verifier_first_msg, prover_state, zk_rng);
+            AHPForR1CS::index_private_prover_second_round(
+                &verifier_first_msg,
+                prover_state,
+                zk_rng,
+            );
 
         let domain_k = prover_state.domain_k.clone();
 
@@ -731,6 +742,250 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         Ok(proof)
     }
 
+    /// Create a zkSNARK asserting that the constraint system is satisfied where circuit is private.
+    pub fn index_private_prove_for_fc<R: RngCore>(
+        index_pk: &IndexPrivateProverKey<F, PC>,
+        r1csf_index: R1CSfIndex<F>,
+        assignment: Vec<F>,
+        zk_rng: &mut R,
+    ) -> Result<IndexPrivateProof<F, PC>, Error<PC::Error>> {
+        let prover_time = start_timer!(|| "Marlin::Prover");
+
+        let prover_init_state =
+            AHPForR1CS::index_private_fc_init(&index_pk.index, r1csf_index, assignment)?;
+        let public_input = prover_init_state.public_input();
+        let mut fs_rng = FS::initialize(
+            &to_bytes![
+                &Self::PROTOCOL_NAME,
+                &index_pk.index_private_vk,
+                &public_input
+            ]
+            .unwrap(),
+        );
+
+        // --------------------------------------------------------------------
+        // First round
+
+        let (prover_first_msg, prover_first_oracles, prover_state) =
+            AHPForR1CS::prover_index_private_first_round(prover_init_state, zk_rng)?;
+
+        let first_round_comm_time = start_timer!(|| "Committing to first round polys");
+        let (first_comms, first_comm_rands) = PC::commit(
+            &index_pk.committer_key,
+            prover_first_oracles.iter(),
+            Some(zk_rng),
+        )
+        .map_err(Error::from_pc_err)?;
+        end_timer!(first_round_comm_time);
+
+        fs_rng.absorb(&to_bytes![first_comms, prover_first_msg].unwrap());
+
+        println!("alive");
+
+        let (verifier_first_msg, verifier_state) =
+            AHPForR1CS::verifier_first_round(index_pk.index_private_vk.index_info, &mut fs_rng)?;
+        // --------------------------------------------------------------------
+
+        // --------------------------------------------------------------------
+        // Second round
+        println!("alive");
+
+        let (prover_second_msg, prover_second_oracles, prover_state) =
+            AHPForR1CS::index_private_prover_second_round(
+                &verifier_first_msg,
+                prover_state,
+                zk_rng,
+            );
+
+        println!("alive");
+
+        let domain_k = prover_state.domain_k.clone();
+
+        let second_round_comm_time = start_timer!(|| "Committing to second round polys");
+        let (second_comms, second_comm_rands) = PC::commit(
+            &index_pk.committer_key,
+            prover_second_oracles.iter(),
+            Some(zk_rng),
+        )
+        .map_err(Error::from_pc_err)?;
+        end_timer!(second_round_comm_time);
+
+        fs_rng.absorb(&to_bytes![second_comms, prover_second_msg].unwrap());
+
+        let (verifier_second_msg, verifier_state) =
+            AHPForR1CS::verifier_second_round(verifier_state, &mut fs_rng);
+        // --------------------------------------------------------------------
+
+        // --------------------------------------------------------------------
+        // Third round
+        let (prover_third_msg, prover_third_oracles) =
+            AHPForR1CS::prover_index_private_third_round(&verifier_second_msg, prover_state)?;
+
+        let third_round_comm_time = start_timer!(|| "Committing to third round polys");
+        let (third_comms, third_comm_rands) = PC::commit(
+            &index_pk.committer_key,
+            prover_third_oracles.iter(),
+            Some(zk_rng),
+        )
+        .map_err(Error::from_pc_err)?;
+        end_timer!(third_round_comm_time);
+
+        fs_rng.absorb(&to_bytes![third_comms, prover_third_msg].unwrap());
+
+        let verifier_state = AHPForR1CS::verifier_third_round(verifier_state, &mut fs_rng);
+        // --------------------------------------------------------------------
+
+        // Gather prover polynomials in one vector.
+        let polynomials: Vec<_> = 
+        // index_pk
+        //     .index
+        //     .iter()
+            // .chain(prover_first_oracles.iter())
+            prover_first_oracles.iter()
+            .chain(prover_second_oracles.iter())
+            .chain(prover_third_oracles.iter())
+            .collect();
+
+        // Gather commitments in one vector.
+        #[rustfmt::skip]
+            let commitments = vec![
+                first_comms.iter().map(|p| p.commitment().clone()).collect(),
+                second_comms.iter().map(|p| p.commitment().clone()).collect(),
+                third_comms.iter().map(|p| p.commitment().clone()).collect(),
+            ];
+
+        let labeled_comms: Vec<_> = 
+            // index_pk
+            // .index_vk
+            // .iter()
+            // .cloned()
+            // .zip(&AHPForR1CS::<F>::INDEXER_POLYNOMIALS)
+            // .map(|(c, l)| LabeledCommitment::new(l.to_string(), c, None))
+            // .chain(first_comms.iter().cloned())
+            first_comms.iter().cloned()
+            .chain(second_comms.iter().cloned())
+            .chain(third_comms.iter().cloned())
+            .collect();
+
+        // Gather commitment randomness together.
+        let comm_rands: Vec<PC::Randomness> = 
+            // index_pk
+            // .index_comm_rands
+            // .clone()
+            // .into_iter()
+            // .chain(first_comm_rands)
+            first_comm_rands.into_iter()
+            .chain(second_comm_rands)
+            .chain(third_comm_rands)
+            .collect();
+
+        // Compute the AHP verifier's query set.
+        let (query_set, verifier_state) =
+            AHPForR1CS::index_private_verifier_query_set(verifier_state, &mut fs_rng);
+        let lc_s = AHPForR1CS::construct_linear_combinations_for_index_private(
+            &public_input,
+            &polynomials,
+            &verifier_state,
+        )?;
+
+        let eval_time = start_timer!(|| "Evaluating linear combinations over query set");
+        let mut evaluations = Vec::new();
+        for (label, (_, point)) in &query_set {
+            let lc = lc_s
+                .iter()
+                .find(|lc| &lc.label == label)
+                .ok_or(ahp::Error::MissingEval(label.to_string()))?;
+            let eval = polynomials.get_lc_eval(&lc, *point)?;
+            if !AHPForR1CS::<F>::INDEX_PRIVATE_LC_WITH_ZERO_EVAL.contains(&lc.label.as_ref()) {
+                evaluations.push((label.to_string(), eval));
+            }
+        }
+
+        evaluations.sort_by(|a, b| a.0.cmp(&b.0));
+        println!("{:?}", evaluations);
+        let evaluations = evaluations.into_iter().map(|x| x.1).collect::<Vec<F>>();
+        end_timer!(eval_time);
+
+        fs_rng.absorb(&evaluations);
+        let opening_challenge: F = u128::rand(&mut fs_rng).into();
+
+        let concrete_oracles = [
+            index_pk.index.a_arith.row.clone(),
+            index_pk.index.a_arith.col.clone(),
+            index_pk.index.a_arith.val.clone(),
+            index_pk.index.b_arith.row.clone(),
+            index_pk.index.b_arith.col.clone(),
+            index_pk.index.b_arith.val.clone(),
+            index_pk.index.c_arith.row.clone(),
+            index_pk.index.c_arith.col.clone(),
+            index_pk.index.c_arith.val.clone(),
+            prover_third_oracles.f.clone(), // f
+        ];
+
+        let rational_sumcheck_vo = GenericShiftingVO::new(
+            &vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+            &vec![F::one(); 10],
+            rational_sumcheck_oracle!(verifier_first_msg, verifier_second_msg, domain_k),
+        )?;
+
+        let labels = vec![
+            "a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val",
+        ];
+        let mut rational_sumcheck_commitments = index_pk
+            .index_private_vk
+            .polys
+            .iter()
+            .zip(labels.iter())
+            .map(|(commitment, &label)| {
+                LabeledCommitment::new(label.into(), commitment.clone(), None)
+            })
+            .collect::<Vec<_>>();
+
+        rational_sumcheck_commitments.push(LabeledCommitment::new(
+            "f".into(),
+            third_comms[0].commitment().clone(),
+            None,
+        ));
+
+        let empty_rands = vec![PC::Randomness::empty(); concrete_oracles.len()];
+
+        let rational_sumcheck_proof = ZeroOverK::<F, PC, FS>::prove(
+            &concrete_oracles,
+            &rational_sumcheck_commitments,
+            empty_rands.as_slice(),
+            None,
+            &rational_sumcheck_vo,
+            &domain_k,
+            &index_pk.committer_key,
+            zk_rng,
+        )?;
+
+        let pc_proof = PC::open_combinations(
+            &index_pk.committer_key,
+            &lc_s,
+            polynomials.clone(),
+            &labeled_comms,
+            &query_set,
+            opening_challenge,
+            &comm_rands,
+            Some(zk_rng),
+        )
+        .map_err(Error::from_pc_err)?;
+
+        // Gather prover messages together.
+        let prover_messages = vec![prover_first_msg, prover_second_msg, prover_third_msg];
+
+        let proof = IndexPrivateProof::new(
+            commitments,
+            evaluations,
+            prover_messages,
+            pc_proof,
+            rational_sumcheck_proof,
+        );
+        // proof.print_size_info();
+        end_timer!(prover_time);
+        Ok(proof)
+    }
     /// Verify that a proof for the constrain system defined by `C` asserts that
     /// all constraints are satisfied.
     pub fn verify<R: RngCore>(

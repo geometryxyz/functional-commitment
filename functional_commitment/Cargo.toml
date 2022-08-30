@@ -22,3 +22,4 @@ new_ac_compiler = { path = "../new_ac_compiler" }
 
 [dev-dependencies]
 ark-bn254 = { version = "^0.3.0", default-features = false }
+ark-bls12-381 = { version = "^0.3.0", default-features = false, features = [ "curve" ] }

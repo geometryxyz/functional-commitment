@@ -159,7 +159,7 @@ pub struct IndexPrivateIndex<F: PrimeField> {
     /// tmp store matrices
     pub a: Matrix<F>,
     pub b: Matrix<F>,
-    pub c: Matrix<F>
+    pub c: Matrix<F>,
 }
 
 impl<F: PrimeField> IndexPrivateIndex<F> {
@@ -370,9 +370,9 @@ impl<F: PrimeField> AHPForR1CS<F> {
             c_arith,
             index_info,
 
-            a: matrix_a, 
-            b: matrix_b, 
-            c: matrix_c
+            a: matrix_a,
+            b: matrix_b,
+            c: matrix_c,
         })
     }
 }

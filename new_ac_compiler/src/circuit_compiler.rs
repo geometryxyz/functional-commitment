@@ -1,6 +1,6 @@
 use crate::R1CSfIndex;
 use ark_ff::Field;
-use std::{marker::PhantomData, cmp::max};
+use std::{cmp::max, marker::PhantomData};
 
 use crate::{circuit::Circuit, empty_matrix, gate::GateType};
 
@@ -21,9 +21,9 @@ impl<F: Field> CircuitCompiler<F> for VanillaCompiler<F> {
         let number_of_outputs = circuit.number_of_outputs;
 
         // num of non zero entires should be max of nom of non zero in a, b, c
-        let mut number_of_non_zero_entries_a = 0; 
-        let mut number_of_non_zero_entries_b = 0; 
-        let mut number_of_non_zero_entries_c = 0; 
+        let mut number_of_non_zero_entries_a = 0;
+        let mut number_of_non_zero_entries_b = 0;
+        let mut number_of_non_zero_entries_c = 0;
 
         let mut a_matrix = empty_matrix(number_of_constraints);
         let mut b_matrix = empty_matrix(number_of_constraints);
@@ -33,7 +33,7 @@ impl<F: Field> CircuitCompiler<F> for VanillaCompiler<F> {
         for (i, gate) in circuit.gates.iter().enumerate() {
             c_matrix[1 + circuit.number_of_inputs + i]
                 .push((F::one(), 1 + circuit.number_of_inputs + i));
-                number_of_non_zero_entries_c += 1; 
+            number_of_non_zero_entries_c += 1;
             match gate.symbol {
                 GateType::Add => {
                     a_matrix[1 + circuit.number_of_inputs + i].push((F::one(), 0));
@@ -41,7 +41,7 @@ impl<F: Field> CircuitCompiler<F> for VanillaCompiler<F> {
                         .push((F::one(), 0 + gate.left_index));
                     b_matrix[1 + circuit.number_of_inputs + i]
                         .push((F::one(), 0 + gate.right_index));
-                    number_of_non_zero_entries_a += 1; 
+                    number_of_non_zero_entries_a += 1;
                     number_of_non_zero_entries_b += 2;
                 }
                 GateType::Mul => {
@@ -49,13 +49,16 @@ impl<F: Field> CircuitCompiler<F> for VanillaCompiler<F> {
                         .push((F::one(), 0 + gate.left_index));
                     b_matrix[1 + circuit.number_of_inputs + i]
                         .push((F::one(), 0 + gate.right_index));
-                    number_of_non_zero_entries_a += 1; 
+                    number_of_non_zero_entries_a += 1;
                     number_of_non_zero_entries_b += 1;
                 }
             }
         }
 
-        let number_of_non_zero_entries = max(number_of_non_zero_entries_a, max(number_of_non_zero_entries_b, number_of_non_zero_entries_c));
+        let number_of_non_zero_entries = max(
+            number_of_non_zero_entries_a,
+            max(number_of_non_zero_entries_b, number_of_non_zero_entries_c),
+        );
 
         R1CSfIndex {
             number_of_constraints,

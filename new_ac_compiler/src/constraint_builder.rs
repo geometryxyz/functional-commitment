@@ -39,7 +39,7 @@ impl<F: Field> ConstraintBuilder<F> {
         lhs: &Variable<F>,
         rhs: &Variable<F>,
         constraint_type: GateType,
-        variable_type: VariableType
+        variable_type: VariableType,
     ) -> Result<Variable<F>, Error> {
         let lhs_index = match self.label_to_var_index.get(&lhs.label) {
             Some(index) => Ok(*index),
@@ -109,9 +109,13 @@ impl<F: Field> ConstraintBuilder<F> {
         self.curr_index += 1;
 
         match variable_type {
-            VariableType::Input => { self.number_of_inputs += 1; },
-            VariableType::Witness => { },
-            VariableType::Output => { self.number_of_ouputs += 1; },
+            VariableType::Input => {
+                self.number_of_inputs += 1;
+            }
+            VariableType::Witness => {}
+            VariableType::Output => {
+                self.number_of_ouputs += 1;
+            }
         };
 
         self.assignment.push(value);

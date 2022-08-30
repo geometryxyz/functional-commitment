@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 
+use core::cmp::max;
+
 use crate::ahp::indexer::IndexInfo;
 use crate::ahp::*;
 use ark_std::rand::RngCore;
@@ -45,15 +47,29 @@ impl<F: PrimeField> AHPForR1CS<F> {
         index_info: IndexInfo<F>,
         rng: &mut R,
     ) -> Result<(VerifierFirstMsg<F>, VerifierState<F>), Error> {
-        if index_info.num_constraints != index_info.num_variables {
-            return Err(Error::NonSquareMatrix);
-        }
+        // if index_info.num_constraints != index_info.num_variables {
+        //     return Err(Error::NonSquareMatrix);
+        // }
 
-        let domain_h = GeneralEvaluationDomain::new(index_info.num_constraints)
+        // let index_info = IndexInfo::<F> {
+        //     num_variables: r1csf_index.number_of_constraints + r1csf_index.number_of_input_rows, // for each gate we have a new var
+        //     num_constraints: r1csf_index.number_of_constraints,
+        //     num_non_zero: r1csf_index.number_of_non_zero_entries,
+        //     num_instance_variables: r1csf_index.number_of_input_rows,
+        //     f: PhantomData,
+        // };
+        let interpolation_domain_size = max(index_info.num_non_zero, index_info.num_constraints);
+
+        let domain_k = GeneralEvaluationDomain::<F>::new(interpolation_domain_size)
+            .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
+        let domain_h = GeneralEvaluationDomain::<F>::new(index_info.num_constraints)
             .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
 
-        let domain_k = GeneralEvaluationDomain::new(index_info.num_non_zero)
-            .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
+        // let domain_h = GeneralEvaluationDomain::new(index_info.num_constraints)
+        //     .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
+
+        // let domain_k = GeneralEvaluationDomain::new(index_info.num_non_zero)
+        //     .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
 
         let alpha = domain_h.sample_element_outside_domain(rng);
         let eta_a = F::rand(rng);

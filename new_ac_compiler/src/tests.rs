@@ -6,11 +6,11 @@ mod tests {
         circuit::Circuit,
         circuit_compiler::{CircuitCompiler, VanillaCompiler},
         constraint_builder::ConstraintBuilder,
+        diag_test,
         error::Error,
         example_circuits::sample_circuit_2,
         gate::GateType,
-        printmatrix, R1CSfIndex,
-        slt_test, diag_test
+        printmatrix, slt_test, R1CSfIndex,
     };
     use ark_bn254::Bn254;
     use ark_bn254::Fr;
@@ -36,12 +36,19 @@ mod tests {
             let x = cb.new_input_variable("x", F::from(7u64))?;
 
             let x_square = cb.enforce_constraint(&x, &x, GateType::Mul, VariableType::Witness)?;
-            let x_cube = cb.enforce_constraint(&x_square, &x, GateType::Mul, VariableType::Witness)?;
+            let x_cube =
+                cb.enforce_constraint(&x_square, &x, GateType::Mul, VariableType::Witness)?;
 
             let two_x = cb.enforce_constraint(&two, &x, GateType::Mul, VariableType::Witness)?;
-            let x_qubed_plus_2x = cb.enforce_constraint(&x_cube, &two_x, GateType::Add, VariableType::Witness)?;
+            let x_qubed_plus_2x =
+                cb.enforce_constraint(&x_cube, &two_x, GateType::Add, VariableType::Witness)?;
 
-            let _ = cb.enforce_constraint(&x_qubed_plus_2x, &five, GateType::Add, VariableType::Output)?;
+            let _ = cb.enforce_constraint(
+                &x_qubed_plus_2x,
+                &five,
+                GateType::Add,
+                VariableType::Output,
+            )?;
 
             Ok(())
         };
@@ -60,18 +67,27 @@ mod tests {
             acc
         };
 
-        let z_a: Vec<F> = r1csf_index_from_synthesized.a.iter().map(|row| inner_prod_fn(row)).collect();
-        let z_b: Vec<F> = r1csf_index_from_synthesized.b.iter().map(|row| inner_prod_fn(row)).collect();
-        let z_c: Vec<F> = r1csf_index_from_synthesized.c.iter().map(|row| inner_prod_fn(row)).collect();
+        let z_a: Vec<F> = r1csf_index_from_synthesized
+            .a
+            .iter()
+            .map(|row| inner_prod_fn(row))
+            .collect();
+        let z_b: Vec<F> = r1csf_index_from_synthesized
+            .b
+            .iter()
+            .map(|row| inner_prod_fn(row))
+            .collect();
+        let z_c: Vec<F> = r1csf_index_from_synthesized
+            .c
+            .iter()
+            .map(|row| inner_prod_fn(row))
+            .collect();
 
         assert_eq!(z_a.len(), z_b.len());
         assert_eq!(z_b.len(), z_c.len());
         for ((&za_i, &zb_i), &zc_i) in z_a.iter().zip(z_b.iter()).zip(z_c.iter()) {
             assert_eq!(za_i * zb_i, zc_i);
         }
-
-        let formatted_input_assignment = cb.assignment[..r1csf_index_from_synthesized.number_of_input_rows].to_vec();
-        let witness_assignment = cb.assignment[r1csf_index_from_synthesized.number_of_input_rows..].to_vec();
     }
 }
 

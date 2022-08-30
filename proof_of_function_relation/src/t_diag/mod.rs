@@ -196,7 +196,7 @@ where
         println!("ALIVEEEEE");
 
         let val_evals = domain_k.fft(val_m);
-        
+
         for (val, h2) in val_evals.iter().zip(seq.iter()) {
             println!("val: {}, h2: {}", val, h2);
         }
