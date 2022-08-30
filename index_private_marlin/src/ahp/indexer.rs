@@ -321,58 +321,58 @@ impl<F: PrimeField> AHPForR1CS<F> {
         })
     }
 
-    /// Produce an index for the provided functional triple
-    pub fn index_from_functional_triple(
-        matrix_a: Matrix<F>,
-        matrix_b: Matrix<F>,
-        matrix_c: Matrix<F>,
-        num_formatted_input_variables: usize,
-    ) -> Result<IndexPrivateIndex<F>, Error> {
-        assert_eq!(matrix_a.len(), matrix_b.len());
-        assert_eq!(matrix_b.len(), matrix_c.len());
+    // Produce an index for the provided functional triple
+    // pub fn index_from_functional_triple(
+    //     matrix_a: Matrix<F>,
+    //     matrix_b: Matrix<F>,
+    //     matrix_c: Matrix<F>,
+    //     num_formatted_input_variables: usize,
+    // ) -> Result<IndexPrivateIndex<F>, Error> {
+    //     assert_eq!(matrix_a.len(), matrix_b.len());
+    //     assert_eq!(matrix_b.len(), matrix_c.len());
 
-        let joint_matrix = sum_matrices(&matrix_a, &matrix_b, &matrix_c);
-        let num_non_zero = num_non_zero(&joint_matrix);
-        let num_constraints = matrix_a.len();
+    //     let joint_matrix = sum_matrices(&matrix_a, &matrix_b, &matrix_c);
+    //     let num_non_zero = num_non_zero(&joint_matrix);
+    //     let num_constraints = matrix_a.len();
 
-        if !Self::num_formatted_public_inputs_is_admissible(num_formatted_input_variables) {
-            return Err(Error::InvalidPublicInputLength);
-        }
+    //     if !Self::num_formatted_public_inputs_is_admissible(num_formatted_input_variables) {
+    //         return Err(Error::InvalidPublicInputLength);
+    //     }
 
-        let index_info = IndexInfo {
-            num_variables: num_formatted_input_variables,
-            num_constraints,
-            num_non_zero,
-            num_instance_variables: num_formatted_input_variables,
+    //     let index_info = IndexInfo {
+    //         num_variables: num_formatted_input_variables,
+    //         num_constraints,
+    //         num_non_zero,
+    //         num_instance_variables: num_formatted_input_variables,
 
-            f: PhantomData,
-        };
+    //         f: PhantomData,
+    //     };
 
-        let domain_h = GeneralEvaluationDomain::<F>::new(num_constraints)
-            .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
-        let domain_k = GeneralEvaluationDomain::<F>::new(num_non_zero)
-            .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
-        let x_domain = GeneralEvaluationDomain::<F>::new(num_formatted_input_variables)
-            .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
+    //     let domain_h = GeneralEvaluationDomain::<F>::new(num_constraints)
+    //         .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
+    //     let domain_k = GeneralEvaluationDomain::<F>::new(num_non_zero)
+    //         .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
+    //     let x_domain = GeneralEvaluationDomain::<F>::new(num_formatted_input_variables)
+    //         .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
 
-        let a_arith: IndividualMatrixArithmetization<F> =
-            arithmetize_individual_matrix(&matrix_a, domain_k, domain_h, x_domain, "a");
+    //     let a_arith: IndividualMatrixArithmetization<F> =
+    //         arithmetize_individual_matrix(&matrix_a, domain_k, domain_h, x_domain, "a");
 
-        let b_arith: IndividualMatrixArithmetization<F> =
-            arithmetize_individual_matrix(&matrix_b, domain_k, domain_h, x_domain, "b");
+    //     let b_arith: IndividualMatrixArithmetization<F> =
+    //         arithmetize_individual_matrix(&matrix_b, domain_k, domain_h, x_domain, "b");
 
-        let c_arith: IndividualMatrixArithmetization<F> =
-            arithmetize_individual_matrix(&matrix_c, domain_k, domain_h, x_domain, "c");
+    //     let c_arith: IndividualMatrixArithmetization<F> =
+    //         arithmetize_individual_matrix(&matrix_c, domain_k, domain_h, x_domain, "c");
 
-        Ok(IndexPrivateIndex {
-            a_arith,
-            b_arith,
-            c_arith,
-            index_info,
+    //     Ok(IndexPrivateIndex {
+    //         a_arith,
+    //         b_arith,
+    //         c_arith,
+    //         index_info,
 
-            a: matrix_a,
-            b: matrix_b,
-            c: matrix_c,
-        })
-    }
+    //         a: matrix_a,
+    //         b: matrix_b,
+    //         c: matrix_c,
+    //     })
+    // }
 }

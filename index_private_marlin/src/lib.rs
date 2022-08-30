@@ -252,7 +252,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         degree_bounds[1] = domain_h.size() - 2;
         degree_bounds[2] = 2; // for masking
         degree_bounds[3] = domain_k.size() + 1; // for poly + masking
-        degree_bounds[4] = 6; // for poly + masking
+        degree_bounds[4] = 6; // hardcoded for now
 
         let supported_hiding_bound = 1;
         let zk_bound = 1;
@@ -754,6 +754,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         let prover_init_state =
             AHPForR1CS::index_private_fc_init(&index_pk.index, r1csf_index, assignment)?;
         let public_input = prover_init_state.public_input();
+        // let public_input = prover_init_state.formatted_input_assignment;
         let mut fs_rng = FS::initialize(
             &to_bytes![
                 &Self::PROTOCOL_NAME,
@@ -780,15 +781,12 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
 
         fs_rng.absorb(&to_bytes![first_comms, prover_first_msg].unwrap());
 
-        println!("alive");
-
         let (verifier_first_msg, verifier_state) =
             AHPForR1CS::verifier_first_round(index_pk.index_private_vk.index_info, &mut fs_rng)?;
         // --------------------------------------------------------------------
 
         // --------------------------------------------------------------------
         // Second round
-        println!("alive");
 
         let (prover_second_msg, prover_second_oracles, prover_state) =
             AHPForR1CS::index_private_prover_second_round(
@@ -796,8 +794,6 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
                 prover_state,
                 zk_rng,
             );
-
-        println!("alive");
 
         let domain_k = prover_state.domain_k.clone();
 
@@ -902,7 +898,6 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         }
 
         evaluations.sort_by(|a, b| a.0.cmp(&b.0));
-        println!("{:?}", evaluations);
         let evaluations = evaluations.into_iter().map(|x| x.1).collect::<Vec<F>>();
         end_timer!(eval_time);
 
@@ -1273,6 +1268,172 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
 
         Ok(evaluations_are_correct)
     }
+
+        /// Verify that a proof for the constrain system defined by `C` asserts that
+    /// all constraints are satisfied where circuit is private.
+    pub fn verify_index_private_fc<R: RngCore>(
+        index_vk: &IndexPrivateVerifierKey<F, PC>,
+        public_input: &[F],
+        proof: IndexPrivateProof<F, PC>,
+        rng: &mut R,
+    ) -> Result<bool, Error<PC::Error>> {
+        let verifier_time = start_timer!(|| "Marlin::Verify");
+
+        let public_input = {
+            let domain_x = GeneralEvaluationDomain::<F>::new(public_input.len()).unwrap();
+
+            let mut unpadded_input = public_input.to_vec();
+            unpadded_input.resize(
+                core::cmp::max(public_input.len(), domain_x.size() - 1),
+                F::zero(),
+            );
+
+            unpadded_input
+        };
+
+        let mut fs_rng =
+            FS::initialize(&to_bytes![&Self::PROTOCOL_NAME, &index_vk, &public_input].unwrap());
+
+        // --------------------------------------------------------------------
+        // First round
+
+        let first_comms = &proof.commitments[0];
+        fs_rng.absorb(&to_bytes![first_comms, proof.prover_messages[0]].unwrap());
+
+        let (verifier_first_msg, verifier_state) =
+            AHPForR1CS::verifier_first_round(index_vk.index_info, &mut fs_rng)?;
+        // --------------------------------------------------------------------
+
+        // --------------------------------------------------------------------
+        // Second round
+        let second_comms = &proof.commitments[1];
+        fs_rng.absorb(&to_bytes![second_comms, proof.prover_messages[1]].unwrap());
+
+        let (verifier_second_msg, verifier_state) =
+            AHPForR1CS::verifier_second_round(verifier_state, &mut fs_rng);
+        // --------------------------------------------------------------------
+
+        // --------------------------------------------------------------------
+        // Third round
+        let third_comms = &proof.commitments[2];
+        fs_rng.absorb(&to_bytes![third_comms, proof.prover_messages[2]].unwrap());
+
+        let verifier_state = AHPForR1CS::verifier_third_round(verifier_state, &mut fs_rng);
+        // --------------------------------------------------------------------
+
+        // Collect degree bounds for commitments. Indexed polynomials have *no*
+        // degree bounds because we know the committed index polynomial has the
+        // correct degree.
+        let index_info = index_vk.index_info;
+        let degree_bounds = 
+            // vec![None; index_vk.index_comms.len()]
+            // .into_iter()
+            // .chain(AHPForR1CS::prover_index_private_first_round_degree_bounds(&index_info))
+            AHPForR1CS::prover_index_private_first_round_degree_bounds(&index_info)
+            .chain(AHPForR1CS::prover_second_round_degree_bounds(&index_info))
+            .chain(AHPForR1CS::index_private_prover_third_round_degree_bounds(
+                &index_info,
+            ))
+            .collect::<Vec<_>>();
+
+        // Gather commitments in one vector.
+        let commitments: Vec<_> = 
+        // index_vk
+        //     .iter()
+        //     .chain(first_comms)
+            first_comms.into_iter()
+            .chain(second_comms)
+            .chain(third_comms)
+            .cloned()
+            .zip(AHPForR1CS::<F>::index_private_polynomial_labels())
+            .zip(degree_bounds)
+            .map(|((c, l), d)| LabeledCommitment::new(l, c, d))
+            .collect();
+
+        let (query_set, verifier_state) =
+            AHPForR1CS::index_private_verifier_query_set(verifier_state, &mut fs_rng);
+
+        fs_rng.absorb(&proof.evaluations);
+        let opening_challenge: F = u128::rand(&mut fs_rng).into();
+
+        let mut evaluations = Evaluations::new();
+        let mut evaluation_labels = Vec::new();
+        for (poly_label, (_, point)) in query_set.iter().cloned() {
+            if AHPForR1CS::<F>::INDEX_PRIVATE_LC_WITH_ZERO_EVAL.contains(&poly_label.as_ref()) {
+                evaluations.insert((poly_label, point), F::zero());
+            } else {
+                evaluation_labels.push((poly_label, point));
+            }
+        }
+        evaluation_labels.sort_by(|a, b| a.0.cmp(&b.0));
+        for (q, eval) in evaluation_labels.into_iter().zip(&proof.evaluations) {
+            evaluations.insert(q, *eval);
+        }
+
+        let lc_s = AHPForR1CS::construct_linear_combinations_for_index_private(
+            &public_input,
+            &evaluations,
+            &verifier_state,
+        )?;
+
+        let evaluations_are_correct = PC::check_combinations(
+            &index_vk.verifier_key,
+            &lc_s,
+            &commitments,
+            &query_set,
+            &evaluations,
+            &proof.pc_proof,
+            opening_challenge,
+            rng,
+        )
+        .map_err(Error::from_pc_err)?;
+
+        let domain_k = verifier_state.domain_k.clone();
+
+        let rational_sumcheck_vo = GenericShiftingVO::new(
+            &vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+            &vec![F::one(); 10],
+            rational_sumcheck_oracle!(verifier_first_msg, verifier_second_msg, domain_k),
+        )?;
+
+        let labels = vec![
+            "a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val",
+        ];
+        let mut rational_sumcheck_commitments = index_vk
+            .polys
+            .iter()
+            .zip(labels.iter())
+            .map(|(commitment, &label)| {
+                LabeledCommitment::new(label.into(), commitment.clone(), None)
+            })
+            .collect::<Vec<_>>();
+
+        rational_sumcheck_commitments.push(LabeledCommitment::new(
+            "f".into(),
+            third_comms[0].clone(),
+            None,
+        )); // TODO f should also be bounded with |K| -1
+
+        let is_valid = ZeroOverK::<F, PC, FS>::verify(
+            proof.rational_sumcheck_zero_over_k_proof,
+            &rational_sumcheck_commitments,
+            None,
+            &rational_sumcheck_vo,
+            &domain_k,
+            &index_vk.verifier_key,
+        );
+        println!("{:?}", is_valid);
+
+        if !evaluations_are_correct {
+            eprintln!("Outter PC::Check failed");
+        }
+        end_timer!(verifier_time, || format!(
+            " PC::Check for AHP Verifier linear equations: {}",
+            evaluations_are_correct
+        ));
+
+        Ok(evaluations_are_correct)
+    }
 }
 
 /// A closure to be used for the Marlin rational sumcheck virtual oracle. The expected terms are:
@@ -1338,13 +1499,13 @@ macro_rules! rational_sumcheck_oracle {
 
             let a_poly = {
                 let summand_0 = a_part_nom * b_denom.clone() * c_denom.clone();
-                let summand_1 = b_part_nom * b_denom.clone() * c_denom.clone();
-                let summand_2 = c_part_nom * b_denom.clone() * c_denom.clone();
+                let summand_1 = b_part_nom * a_denom.clone() * c_denom.clone();
+                let summand_2 = c_part_nom * a_denom.clone() * b_denom.clone();
 
                 summand_0 + summand_1 + summand_2
             };
 
-            a_poly - b_poly - f
+            a_poly - b_poly * f
         }
     };
 }

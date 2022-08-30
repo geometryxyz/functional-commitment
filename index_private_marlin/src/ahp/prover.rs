@@ -107,7 +107,8 @@ pub struct IndexPrivateProverState<'a, F: PrimeField> {
 impl<'a, F: PrimeField> IndexPrivateProverState<'a, F> {
     /// Get the public input.
     pub fn public_input(&self) -> Vec<F> {
-        unformat_public_input(&self.formatted_input_assignment)
+        // unformat_public_input(&self.formatted_input_assignment)
+        self.formatted_input_assignment.clone()
     }
 
     pub fn get_assignment(&self) -> Vec<F> {
@@ -1641,13 +1642,6 @@ impl<F: PrimeField> AHPForR1CS<F> {
             prover_state.domain_x,
             prover_state.domain_h,
             r_alpha_x_evals.clone(),
-        );
-
-        println!(
-            "h: {}, k: {}, x: {}",
-            domain_h.size(),
-            domain_k.size(),
-            domain_x.size()
         );
 
         let beta2 = F::from(123131u64);

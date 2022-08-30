@@ -149,7 +149,8 @@ pub struct IndexPrivateVerifierKey<F: PrimeField, PC: AdditivelyHomomorphicPCS<F
     // pub c_val_commit: PC::Commitment,
     /// a(row, col, val), b(row, col, val), c(row, col, val),
 
-    /// commitments of (row, col, val) for each matrix
+    /// commitments of (row, col, val) for each matrix 
+    /// TODO rename this to commits
     pub polys: Vec<PC::Commitment>,
 
     /// verifier key

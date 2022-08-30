@@ -28,66 +28,74 @@ mod tests {
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
     use new_ac_compiler::circuit_compiler::{CircuitCompiler, VanillaCompiler};
 
+    use crate::{slt_test, diag_test};
+
     type F = Fr;
     type PC = KZG10<Bn254>;
 
     type MultiPC = MarlinKZG10<Bn254, DensePolynomial<Fr>>;
-    type MarlinInst = Marlin<Fr, MultiPC, FS>;
+    type MarlinInst = Marlin<Fr, PC, FS>;
 
-    // #[test]
-    // fn test_airth() {
-    //     let constraints = |cb: &mut ConstraintBuilder<F>| -> Result<(), Error> {
-    //         let two = cb.new_input_variable("two", F::from(2u64))?;
-    //         let five = cb.new_input_variable("five", F::from(5u64))?;
-    //         let x = cb.new_input_variable("x", F::from(7u64))?;
+    #[test]
+    fn test_airth() {
+        let constraints = |cb: &mut ConstraintBuilder<F>| -> Result<(), Error> {
+            let two = cb.new_input_variable("two", F::from(2u64))?;
+            let five = cb.new_input_variable("five", F::from(5u64))?;
+            let x = cb.new_input_variable("x", F::from(7u64))?;
 
-    //         let x_square = cb.enforce_constraint(&x, &x, GateType::Mul, VariableType::Witness)?;
-    //         let x_cube = cb.enforce_constraint(&x_square, &x, GateType::Mul, VariableType::Witness)?;
+            let x_square = cb.enforce_constraint(&x, &x, GateType::Mul, VariableType::Witness)?;
+            let x_cube = cb.enforce_constraint(&x_square, &x, GateType::Mul, VariableType::Witness)?;
 
-    //         let two_x = cb.enforce_constraint(&two, &x, GateType::Mul, VariableType::Witness)?;
-    //         let x_qubed_plus_2x = cb.enforce_constraint(&x_cube, &two_x, GateType::Add, VariableType::Witness)?;
+            let two_x = cb.enforce_constraint(&two, &x, GateType::Mul, VariableType::Witness)?;
+            let x_qubed_plus_2x = cb.enforce_constraint(&x_cube, &two_x, GateType::Add, VariableType::Witness)?;
 
-    //         let _ = cb.enforce_constraint(&x_qubed_plus_2x, &five, GateType::Add, VariableType::Output)?;
+            let _ = cb.enforce_constraint(&x_qubed_plus_2x, &five, GateType::Add, VariableType::Output)?;
 
-    //         Ok(())
-    //     };
+            Ok(())
+        };
 
-    //     let mut cb = ConstraintBuilder::<F>::new();
+        let mut cb = ConstraintBuilder::<F>::new();
 
-    //     let synthesized_circuit = Circuit::synthesize(constraints, &mut cb).unwrap();
-    //     let r1csf_index_from_synthesized = VanillaCompiler::<F>::ac2tft(&synthesized_circuit);
+        let synthesized_circuit = Circuit::synthesize(constraints, &mut cb).unwrap();
+        let r1csf_index_from_synthesized = VanillaCompiler::<F>::ac2tft(&synthesized_circuit);
 
     //     // interpolation domain must be greater or equal to output domain (dl comparison constraint)
-    //     let interpolation_domain_size = max(r1csf_index_from_synthesized.number_of_non_zero_entries, r1csf_index_from_synthesized.number_of_constraints);
+        let interpolation_domain_size = max(r1csf_index_from_synthesized.number_of_non_zero_entries, r1csf_index_from_synthesized.number_of_constraints);
 
-    //     let domain_k = GeneralEvaluationDomain::<F>::new(interpolation_domain_size).unwrap();
-    //     let domain_h = GeneralEvaluationDomain::<F>::new(r1csf_index_from_synthesized.number_of_constraints).unwrap();
+        let domain_k = GeneralEvaluationDomain::<F>::new(interpolation_domain_size).unwrap();
+        let domain_h = GeneralEvaluationDomain::<F>::new(r1csf_index_from_synthesized.number_of_constraints).unwrap();
 
     //     println!("num non zero: {}, num of constraints: {}", r1csf_index_from_synthesized.number_of_non_zero_entries, r1csf_index_from_synthesized.number_of_constraints);
     //     println!("interpolation: {}, output size: {}", domain_k.size(), domain_h.size());
 
-    //     let enforced_degree_bound = domain_k.size() + 1;
-    //     let enforced_hiding_bound = 1;
+        let enforced_degree_bound = domain_k.size() + 1;
+        let enforced_hiding_bound = 1;
 
-    //     let rng = &mut thread_rng();
+        let rng = &mut thread_rng();
 
-    //     let max_degree = 200;
-    //     let pp = PC::setup(max_degree, None, rng).unwrap();
-    //     let (ck, vk) = PC::trim(
-    //         &pp,
-    //         max_degree,
-    //         enforced_hiding_bound,
-    //         Some(&[2, enforced_degree_bound]),
-    //     )
-    //     .unwrap();
+        let max_degree = 200;
+        let pp = PC::setup(max_degree, None, rng).unwrap();
+        let (ck, vk) = PC::trim(
+            &pp,
+            max_degree,
+            enforced_hiding_bound,
+            Some(&[2, enforced_degree_bound]),
+        )
+        .unwrap();
+
+        slt_test!(r1csf_index_from_synthesized.a, r1csf_index_from_synthesized.number_of_input_rows);
+        slt_test!(r1csf_index_from_synthesized.a, r1csf_index_from_synthesized.number_of_input_rows);
+        diag_test!(r1csf_index_from_synthesized.c);
+
+
+        // let input_domain = GeneralEvaluationDomain::new(r1csf_index_from_synthesized.number_of_input_rows).unwrap();
 
     //     /*
 
     //     BEGIN A TEST
 
     //     */
-    //     let a_arith = fc_arith(&r1csf_index_from_synthesized.a, domain_k, domain_h, "a", false);
-
+        // let a_arith = fc_arith(&r1csf_index_from_synthesized.a, domain_k, domain_h, input_domain, "a", false);
     //     let polys = [
     //         a_arith.row.clone(),
     //         a_arith.col.clone(),
@@ -255,7 +263,7 @@ mod tests {
     //     END C TEST
 
     //     */
-    // }
+    }
 
     #[test]
     fn test_index_private_marin() {
@@ -294,13 +302,34 @@ mod tests {
         let (index_pk, index_vk) =
             MarlinInst::index_from_new_compiler(&universal_srs, r1csf_index.clone()).unwrap();
 
-        // index_private_prove_for_fc
         let proof =
-            MarlinInst::index_private_prove_for_fc(&index_pk, r1csf_index, cb.assignment, rng)
-                .unwrap();
+            MarlinInst::index_private_prove_for_fc(&index_pk, r1csf_index, cb.assignment, rng).unwrap();
 
-        // MarxlinInst::verify_index_private(&index_vk, &[F::one(), F::from(2u64), F::from(5u64), F::from(7u64)], proof, rng);
-
-        // assert!(MarlinInst::verify_index_private(&index_vk, &[F::one(), F::from(2u64), F::from(5u64), F::from(7u64)], proof, rng).unwrap());
+        assert!(MarlinInst::verify_index_private_fc(&index_vk, &[F::one(), F::from(2u64), F::from(5u64), F::from(7u64)], proof, rng).unwrap());
     }
+}
+
+#[macro_export]
+/// Print a Matrix
+macro_rules! slt_test {
+    ($matrix:expr, $num_of_pub_inputs_plus_one:expr) => {
+        for (row_index, row) in $matrix.iter().enumerate() {
+            for (_, col_index) in row {
+                assert!(row_index >= $num_of_pub_inputs_plus_one);
+                assert!(row_index > *col_index);
+            }
+        }
+    };
+}
+
+#[macro_export]
+/// Print a Matrix
+macro_rules! diag_test {
+    ($matrix:expr) => {
+        for (row_index, row) in $matrix.iter().enumerate() {
+            for (_, col_index) in row {
+                assert_eq!(row_index, *col_index);
+            }
+        }
+    };
 }
