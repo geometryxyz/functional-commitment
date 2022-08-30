@@ -23,6 +23,7 @@ use ark_std::{
     cfg_into_iter, cfg_iter, cfg_iter_mut,
     io::{Read, Write},
 };
+use new_ac_compiler::R1CSfIndex;
 
 /// State for the AHP prover.
 pub struct ProverState<'a, F: PrimeField> {
@@ -493,6 +494,57 @@ impl<F: PrimeField> AHPForR1CS<F> {
             domain_k,
             domain_x,
         })
+    }
+
+    fn index_private_fc_init<'a>(
+        index: &'a IndexPrivateIndex<F>,
+        r1csf_index: R1CSfIndex<F>, 
+        assignment: Vec<F>
+    ) -> Result<IndexPrivateProverState<'a, F>, Error> {
+
+        // Perform matrix multiplications
+        let inner_prod_fn = |row: &[(F, usize)]| {
+            let mut acc = F::zero();
+            for &(_, i) in row {
+                acc += assignment[i];
+            }
+            acc
+        };
+
+        let z_a = index.a.iter().map(|row| inner_prod_fn(row)).collect();
+        let z_b = index.b.iter().map(|row| inner_prod_fn(row)).collect();
+        
+        let zk_bound = 1; // One query is sufficient for our desired soundness
+
+        let domain_h = GeneralEvaluationDomain::new(r1csf_index.number_of_constraints)
+            .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
+
+        let domain_k = GeneralEvaluationDomain::new(r1csf_index.number_of_non_zero_entries)
+            .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
+
+        let domain_x = GeneralEvaluationDomain::new(r1csf_index.number_of_input_rows)
+            .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
+
+        let formatted_input_assignment = assignment[..r1csf_index.number_of_input_rows].to_vec();
+        let witness_assignment = assignment[r1csf_index.number_of_input_rows..].to_vec();
+
+        Ok(IndexPrivateProverState {
+            formatted_input_assignment,
+            witness_assignment,
+            z_a: Some(z_a),
+            z_b: Some(z_b),
+            w_poly: None,
+            mz_polys: None,
+            zk_bound,
+            index,
+            verifier_first_msg: None,
+            mask_poly: None,
+            inner_mask_poly: None,
+            domain_h,
+            domain_k,
+            domain_x,
+        })
+
     }
 
     /// Output the first round message and the next state.

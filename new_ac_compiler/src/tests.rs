@@ -29,40 +29,6 @@ mod tests {
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
 
     #[test]
-    fn test_sample_circuit_2() {
-        let constraints = |cb: &mut ConstraintBuilder<F>| -> Result<(), Error> {
-            let two = cb.new_input_variable("two", F::from(2u64))?;
-            let five = cb.new_input_variable("five", F::from(5u64))?;
-            let x = cb.new_input_variable("x", F::from(7u64))?;
-
-            let x_square = cb.enforce_constraint(&x, &x, GateType::Mul, VariableType::Witness)?;
-            let x_cube = cb.enforce_constraint(&x_square, &x, GateType::Mul, VariableType::Witness)?;
-
-            let two_x = cb.enforce_constraint(&two, &x, GateType::Mul, VariableType::Witness)?;
-            let x_qubed_plus_2x = cb.enforce_constraint(&x_cube, &two_x, GateType::Add, VariableType::Witness)?;
-
-            let _ = cb.enforce_constraint(&x_qubed_plus_2x, &five, GateType::Add, VariableType::Output)?;
-
-            Ok(())
-        };
-
-        let mut cb = ConstraintBuilder::<F>::new();
-
-        let synthesized_circuit = Circuit::synthesize(constraints, &mut cb).unwrap();
-        let r1csf_index_from_synthesized = VanillaCompiler::<F>::ac2tft(&synthesized_circuit);
-
-        slt_test!(r1csf_index_from_synthesized.a, 4);
-        slt_test!(r1csf_index_from_synthesized.b, 4);
-        diag_test!(r1csf_index_from_synthesized.c);
-
-
-        let manual_circuit = sample_circuit_2();
-        let r1csf_index_from_manual = VanillaCompiler::<F>::ac2tft(&manual_circuit);
-
-        assert_eq!(r1csf_index_from_manual, r1csf_index_from_synthesized)
-    }
-
-    #[test]
     fn test_matrix_correctness() {
         let constraints = |cb: &mut ConstraintBuilder<F>| -> Result<(), Error> {
             let two = cb.new_input_variable("two", F::from(2u64))?;
@@ -85,31 +51,11 @@ mod tests {
         let synthesized_circuit = Circuit::synthesize(constraints, &mut cb).unwrap();
         let r1csf_index_from_synthesized = VanillaCompiler::<F>::ac2tft(&synthesized_circuit);
 
-        for val in &cb.assignment {
-            println!("{}", val);
-        }
-        println!("====================");
-        printmatrix!(r1csf_index_from_synthesized.a);
-        println!("====================");
-        printmatrix!(r1csf_index_from_synthesized.b);
-        println!("====================");
-        printmatrix!(r1csf_index_from_synthesized.c);
-
-
         // Perform matrix multiplications
         let inner_prod_fn = |row: &[(F, usize)]| {
             let mut acc = F::zero();
             for &(_, i) in row {
-                // coeff is always one
                 acc += cb.assignment[i];
-
-                // let tmp = if i < num_input_variables {
-                //     formatted_input_assignment[i]
-                // } else {
-                //     witness_assignment[i - num_input_variables]
-                // };
-
-                // acc += &(if coeff.is_one() { tmp } else { tmp * coeff });
             }
             acc
         };
@@ -121,139 +67,11 @@ mod tests {
         assert_eq!(z_a.len(), z_b.len());
         assert_eq!(z_b.len(), z_c.len());
         for ((&za_i, &zb_i), &zc_i) in z_a.iter().zip(z_b.iter()).zip(z_c.iter()) {
-            println!("za: {}, zb: {}, zc: {}", za_i, zb_i, zc_i);
             assert_eq!(za_i * zb_i, zc_i);
         }
 
-        
-    }
-
-    #[test]
-    fn test_arithmetization() {
-        let rng = &mut thread_rng();
-
-        let circuit = sample_circuit_2();
-        let index: R1CSfIndex<F> = VanillaCompiler::ac2tft(&circuit);
-
-        let domain_k = GeneralEvaluationDomain::new(index.number_of_non_zero_entries).unwrap();
-        let domain_h = GeneralEvaluationDomain::new(index.number_of_constraints).unwrap();
-
-        let concrete_oracles = naive_matrix_encoding(&index, domain_k, domain_h);
-
-        let enforced_degree_bound = domain_k.size() + 1;
-        let enforced_hiding_bound = 1;
-
-        let max_degree = 20;
-        let pp = PC::setup(max_degree, None, rng).unwrap();
-        let (ck, vk) = PC::trim(
-            &pp,
-            max_degree,
-            enforced_hiding_bound,
-            Some(&[2, enforced_degree_bound]),
-        )
-        .unwrap();
-
-        let (commitments, rands) = PC::commit(&ck, &concrete_oracles, Some(rng)).unwrap();
-
-        let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
-
-        println!(
-            "domain_k {} - non-zero entries {},\ndomain_h {} - matrix length {},\nt {}",
-            domain_k.size(),
-            index.number_of_non_zero_entries,
-            domain_h.size(),
-            index.number_of_constraints,
-            index.number_of_input_rows
-        );
-
-        let proof = TFT::<F, PC, FS>::prove(
-            &ck,
-            index.number_of_input_rows,
-            &domain_k,
-            &domain_h,
-            None,
-            &concrete_oracles[0], // a_row_poly
-            &concrete_oracles[1], // a_col_poly
-            &commitments[0],      // a_row_commit
-            &commitments[1],      // a_col_commit
-            &rands[0],            // a_row_rand
-            &rands[1],            // a_col_rand
-            &concrete_oracles[3], // b_row_poly
-            &concrete_oracles[4], // b_col_poly
-            &commitments[3],      // b_row_commit
-            &commitments[4],      // b_col_commit
-            &rands[3],            // b_row_rand
-            &rands[4],            // b_col_rand
-            &concrete_oracles[6], // c_row_poly
-            &concrete_oracles[7], // c_row_poly
-            &concrete_oracles[8], // c_row_poly
-            &commitments[6],      // c_row_commit
-            &commitments[7],      // c_row_commit
-            &commitments[8],      // c_row_commit
-            &rands[6],            // c_row_rand
-            &rands[7],            // c_row_rand
-            &rands[8],            // c_row_rand
-            &mut fs_rng,
-            rng,
-        )
-        .unwrap();
-
-        // let proof = TFT::<F, PC, D>::prove(
-        //     &ck,
-        //     t,
-        //     &domain_k,
-        //     &domain_h,
-        //     Some(enforced_degree_bound),
-        //     //a
-        //     &row_a_poly,
-        //     &col_a_poly,
-        //     &a_commitments[0],
-        //     &a_commitments[1],
-        //     &a_rands[0],
-        //     &a_rands[1],
-        //     //b
-        //     &row_b_poly,
-        //     &col_b_poly,
-        //     &b_commitments[0],
-        //     &b_commitments[1],
-        //     &b_rands[0],
-        //     &b_rands[1],
-        //     //c
-        //     &row_c_poly,
-        //     &col_c_poly,
-        //     &val_c_poly,
-        //     &c_commitments[0],
-        //     &c_commitments[1],
-        //     &c_commitments[2],
-        //     &c_rands[0],
-        //     &c_rands[1],
-        //     &c_rands[2],
-        //     &mut fs_rng,
-        //     rng,
-        // )
-        // .unwrap();
-
-        // let is_valid = TFT::<F, PC, D>::verify(
-        //     &vk,
-        //     &ck,
-        //     t,
-        //     &a_commitments[0],
-        //     &a_commitments[1],
-        //     &b_commitments[0],
-        //     &b_commitments[1],
-        //     &c_commitments[0],
-        //     &c_commitments[1],
-        //     &c_commitments[2],
-        //     Some(enforced_degree_bound),
-        //     &domain_h,
-        //     &domain_k,
-        //     proof,
-        //     &mut fs_rng,
-        // );
-
-        // assert!(is_valid.is_ok());
-
-        // TODO: commit to these polynomials and try the proof of function relation!
+        let formatted_input_assignment = cb.assignment[..r1csf_index_from_synthesized.number_of_input_rows].to_vec();
+        let witness_assignment = cb.assignment[r1csf_index_from_synthesized.number_of_input_rows..].to_vec();
     }
 }
 
