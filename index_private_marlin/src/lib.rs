@@ -1414,19 +1414,15 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
             None,
         )); // TODO f should also be bounded with |K| -1
 
-        let is_valid = ZeroOverK::<F, PC, FS>::verify(
+        ZeroOverK::<F, PC, FS>::verify(
             proof.rational_sumcheck_zero_over_k_proof,
             &rational_sumcheck_commitments,
             None,
             &rational_sumcheck_vo,
             &domain_k,
             &index_vk.verifier_key,
-        );
-        println!("{:?}", is_valid);
+        )?;
 
-        if !evaluations_are_correct {
-            eprintln!("Outter PC::Check failed");
-        }
         end_timer!(verifier_time, || format!(
             " PC::Check for AHP Verifier linear equations: {}",
             evaluations_are_correct
