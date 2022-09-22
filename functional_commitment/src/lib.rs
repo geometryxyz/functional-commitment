@@ -84,7 +84,7 @@ mod tests {
         .unwrap();
 
         slt_test!(r1csf_index_from_synthesized.a, r1csf_index_from_synthesized.number_of_input_rows);
-        slt_test!(r1csf_index_from_synthesized.a, r1csf_index_from_synthesized.number_of_input_rows);
+        slt_test!(r1csf_index_from_synthesized.b, r1csf_index_from_synthesized.number_of_input_rows);
         diag_test!(r1csf_index_from_synthesized.c);
 
 
