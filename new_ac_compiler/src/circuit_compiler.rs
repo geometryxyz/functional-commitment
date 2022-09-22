@@ -16,7 +16,16 @@ pub struct VanillaCompiler<F: Field> {
 
 impl<F: Field> CircuitCompiler<F> for VanillaCompiler<F> {
     fn ac2tft(circuit: &Circuit) -> R1CSfIndex<F> {
-        let number_of_constraints = circuit.gates.len() + circuit.number_of_inputs + 1;
+        let mut number_of_constraints = circuit.gates.len() + circuit.number_of_inputs + 1;
+
+        let mut next_square = 1 as usize;
+        let mut exp = 0u32;
+        while next_square < number_of_constraints {
+            exp += 1;
+            next_square = 2u32.pow(exp).try_into().unwrap();
+        }
+        number_of_constraints = next_square;
+
         let number_of_input_rows = circuit.number_of_inputs + 1; // this is the `t` value in a t-functional triple
         let number_of_outputs = circuit.number_of_outputs;
 
@@ -53,6 +62,17 @@ impl<F: Field> CircuitCompiler<F> for VanillaCompiler<F> {
                     number_of_non_zero_entries_b += 1;
                 }
             }
+        }
+
+        // Create dummy constraints of 1 * 1 == 1
+        let x = circuit.gates.len() + circuit.number_of_inputs + 1;
+        for i in x..number_of_constraints {
+            // assumes that the index 0 contains the dummy input 1
+            // because lib.rs says "the first is always reserved for the constant 1"
+            a_matrix[i].push((F::one(), 0));
+            b_matrix[i].push((F::one(), 0));
+            number_of_non_zero_entries_a += 1;
+            number_of_non_zero_entries_b += 1;
         }
 
         let number_of_non_zero_entries = max(
