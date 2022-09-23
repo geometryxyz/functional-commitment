@@ -75,6 +75,7 @@ impl<F: Field> CircuitCompiler<F> for VanillaCompiler<F> {
             // because lib.rs says "the first is always reserved for the constant 1"
             a_matrix[i].push((F::one(), 0));
             b_matrix[i].push((F::one(), 0));
+            c_matrix[i].push((F::one(), 0));
             number_of_non_zero_entries_a += 1;
             number_of_non_zero_entries_b += 1;
         }
