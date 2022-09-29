@@ -22,11 +22,11 @@ mod tests {
         let mut cb = ConstraintBuilder::<F>::new();
 
         let synthesized_circuit = Circuit::synthesize(constraints, &mut cb).unwrap();
-        let r1csf_index_from_synthesized = VanillaCompiler::<F>::ac2tft(&synthesized_circuit);
+        let (r1csf_index_from_synthesized, a, b, c) = VanillaCompiler::<F>::ac2tft(&synthesized_circuit);
 
-        slt_test!(r1csf_index_from_synthesized.a, r1csf_index_from_synthesized.number_of_input_rows + 1);
-        slt_test!(r1csf_index_from_synthesized.b, r1csf_index_from_synthesized.number_of_input_rows + 1);
-        diag_test!(r1csf_index_from_synthesized.c);
+        slt_test!(a, r1csf_index_from_synthesized.number_of_input_rows);
+        slt_test!(b, r1csf_index_from_synthesized.number_of_input_rows);
+        diag_test!(c);
 
         // Perform matrix multiplications
         let inner_prod_fn = |row: &[(F, usize)]| {
@@ -37,18 +37,15 @@ mod tests {
             acc
         };
 
-        let z_a: Vec<F> = r1csf_index_from_synthesized
-            .a
+        let z_a: Vec<F> = a
             .iter()
             .map(|row| inner_prod_fn(row))
             .collect();
-        let z_b: Vec<F> = r1csf_index_from_synthesized
-            .b
+        let z_b: Vec<F> = b
             .iter()
             .map(|row| inner_prod_fn(row))
             .collect();
-        let z_c: Vec<F> = r1csf_index_from_synthesized
-            .c
+        let z_c: Vec<F> = c
             .iter()
             .map(|row| inner_prod_fn(row))
             .collect();

@@ -1,6 +1,6 @@
 use ark_ff::PrimeField;
 use ark_poly::{GeneralEvaluationDomain, EvaluationDomain};
-use ark_relations::r1cs::Matrix;
+use ark_serialize::{CanonicalSerialize, CanonicalDeserialize, SerializationError};
 use std::iter;
 
 pub mod circuit;
@@ -12,11 +12,17 @@ pub mod gate;
 pub mod tests;
 pub mod variable;
 
+use ark_std::{
+    io::{Read, Write},
+};
+
+pub type Matrix<F> = Vec<Vec<(F, usize)>>;
+
 /// A structure containing the output-final R1CS encoding of an arithmetic circuit. There are `t` input rows,
 /// the first is always reserved for the constant 1. All other input rows are for public data, regardless of
 /// whether this is a public variable or public constant.
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct R1CSfIndex<F: PrimeField> {
+#[derive(PartialEq, Eq, Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
+pub struct R1CSfIndex {
     /// Number of constrains (this is also the length of the matrices)
     pub number_of_constraints: usize,
 
@@ -29,23 +35,34 @@ pub struct R1CSfIndex<F: PrimeField> {
 
     /// The maximum number of non-zero entries
     pub number_of_non_zero_entries: usize,
-
-    pub a: Matrix<F>,
-    pub b: Matrix<F>,
-    pub c: Matrix<F>,
+    // pub a: Matrix<F>,
+    // pub b: Matrix<F>,
+    // pub c: Matrix<F>,
 }
 
-impl<F: PrimeField> R1CSfIndex<F> {
-    /// Iterate through the matrices of the index: A, B, C
-    pub fn iter_matrices(&self) -> impl Iterator<Item = &Matrix<F>> {
-        iter::once(&self.a)
-            .chain(iter::once(&self.b))
-            .chain(iter::once(&self.c))
+impl ark_ff::ToBytes
+    for R1CSfIndex
+{
+    fn write<W: Write>(&self, mut w: W) -> ark_std::io::Result<()> {
+        (self.number_of_constraints as u64).write(&mut w)?;
+        (self.number_of_input_rows as u64).write(&mut w)?;
+        (self.number_of_outputs as u64).write(&mut w)?;
+        (self.number_of_outputs as u64).write(&mut w)?;
+        (self.number_of_outputs as u64).write(&mut w)
     }
+}
+
+impl R1CSfIndex {
+    /// Iterate through the matrices of the index: A, B, C
+    // pub fn iter_matrices(&self) -> impl Iterator<Item = &Matrix<F>> {
+    //     iter::once(&self.a)
+    //         .chain(iter::once(&self.b))
+    //         .chain(iter::once(&self.c))
+    // }
 
     // since there are two domains: interpolation and input
     // for discrete log comparison it's required that input <= interpolation
-    pub fn check_domains_sizes(&self) -> bool {
+    pub fn check_domains_sizes<F: PrimeField>(&self) -> bool {
         // we work with circuits where number_of_constraints is always power of 2
         let interpolation_domain = GeneralEvaluationDomain::<F>::new(self.number_of_non_zero_entries).unwrap();
         self.number_of_constraints <= interpolation_domain.size()

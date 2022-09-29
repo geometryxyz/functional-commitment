@@ -21,7 +21,7 @@ digest = { version = "0.9" }
 
 [dev-dependencies]
 proof_of_function_relation = { path = "../proof_of_function_relation" }
-index_private_marlin = { path = "../index_private_marlin" }
+# index_private_marlin = { path = "../index_private_marlin" }
 ark-marlin = "0.3.0"
 ark-bn254 = "0.3.0"
 blake2 = { version = "0.9", default-features = false }

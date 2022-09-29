@@ -316,7 +316,6 @@ impl<F: PrimeField> AHPForR1CS<F> {
                     (-beta * g_1_at_beta, LCTerm::One),
                 ],
             );
-        println!("I'M HERE");
         debug_assert!(evals.get_lc_eval(&outer_sumcheck, beta)?.is_zero());
 
         linear_combinations.push(z_b);

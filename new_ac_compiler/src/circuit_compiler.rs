@@ -1,5 +1,6 @@
-use crate::R1CSfIndex;
+use crate::{R1CSfIndex, Matrix};
 use ark_ff::PrimeField;
+// use ark_marlin::ahp::indexer::Matrix;
 use std::{cmp::max, marker::PhantomData};
 
 use crate::{circuit::Circuit, empty_matrix, gate::GateType};
@@ -7,7 +8,7 @@ use crate::{circuit::Circuit, empty_matrix, gate::GateType};
 /// Given: an arithmetic circuit with ng gates, ni inputs, and no <= ng outputs, where gates are triples of (left_input_index, right_input_index, (add/mul))
 /// Produces: An index for R_R1CS-f(ng + ni + 1, ni + 1, no)
 pub trait CircuitCompiler<F: PrimeField> {
-    fn ac2tft(circuit: &Circuit) -> R1CSfIndex<F>;
+    fn ac2tft(circuit: &Circuit) -> (R1CSfIndex, Matrix<F>, Matrix<F>, Matrix<F>);
 }
 
 pub struct VanillaCompiler<F: PrimeField> {
@@ -15,7 +16,7 @@ pub struct VanillaCompiler<F: PrimeField> {
 }
 
 impl<F: PrimeField> CircuitCompiler<F> for VanillaCompiler<F> {
-    fn ac2tft(circuit: &Circuit) -> R1CSfIndex<F> {
+    fn ac2tft(circuit: &Circuit) -> (R1CSfIndex, Matrix<F>, Matrix<F>, Matrix<F>) {
         let number_of_constraints = circuit.gates.len() + circuit.number_of_inputs + 1;
         let number_of_input_rows = circuit.number_of_inputs + 1; // this is the `t` value in a t-functional triple
         let number_of_outputs = circuit.number_of_outputs;
@@ -60,14 +61,14 @@ impl<F: PrimeField> CircuitCompiler<F> for VanillaCompiler<F> {
             max(number_of_non_zero_entries_b, number_of_non_zero_entries_c),
         );
 
-        R1CSfIndex {
+        let index_info = R1CSfIndex {
             number_of_constraints,
             number_of_input_rows,
             number_of_outputs,
             number_of_non_zero_entries,
-            a: a_matrix,
-            b: b_matrix,
-            c: c_matrix,
-        }
+        };
+
+        (index_info, a_matrix, b_matrix, c_matrix)
+
     }
 }

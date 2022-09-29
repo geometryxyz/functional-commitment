@@ -5,8 +5,8 @@ members = [
     "zero_over_k",
     "fiat_shamir_rng",
     "proof_of_function_relation",
-    "index_private_marlin",
     "ac2tft",
     "functional_commitment",
-    "new_ac_compiler"
+    "new_ac_compiler", 
+    "new_marlin"
 ]

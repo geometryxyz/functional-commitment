@@ -10,7 +10,8 @@ ark-ff = { version = "^0.3.0", default-features = false }
 ark-poly = { version = "^0.3.0", default-features = false }
 ac2tft = { path = "../ac2tft"}
 homomorphic_poly_commit = { path = "../homomorphic_poly_commit"}
-index_private_marlin = { path = "../index_private_marlin"}
+# index_private_marlin = { path = "../index_private_marlin"}
+new_marlin = { path = "../new_marlin"}
 proof_of_function_relation = { path = "../proof_of_function_relation"}
 fiat_shamir_rng = { path = "../fiat_shamir_rng"}
 rand_chacha = { version = "0.3.0", default-features = false }

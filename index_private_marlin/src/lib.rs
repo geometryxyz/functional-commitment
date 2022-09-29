@@ -60,6 +60,7 @@ pub use data_structures::*;
 /// Implements an Algebraic Holographic Proof (AHP) for the R1CS indexed relation.
 pub mod ahp;
 pub use ahp::constraint_systems::fc_arith;
+pub use ahp::constraint_systems::fc_arith_withoud_reindexing;
 pub use ahp::AHPForR1CS;
 use ahp::{
     indexer::{IndexInfo, IndexPrivateIndex},
