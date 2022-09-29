@@ -22,17 +22,17 @@ impl Circuit {
         Self {
             gates: cb.gates.clone(),
             number_of_inputs: cb.number_of_inputs,
-            number_of_outputs: cb.number_of_ouputs,
+            number_of_outputs: cb.number_of_outputs,
         }
     }
 
     pub fn synthesize<Func, F>(f: Func, cb: &mut ConstraintBuilder<F>) -> Result<Self, Error>
     where
         F: Field,
-        Func: Fn(&mut ConstraintBuilder<F>) -> Result<(), Error>,
+        Func: FnOnce(&mut ConstraintBuilder<F>) -> Result<(), Error>,
     {
-        // let mut cb = ConstraintBuilder::new(number_of_outputs);
         f(cb)?;
+        cb.finalize();
         Ok(Self::from_constraint_builder(&cb))
     }
 }

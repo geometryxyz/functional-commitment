@@ -1,4 +1,5 @@
-use ark_ff::Field;
+use ark_ff::PrimeField;
+use ark_poly::{GeneralEvaluationDomain, EvaluationDomain};
 use ark_relations::r1cs::Matrix;
 use std::iter;
 
@@ -15,7 +16,7 @@ pub mod variable;
 /// the first is always reserved for the constant 1. All other input rows are for public data, regardless of
 /// whether this is a public variable or public constant.
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct R1CSfIndex<F: Field> {
+pub struct R1CSfIndex<F: PrimeField> {
     /// Number of constrains (this is also the length of the matrices)
     pub number_of_constraints: usize,
 
@@ -34,16 +35,24 @@ pub struct R1CSfIndex<F: Field> {
     pub c: Matrix<F>,
 }
 
-impl<F: Field> R1CSfIndex<F> {
+impl<F: PrimeField> R1CSfIndex<F> {
     /// Iterate through the matrices of the index: A, B, C
     pub fn iter_matrices(&self) -> impl Iterator<Item = &Matrix<F>> {
         iter::once(&self.a)
             .chain(iter::once(&self.b))
             .chain(iter::once(&self.c))
     }
+
+    // since there are two domains: interpolation and input
+    // for discrete log comparison it's required that input <= interpolation
+    pub fn check_domains_sizes(&self) -> bool {
+        // we work with circuits where number_of_constraints is always power of 2
+        let interpolation_domain = GeneralEvaluationDomain::<F>::new(self.number_of_non_zero_entries).unwrap();
+        self.number_of_constraints <= interpolation_domain.size()
+    }
 }
 
-fn empty_matrix<F: Field>(length: usize) -> Matrix<F> {
+fn empty_matrix<F: PrimeField>(length: usize) -> Matrix<F> {
     let mut matrix = vec![];
     for _ in 0..length {
         matrix.push(vec![]);
@@ -69,7 +78,7 @@ macro_rules! slt_test {
     ($matrix:expr, $num_of_pub_inputs_plus_one:expr) => {
         for (row_index, row) in $matrix.iter().enumerate() {
             for (_, col_index) in row {
-                assert!(row_index >= $num_of_pub_inputs_plus_one);
+                // assert!(row_index > $num_of_pub_inputs_plus_one);
                 assert!(row_index > *col_index);
             }
         }

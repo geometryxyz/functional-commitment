@@ -12,7 +12,7 @@ pub struct ConstraintBuilder<F: Field> {
     label_to_var_index: BTreeMap<String, usize>,
     curr_index: usize,
     pub(crate) number_of_inputs: usize,
-    pub(crate) number_of_ouputs: usize,
+    pub(crate) number_of_outputs: usize,
     pub assignment: Vec<F>,
     _f: PhantomData<F>,
 }
@@ -24,7 +24,7 @@ impl<F: Field> ConstraintBuilder<F> {
             label_to_var_index: BTreeMap::new(),
             curr_index: 1, // we reserve first input to be dummy selector constraint for addition
             number_of_inputs: 0,
-            number_of_ouputs: 0,
+            number_of_outputs: 0,
             assignment: vec![F::one()], // we add 1 to be the value of dummy selector
             _f: PhantomData,
         }
@@ -114,12 +114,42 @@ impl<F: Field> ConstraintBuilder<F> {
             }
             VariableType::Witness => {}
             VariableType::Output => {
-                self.number_of_ouputs += 1;
+                self.number_of_outputs += 1;
             }
         };
 
         self.assignment.push(value);
 
         Ok(var)
+    }
+
+    // we want assignment to be power of 2
+    // after all user constraints are added
+    // additional dummy gates are appended to fullfil this
+    pub fn finalize(&mut self) {
+        let next_power_of_2 = |val: usize| -> usize {
+            let val_f64 = val as f64;
+            let log2_val = val_f64.log2().floor() as u32;
+            if 2u32.pow(log2_val) == val_f64 as u32 {
+                return val;
+            } else {
+                return 2u32.pow(1u32 + log2_val).try_into().unwrap();
+            }
+        };
+
+        let unnormalized_num_of_constraints = self.gates.len() + self.number_of_inputs + 1;
+        let number_of_constraints = next_power_of_2(unnormalized_num_of_constraints);
+        let number_of_dummy_constraints = number_of_constraints - unnormalized_num_of_constraints;
+
+        // dummy constraint is represented as 1 * 1 = 1 where we refer to dummy variable at first position
+        let output_gates = self.gates.split_off(self.gates.len() - self.number_of_outputs);
+        let dummy_gates = vec![Gate::new(0, 0, GateType::Mul); number_of_dummy_constraints];
+        self.gates.extend(dummy_gates);
+        self.gates.extend(output_gates);
+
+        let outputs = self.assignment.split_off(unnormalized_num_of_constraints - self.number_of_outputs);
+        let dummy_assignment = vec![F::one(); number_of_dummy_constraints];
+        self.assignment.extend(&dummy_assignment);
+        self.assignment.extend(&outputs);
     }
 }

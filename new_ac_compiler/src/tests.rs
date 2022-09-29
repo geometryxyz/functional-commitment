@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod tests {
-    use crate::tests::naive_matrix_encoding;
     use crate::variable::VariableType;
     use crate::{
         circuit::Circuit,
@@ -8,55 +7,26 @@ mod tests {
         constraint_builder::ConstraintBuilder,
         diag_test,
         error::Error,
-        example_circuits::sample_circuit_2,
         gate::GateType,
-        printmatrix, slt_test, R1CSfIndex,
+        slt_test,
     };
-    use ark_bn254::Bn254;
     use ark_bn254::Fr;
-    use ark_ff::{to_bytes, Zero};
-    use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
-    use ark_poly_commit::PolynomialCommitment;
-    use ark_std::rand::thread_rng;
-    use blake2::Blake2s;
-    use fiat_shamir_rng::{FiatShamirRng, SimpleHashFiatShamirRng};
-    use homomorphic_poly_commit::{marlin_kzg::KZG10, AdditivelyHomomorphicPCS};
-    use proof_of_function_relation::t_functional_triple::TFT;
-    use rand_chacha::ChaChaRng;
+    use ark_ff::Zero;
 
     type F = Fr;
-    type PC = KZG10<Bn254>;
-    type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
 
-    #[test]
-    fn test_matrix_correctness() {
-        let constraints = |cb: &mut ConstraintBuilder<F>| -> Result<(), Error> {
-            let two = cb.new_input_variable("two", F::from(2u64))?;
-            let five = cb.new_input_variable("five", F::from(5u64))?;
-            let x = cb.new_input_variable("x", F::from(7u64))?;
-
-            let x_square = cb.enforce_constraint(&x, &x, GateType::Mul, VariableType::Witness)?;
-            let x_cube =
-                cb.enforce_constraint(&x_square, &x, GateType::Mul, VariableType::Witness)?;
-
-            let two_x = cb.enforce_constraint(&two, &x, GateType::Mul, VariableType::Witness)?;
-            let x_qubed_plus_2x =
-                cb.enforce_constraint(&x_cube, &two_x, GateType::Add, VariableType::Witness)?;
-
-            let _ = cb.enforce_constraint(
-                &x_qubed_plus_2x,
-                &five,
-                GateType::Add,
-                VariableType::Output,
-            )?;
-
-            Ok(())
-        };
-
+    fn circuit_test_template<Func>(constraints: Func) 
+        where
+            Func: FnOnce(&mut ConstraintBuilder<F>) -> Result<(), Error>,
+    {
         let mut cb = ConstraintBuilder::<F>::new();
 
         let synthesized_circuit = Circuit::synthesize(constraints, &mut cb).unwrap();
         let r1csf_index_from_synthesized = VanillaCompiler::<F>::ac2tft(&synthesized_circuit);
+
+        slt_test!(r1csf_index_from_synthesized.a, r1csf_index_from_synthesized.number_of_input_rows + 1);
+        slt_test!(r1csf_index_from_synthesized.b, r1csf_index_from_synthesized.number_of_input_rows + 1);
+        diag_test!(r1csf_index_from_synthesized.c);
 
         // Perform matrix multiplications
         let inner_prod_fn = |row: &[(F, usize)]| {
@@ -89,105 +59,32 @@ mod tests {
             assert_eq!(za_i * zb_i, zc_i);
         }
     }
-}
 
-use crate::R1CSfIndex;
-use ark_ff::FftField;
-use ark_poly::{univariate::DensePolynomial, EvaluationDomain, UVPolynomial};
-use ark_poly_commit::LabeledPolynomial;
-use ark_relations::r1cs::Matrix;
+    #[test]
+    fn test_simple_circuit() {
+        let constraints = |cb: &mut ConstraintBuilder<F>| -> Result<(), Error> {
+            let two = cb.new_input_variable("two", F::from(2u64))?;
+            let five = cb.new_input_variable("five", F::from(5u64))?;
+            let x = cb.new_input_variable("x", F::from(7u64))?;
 
-/// A naive encoding of the R1CSfIndex into polynomial. For testing with proof of function relation
-pub fn naive_matrix_encoding<F: FftField, D: EvaluationDomain<F>>(
-    index: &R1CSfIndex<F>,
-    domain_k: D,
-    domain_h: D,
-) -> Vec<LabeledPolynomial<F, DensePolynomial<F>>> {
-    let encode_and_pad_matrix = |matrix: Matrix<F>| {
-        let omega = domain_h.element(1);
-        let zero = F::zero();
+            let x_square = cb.enforce_constraint(&x, &x, GateType::Mul, VariableType::Witness)?;
+            let x_cube =
+                cb.enforce_constraint(&x_square, &x, GateType::Mul, VariableType::Witness)?;
 
-        let mut row_evals = vec![F::zero(); domain_k.size()];
-        let mut col_evals = vec![F::zero(); domain_k.size()];
-        let mut val_evals = vec![F::zero(); domain_k.size()];
+            let two_x = cb.enforce_constraint(&two, &x, GateType::Mul, VariableType::Witness)?;
+            let x_qubed_plus_2x =
+                cb.enforce_constraint(&x_cube, &two_x, GateType::Add, VariableType::Witness)?;
 
-        let mut non_zero_entries = Vec::new();
-        for (row_index, row) in matrix.iter().enumerate() {
-            for (value, column_index) in row {
-                non_zero_entries.push((row_index, column_index, value));
-            }
-        }
+            let _ = cb.enforce_constraint(
+                &x_qubed_plus_2x,
+                &five,
+                GateType::Add,
+                VariableType::Output,
+            )?;
 
-        if non_zero_entries.len() < domain_k.size() {
-            let padding_length = domain_k.size() - non_zero_entries.len();
-            let last_row = non_zero_entries.last().unwrap().0;
-            let last_col = non_zero_entries.last().unwrap().1;
-            for _i in 0..padding_length {
-                non_zero_entries.push((last_row, last_col, &zero));
-            }
-        }
+            Ok(())
+        };
 
-        for (i, (r_i, c_i, v_i)) in non_zero_entries.iter().enumerate() {
-            row_evals[i] = omega.pow(&[*r_i as u64]);
-            col_evals[i] = omega.pow(&[**c_i as u64]);
-            val_evals[i] = **v_i;
-        }
-
-        let row_poly = DensePolynomial::from_coefficients_vec(domain_k.ifft(&row_evals));
-        let col_poly = DensePolynomial::from_coefficients_vec(domain_k.ifft(&col_evals));
-        let val_poly = DensePolynomial::from_coefficients_vec(domain_k.ifft(&val_evals));
-
-        vec![row_poly, col_poly, val_poly]
-    };
-
-    let encode_and_pad_c = |matrix: Matrix<F>| {
-        let omega = domain_h.element(1);
-        let zero = F::zero();
-
-        let mut row_evals = vec![F::zero(); domain_k.size()];
-        let mut col_evals = vec![F::zero(); domain_k.size()];
-        let mut val_evals = vec![F::zero(); domain_k.size()];
-
-        let mut non_zero_entries = Vec::new();
-        for (row_index, row) in matrix.iter().enumerate() {
-            for (value, column_index) in row {
-                non_zero_entries.push((row_index, column_index, value));
-            }
-        }
-
-        if non_zero_entries.len() < domain_k.size() {
-            let padding_length = domain_k.size() - non_zero_entries.len();
-            for _i in 0..padding_length {
-                non_zero_entries.push((1, &1, &zero));
-            }
-        }
-
-        for (i, (r_i, c_i, v_i)) in non_zero_entries.iter().enumerate() {
-            row_evals[i] = omega.pow(&[*r_i as u64]);
-            col_evals[i] = omega.pow(&[**c_i as u64]);
-            val_evals[i] = **v_i;
-        }
-
-        let row_poly = DensePolynomial::from_coefficients_vec(domain_k.ifft(&row_evals));
-        let col_poly = DensePolynomial::from_coefficients_vec(domain_k.ifft(&col_evals));
-        let val_poly = DensePolynomial::from_coefficients_vec(domain_k.ifft(&val_evals));
-
-        vec![row_poly, col_poly, val_poly]
-    };
-
-    let a_polys = encode_and_pad_matrix(index.a.clone());
-    let b_polys = encode_and_pad_matrix(index.b.clone());
-    let c_polys = encode_and_pad_c(index.c.clone());
-
-    let labels = vec![
-        "a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val",
-    ];
-    let labels = labels.iter().map(|&str| String::from(str));
-
-    let all_labeled_polys: Vec<LabeledPolynomial<F, DensePolynomial<F>>> = labels
-        .zip(a_polys.iter().chain(b_polys.iter()).chain(c_polys.iter()))
-        .map(|(label, poly)| LabeledPolynomial::new(label, poly.clone(), None, None))
-        .collect();
-
-    all_labeled_polys
+        circuit_test_template(constraints)
+    }
 }
