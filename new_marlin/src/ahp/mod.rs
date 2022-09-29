@@ -76,10 +76,10 @@ impl<F: PrimeField> AHPForR1CS<F> {
                 deg(g2) = |K| - 2
                 deg(h2) = max(a, f*b) - vanishing = 7|K| - 7 - |K| = 6|K| - 7
 
-                !!! 
+                !!!
                     when working with zero over K, our oracles are masked with polynomials of degree |K| + 1
-                    when proving zero over k for rational sumcheck we have to commit to polynomial h2 
-                    
+                    when proving zero over k for rational sumcheck we have to commit to polynomial h2
+
                     that's why degrees of concrete oracles will be |K| + 1 instead of |K| - 1
                     deg(val) = |K| + 1
                     deg(row) = |K| + 1
@@ -100,8 +100,8 @@ impl<F: PrimeField> AHPForR1CS<F> {
     }
 
     /// Get all the strict degree bounds enforced in the AHP.
-    pub fn get_degree_bounds(info: &R1CSfIndex) -> [usize; 3] {
-        let mut degree_bounds = [0usize; 3];
+    pub fn get_degree_bounds(info: &R1CSfIndex) -> [usize; 4] {
+        let mut degree_bounds = [0usize; 4];
 
         let h_size =
             GeneralEvaluationDomain::<F>::compute_size_of_domain(info.number_of_constraints)
@@ -113,6 +113,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
         degree_bounds[0] = h_size - 2; // for g1
         degree_bounds[1] = k_size - 2; // for g2
         degree_bounds[2] = 2; // mask poly in zero over k
+        degree_bounds[3] = k_size + 1; // this is needed in tft proof TODO: create better index function abstraction
         degree_bounds
     }
 
@@ -125,36 +126,36 @@ impl<F: PrimeField> AHPForR1CS<F> {
     where
         E: EvaluationsProvider<F>,
     {
-    let domain_h = state.domain_h;
-    let domain_k = state.domain_k;
-    let k_size = domain_k.size_as_field_element();
+        let domain_h = state.domain_h;
+        let domain_k = state.domain_k;
+        let k_size = domain_k.size_as_field_element();
 
-    let first_round_msg = state.first_round_msg.unwrap();
-    let alpha = first_round_msg.alpha;
-    let eta_a = first_round_msg.eta_a;
-    let eta_b = first_round_msg.eta_b;
-    let eta_c = first_round_msg.eta_c;
+        let first_round_msg = state.first_round_msg.unwrap();
+        let alpha = first_round_msg.alpha;
+        let eta_a = first_round_msg.eta_a;
+        let eta_b = first_round_msg.eta_b;
+        let eta_c = first_round_msg.eta_c;
 
-    let beta = state.second_round_msg.unwrap().beta;
-    let gamma = state.gamma.unwrap();
+        let beta = state.second_round_msg.unwrap().beta;
+        let gamma = state.gamma.unwrap();
 
-    let mut linear_combinations = Vec::new();
+        let mut linear_combinations = Vec::new();
 
-    // Constants
-    let r_alpha_at_beta = domain_h.eval_unnormalized_bivariate_lagrange_poly(alpha, beta);
-    let _v_H_at_alpha = domain_h.evaluate_vanishing_polynomial(alpha);
-    let v_H_at_beta = domain_h.evaluate_vanishing_polynomial(beta);
+        // Constants
+        let r_alpha_at_beta = domain_h.eval_unnormalized_bivariate_lagrange_poly(alpha, beta);
+        let _v_H_at_alpha = domain_h.evaluate_vanishing_polynomial(alpha);
+        let v_H_at_beta = domain_h.evaluate_vanishing_polynomial(beta);
 
-    // Outer sumcheck:
-    let z_b = LinearCombination::new("z_b", vec![(F::one(), "z_b")]);
-    let g_1 = LinearCombination::new("g_1", vec![(F::one(), "g_1")]);
-    let t = LinearCombination::new("t", vec![(F::one(), "t")]);
+        // Outer sumcheck:
+        let z_b = LinearCombination::new("z_b", vec![(F::one(), "z_b")]);
+        let g_1 = LinearCombination::new("g_1", vec![(F::one(), "g_1")]);
+        let t = LinearCombination::new("t", vec![(F::one(), "t")]);
 
-    let z_b_at_beta = evals.get_lc_eval(&z_b, beta)?;
-    let t_at_beta = evals.get_lc_eval(&t, beta)?;
-    let g_1_at_beta = evals.get_lc_eval(&g_1, beta)?;
+        let z_b_at_beta = evals.get_lc_eval(&z_b, beta)?;
+        let t_at_beta = evals.get_lc_eval(&t, beta)?;
+        let g_1_at_beta = evals.get_lc_eval(&g_1, beta)?;
 
-    #[rustfmt::skip]
+        #[rustfmt::skip]
         let outer_sumcheck = LinearCombination::new(
             "outer_sumcheck",
             vec![
@@ -169,34 +170,34 @@ impl<F: PrimeField> AHPForR1CS<F> {
                 (-beta * g_1_at_beta, LCTerm::One),
             ],
         );
-    debug_assert!(evals.get_lc_eval(&outer_sumcheck, beta)?.is_zero());
+        debug_assert!(evals.get_lc_eval(&outer_sumcheck, beta)?.is_zero());
 
-    linear_combinations.push(z_b);
-    linear_combinations.push(g_1);
-    linear_combinations.push(t);
-    linear_combinations.push(outer_sumcheck);
+        linear_combinations.push(z_b);
+        linear_combinations.push(g_1);
+        linear_combinations.push(t);
+        linear_combinations.push(outer_sumcheck);
 
-    // f sumcheck test
+        // f sumcheck test
 
-    let g_2 = LinearCombination::new("g_2", vec![(F::one(), "g_2")]);
-    let g_2_at_gamma = evals.get_lc_eval(&g_2, gamma)?;
+        let g_2 = LinearCombination::new("g_2", vec![(F::one(), "g_2")]);
+        let g_2_at_gamma = evals.get_lc_eval(&g_2, gamma)?;
 
-    let f_sumcheck = LinearCombination::<F>::new(
-        "f_sumcheck",
-        vec![
-            (F::one(), "inner_mask_poly".into()),
-            (F::one(), "f".into()),
-            (-gamma * g_2_at_gamma, LCTerm::One),
-            (-(t_at_beta / k_size), LCTerm::One),
-        ],
-    );
+        let f_sumcheck = LinearCombination::<F>::new(
+            "f_sumcheck",
+            vec![
+                (F::one(), "inner_mask_poly".into()),
+                (F::one(), "f".into()),
+                (-gamma * g_2_at_gamma, LCTerm::One),
+                (-(t_at_beta / k_size), LCTerm::One),
+            ],
+        );
 
-    debug_assert!(evals.get_lc_eval(&f_sumcheck, gamma)?.is_zero());
-    linear_combinations.push(g_2);
-    linear_combinations.push(f_sumcheck);
+        debug_assert!(evals.get_lc_eval(&f_sumcheck, gamma)?.is_zero());
+        linear_combinations.push(g_2);
+        linear_combinations.push(f_sumcheck);
 
-    linear_combinations.sort_by(|a, b| a.label.cmp(&b.label));
-    Ok(linear_combinations)
+        linear_combinations.sort_by(|a, b| a.label.cmp(&b.label));
+        Ok(linear_combinations)
     }
 }
 

@@ -15,14 +15,15 @@ mod tests {
 
     type F = Fr;
 
-    fn circuit_test_template<Func>(constraints: Func) 
-        where
-            Func: FnOnce(&mut ConstraintBuilder<F>) -> Result<(), Error>,
+    fn circuit_test_template<Func>(constraints: Func)
+    where
+        Func: FnOnce(&mut ConstraintBuilder<F>) -> Result<(), Error>,
     {
         let mut cb = ConstraintBuilder::<F>::new();
 
         let synthesized_circuit = Circuit::synthesize(constraints, &mut cb).unwrap();
-        let (r1csf_index_from_synthesized, a, b, c) = VanillaCompiler::<F>::ac2tft(&synthesized_circuit);
+        let (r1csf_index_from_synthesized, a, b, c) =
+            VanillaCompiler::<F>::ac2tft(&synthesized_circuit);
 
         slt_test!(a, r1csf_index_from_synthesized.number_of_input_rows);
         slt_test!(b, r1csf_index_from_synthesized.number_of_input_rows);
@@ -37,18 +38,9 @@ mod tests {
             acc
         };
 
-        let z_a: Vec<F> = a
-            .iter()
-            .map(|row| inner_prod_fn(row))
-            .collect();
-        let z_b: Vec<F> = b
-            .iter()
-            .map(|row| inner_prod_fn(row))
-            .collect();
-        let z_c: Vec<F> = c
-            .iter()
-            .map(|row| inner_prod_fn(row))
-            .collect();
+        let z_a: Vec<F> = a.iter().map(|row| inner_prod_fn(row)).collect();
+        let z_b: Vec<F> = b.iter().map(|row| inner_prod_fn(row)).collect();
+        let z_c: Vec<F> = c.iter().map(|row| inner_prod_fn(row)).collect();
 
         assert_eq!(z_a.len(), z_b.len());
         assert_eq!(z_b.len(), z_c.len());

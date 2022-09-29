@@ -10,9 +10,9 @@ use ark_std::{
     io::{Read, Write},
 };
 
-use new_ac_compiler::R1CSfIndex;
 use ::zero_over_k::zero_over_k::proof::Proof as ZeroOverKProof;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
+use new_ac_compiler::R1CSfIndex;
 
 /* ************************************************************************* */
 /* ************************************************************************* */
@@ -83,7 +83,7 @@ pub struct VerifierKey<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> {
     // pub c_val_commit: PC::Commitment,
     /// a(row, col, val), b(row, col, val), c(row, col, val),
 
-    /// commitments of (row, col, val) for each matrix 
+    /// commitments of (row, col, val) for each matrix
     pub commits: Vec<PC::Commitment>,
 
     /// verifier key
@@ -104,9 +104,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> Clone for VerifierKey<F, PC
     }
 }
 
-impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> ark_ff::ToBytes
-    for VerifierKey<F, PC>
-{
+impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> ark_ff::ToBytes for VerifierKey<F, PC> {
     fn write<W: Write>(&self, mut w: W) -> ark_std::io::Result<()> {
         self.index_info.write(&mut w)?;
         self.commits.write(&mut w)

@@ -142,12 +142,16 @@ impl<F: Field> ConstraintBuilder<F> {
         let number_of_dummy_constraints = number_of_constraints - unnormalized_num_of_constraints;
 
         // dummy constraint is represented as 1 * 1 = 1 where we refer to dummy variable at first position
-        let output_gates = self.gates.split_off(self.gates.len() - self.number_of_outputs);
+        let output_gates = self
+            .gates
+            .split_off(self.gates.len() - self.number_of_outputs);
         let dummy_gates = vec![Gate::new(0, 0, GateType::Mul); number_of_dummy_constraints];
         self.gates.extend(dummy_gates);
         self.gates.extend(output_gates);
 
-        let outputs = self.assignment.split_off(unnormalized_num_of_constraints - self.number_of_outputs);
+        let outputs = self
+            .assignment
+            .split_off(unnormalized_num_of_constraints - self.number_of_outputs);
         let dummy_assignment = vec![F::one(); number_of_dummy_constraints];
         self.assignment.extend(&dummy_assignment);
         self.assignment.extend(&outputs);

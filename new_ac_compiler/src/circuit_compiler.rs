@@ -1,4 +1,4 @@
-use crate::{R1CSfIndex, Matrix};
+use crate::{Matrix, R1CSfIndex};
 use ark_ff::PrimeField;
 // use ark_marlin::ahp::indexer::Matrix;
 use std::{cmp::max, marker::PhantomData};
@@ -69,6 +69,5 @@ impl<F: PrimeField> CircuitCompiler<F> for VanillaCompiler<F> {
         };
 
         (index_info, a_matrix, b_matrix, c_matrix)
-
     }
 }

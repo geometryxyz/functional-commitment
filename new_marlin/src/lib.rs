@@ -2,13 +2,15 @@ pub mod ahp;
 pub mod data_structures;
 pub mod error;
 
-
-use ahp::{constraint_systems::arithmetize_matrix, indexer::{Index, Matrix}};
-use data_structures::{UniversalSRS, ProverKey, VerifierKey, Proof};
+use crate::ahp::{AHPForR1CS, EvaluationsProvider};
 use ::zero_over_k::{
     virtual_oracle::generic_shifting_vo::{vo_term::VOTerm, GenericShiftingVO},
     vo_constant,
     zero_over_k::ZeroOverK,
+};
+use ahp::{
+    constraint_systems::arithmetize_matrix,
+    indexer::{Index, Matrix},
 };
 use ark_ff::{to_bytes, PrimeField, UniformRand};
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
@@ -16,11 +18,10 @@ use ark_poly_commit::{Evaluations, PCRandomness};
 use ark_poly_commit::{LabeledCommitment, PCUniversalParams};
 use ark_relations::r1cs::ConstraintSynthesizer;
 use ark_std::rand::RngCore;
+use data_structures::{Proof, ProverKey, UniversalSRS, VerifierKey};
 use fiat_shamir_rng::FiatShamirRng;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use new_ac_compiler::R1CSfIndex;
-use crate::ahp::{AHPForR1CS, EvaluationsProvider};
-
 
 #[macro_use]
 extern crate ark_std;
@@ -36,7 +37,7 @@ use ark_std::{
 
 pub use error::*;
 
-// pub use ahp::constraint_systems::arithmetize_matrix; //TODO: for 
+// pub use ahp::constraint_systems::arithmetize_matrix; //TODO: for
 
 /// The compiled argument system.
 pub struct Marlin<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng>(
@@ -73,8 +74,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         a: Matrix<F>,
         b: Matrix<F>,
         c: Matrix<F>,
-    ) -> Result<(ProverKey<F, PC>, VerifierKey<F, PC>, Vec<PC::Randomness>), Error<PC::Error>>
-    {
+    ) -> Result<(ProverKey<F, PC>, VerifierKey<F, PC>, Vec<PC::Randomness>), Error<PC::Error>> {
         if !index_info.check_domains_sizes::<F>() {
             return Err(Error::DomainHLargerThanDomainK);
         }
@@ -154,18 +154,11 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
     ) -> Result<Proof<F, PC>, Error<PC::Error>> {
         let prover_time = start_timer!(|| "Marlin::Prover");
 
-        let prover_init_state =
-            AHPForR1CS::prover_init(&index_pk.index, assignment)?;
+        let prover_init_state = AHPForR1CS::prover_init(&index_pk.index, assignment)?;
         let public_input = prover_init_state.public_input();
 
-        let mut fs_rng = FS::initialize(
-            &to_bytes![
-                &Self::PROTOCOL_NAME,
-                &index_pk.vk, 
-                &public_input
-            ]
-            .unwrap(),
-        );
+        let mut fs_rng =
+            FS::initialize(&to_bytes![&Self::PROTOCOL_NAME, &index_pk.vk, &public_input].unwrap());
 
         // --------------------------------------------------------------------
         // First round
@@ -192,11 +185,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         // Second round
 
         let (prover_second_msg, prover_second_oracles, prover_state) =
-            AHPForR1CS::prover_second_round(
-                &verifier_first_msg,
-                prover_state,
-                zk_rng,
-            );
+            AHPForR1CS::prover_second_round(&verifier_first_msg, prover_state, zk_rng);
 
         let domain_k = prover_state.domain_k.clone();
 
@@ -235,8 +224,8 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         // --------------------------------------------------------------------
 
         // Gather prover polynomials in one vector.
-        let polynomials: Vec<_> = 
-            prover_first_oracles.iter()
+        let polynomials: Vec<_> = prover_first_oracles
+            .iter()
             .chain(prover_second_oracles.iter())
             .chain(prover_third_oracles.iter())
             .collect();
@@ -249,15 +238,16 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
                 third_comms.iter().map(|p| p.commitment().clone()).collect(),
             ];
 
-        let labeled_comms: Vec<_> = 
-            first_comms.iter().cloned()
+        let labeled_comms: Vec<_> = first_comms
+            .iter()
+            .cloned()
             .chain(second_comms.iter().cloned())
             .chain(third_comms.iter().cloned())
             .collect();
 
         // Gather commitment randomness together.
-        let comm_rands: Vec<PC::Randomness> = 
-            first_comm_rands.into_iter()
+        let comm_rands: Vec<PC::Randomness> = first_comm_rands
+            .into_iter()
             .chain(second_comm_rands)
             .chain(third_comm_rands)
             .collect();
@@ -379,7 +369,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
     ) -> Result<bool, Error<PC::Error>> {
         let verifier_time = start_timer!(|| "Marlin::Verify");
 
-        // let public_input = 
+        // let public_input =
         //     let domain_x = GeneralEvaluationDomain::<F>::new(public_input.len()).unwrap();
 
         //     let mut unpadded_input = public_input.to_vec();
@@ -425,17 +415,18 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         // degree bounds because we know the committed index polynomial has the
         // correct degree.
         let index_info = vk.index_info.clone();
-        let degree_bounds = 
-            AHPForR1CS::<F>::prover_first_round_degree_bounds(&index_info)
-            .chain(AHPForR1CS::<F>::prover_second_round_degree_bounds(&index_info))
+        let degree_bounds = AHPForR1CS::<F>::prover_first_round_degree_bounds(&index_info)
+            .chain(AHPForR1CS::<F>::prover_second_round_degree_bounds(
+                &index_info,
+            ))
             .chain(AHPForR1CS::<F>::prover_third_round_degree_bounds(
                 &index_info,
             ))
             .collect::<Vec<_>>();
 
         // Gather commitments in one vector.
-        let commitments: Vec<_> = 
-            first_comms.into_iter()
+        let commitments: Vec<_> = first_comms
+            .into_iter()
             .chain(second_comms)
             .chain(third_comms)
             .cloned()
@@ -464,10 +455,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
             evaluations.insert(q, *eval);
         }
 
-        let lc_s = AHPForR1CS::construct_linear_combinations(
-            &evaluations,
-            &verifier_state,
-        )?;
+        let lc_s = AHPForR1CS::construct_linear_combinations(&evaluations, &verifier_state)?;
 
         let evaluations_are_correct = PC::check_combinations(
             &vk.verifier_key,
@@ -524,7 +512,6 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         Ok(evaluations_are_correct)
     }
 }
-
 
 // TODO: we must make this nicer! :)
 /// A closure to be used for the Marlin rational sumcheck virtual oracle. The expected terms are:

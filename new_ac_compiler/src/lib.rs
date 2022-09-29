@@ -1,6 +1,6 @@
 use ark_ff::PrimeField;
-use ark_poly::{GeneralEvaluationDomain, EvaluationDomain};
-use ark_serialize::{CanonicalSerialize, CanonicalDeserialize, SerializationError};
+use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use std::iter;
 
 pub mod circuit;
@@ -12,9 +12,7 @@ pub mod gate;
 pub mod tests;
 pub mod variable;
 
-use ark_std::{
-    io::{Read, Write},
-};
+use ark_std::io::{Read, Write};
 
 pub type Matrix<F> = Vec<Vec<(F, usize)>>;
 
@@ -40,9 +38,7 @@ pub struct R1CSfIndex {
     // pub c: Matrix<F>,
 }
 
-impl ark_ff::ToBytes
-    for R1CSfIndex
-{
+impl ark_ff::ToBytes for R1CSfIndex {
     fn write<W: Write>(&self, mut w: W) -> ark_std::io::Result<()> {
         (self.number_of_constraints as u64).write(&mut w)?;
         (self.number_of_input_rows as u64).write(&mut w)?;
@@ -64,7 +60,8 @@ impl R1CSfIndex {
     // for discrete log comparison it's required that input <= interpolation
     pub fn check_domains_sizes<F: PrimeField>(&self) -> bool {
         // we work with circuits where number_of_constraints is always power of 2
-        let interpolation_domain = GeneralEvaluationDomain::<F>::new(self.number_of_non_zero_entries).unwrap();
+        let interpolation_domain =
+            GeneralEvaluationDomain::<F>::new(self.number_of_non_zero_entries).unwrap();
         self.number_of_constraints <= interpolation_domain.size()
     }
 }

@@ -14,8 +14,10 @@ use new_ac_compiler::R1CSfIndex;
 use crate::ahp::UnnormalizedBivariateLagrangePoly;
 
 use super::{
-    constraint_systems::LabeledPolynomial, indexer::{Index, Matrix}, verifier::{VerifierFirstMsg, VerifierSecondMsg}, AHPForR1CS,
-    Error,
+    constraint_systems::LabeledPolynomial,
+    indexer::{Index, Matrix},
+    verifier::{VerifierFirstMsg, VerifierSecondMsg},
+    AHPForR1CS, Error,
 };
 
 /// State for the AHP prover.
@@ -386,17 +388,12 @@ impl<F: PrimeField> AHPForR1CS<F> {
         EvaluationsOnDomain::from_vec_and_domain(t_evals_on_h, domain_h).interpolate()
     }
 
-
     /// Output the second round message and the next state for second round.
     pub fn prover_second_round<'a, R: RngCore>(
         ver_message: &VerifierFirstMsg<F>,
         mut state: ProverState<'a, F>,
         _r: &mut R,
-    ) -> (
-        ProverMsg<F>,
-        ProverSecondOracles<F>,
-        ProverState<'a, F>,
-    ) {
+    ) -> (ProverMsg<F>, ProverSecondOracles<F>, ProverState<'a, F>) {
         let round_time = start_timer!(|| "AHP::Prover::SecondRound");
 
         let domain_h = state.domain_h;
@@ -512,7 +509,8 @@ impl<F: PrimeField> AHPForR1CS<F> {
         info: &R1CSfIndex,
     ) -> impl Iterator<Item = Option<usize>> {
         let h_domain_size =
-            GeneralEvaluationDomain::<F>::compute_size_of_domain(info.number_of_constraints).unwrap();
+            GeneralEvaluationDomain::<F>::compute_size_of_domain(info.number_of_constraints)
+                .unwrap();
 
         vec![None, Some(h_domain_size - 2), None].into_iter()
     }
@@ -669,7 +667,6 @@ impl<F: PrimeField> AHPForR1CS<F> {
         Ok((msg, oracles))
     }
 
-
     /// Output the number of oracles sent by the prover in the third round.
     pub fn prover_num_third_round_oracles() -> usize {
         2
@@ -679,9 +676,10 @@ impl<F: PrimeField> AHPForR1CS<F> {
     pub fn prover_third_round_degree_bounds(
         info: &R1CSfIndex,
     ) -> impl Iterator<Item = Option<usize>> {
-        let k_size = GeneralEvaluationDomain::<F>::compute_size_of_domain(info.number_of_non_zero_entries).unwrap();
+        let k_size =
+            GeneralEvaluationDomain::<F>::compute_size_of_domain(info.number_of_non_zero_entries)
+                .unwrap();
 
         vec![None, Some(k_size - 2)].into_iter()
     }
-
 }
