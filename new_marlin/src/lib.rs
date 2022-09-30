@@ -306,15 +306,13 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
             rational_sumcheck_oracle!(verifier_first_msg, verifier_second_msg, domain_k),
         )?;
 
-        let labels = vec![
-            "a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val",
-        ];
+        let labels = AHPForR1CS::<F>::matrix_poly_labels();
         let mut rational_sumcheck_commitments = pk
             .vk
             .commits
             .iter()
-            .zip(labels.iter())
-            .map(|(commitment, &label)| {
+            .zip(labels)
+            .map(|(commitment, label)| {
                 LabeledCommitment::new(label.into(), commitment.clone(), None)
             })
             .collect::<Vec<_>>();
@@ -472,14 +470,12 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
             rational_sumcheck_oracle!(verifier_first_msg, verifier_second_msg, domain_k),
         )?;
 
-        let labels = vec![
-            "a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val",
-        ];
+        let labels = AHPForR1CS::<F>::matrix_poly_labels();
         let mut rational_sumcheck_commitments = vk
             .commits
             .iter()
-            .zip(labels.iter())
-            .map(|(commitment, &label)| {
+            .zip(labels)
+            .map(|(commitment, label)| {
                 LabeledCommitment::new(label.into(), commitment.clone(), None)
             })
             .collect::<Vec<_>>();
