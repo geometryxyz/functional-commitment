@@ -17,7 +17,7 @@ use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::{Evaluations, PCRandomness};
 use ark_poly_commit::{LabeledCommitment, PCUniversalParams};
 use ark_relations::r1cs::ConstraintSynthesizer;
-use ark_std::rand::RngCore;
+use ark_std::rand::{RngCore, Rng};
 use data_structures::{Proof, ProverKey, UniversalSRS, VerifierKey};
 use fiat_shamir_rng::FiatShamirRng;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
@@ -68,12 +68,13 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         srs
     }
 
-    pub fn index(
+    pub fn index<R: RngCore>(
         srs: &UniversalSRS<F, PC>,
         index_info: &R1CSfIndex,
         a: Matrix<F>,
         b: Matrix<F>,
         c: Matrix<F>,
+        rng: &mut R
     ) -> Result<(ProverKey<F, PC>, VerifierKey<F, PC>, Vec<PC::Randomness>), Error<PC::Error>> {
         if !index_info.check_domains_sizes::<F>() {
             return Err(Error::DomainHLargerThanDomainK);
@@ -96,9 +97,11 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         )
         .map_err(Error::from_pc_err)?;
 
-        let a_arith = arithmetize_matrix(&a, domain_k, domain_h, "a", false);
-        let b_arith = arithmetize_matrix(&b, domain_k, domain_h, "b", false);
-        let c_arith = arithmetize_matrix(&c, domain_k, domain_h, "c", true);
+        let degree_bound = Some(domain_k.size() + 1);
+        let hiding_bound = None;
+        let a_arith = arithmetize_matrix(&a, domain_k, domain_h, "a", false, degree_bound, hiding_bound);
+        let b_arith = arithmetize_matrix(&b, domain_k, domain_h, "b", false, degree_bound, hiding_bound);
+        let c_arith = arithmetize_matrix(&c, domain_k, domain_h, "c", true, degree_bound, hiding_bound);
 
         let polys = [
             a_arith.row.clone(),
@@ -113,7 +116,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         ];
 
         let (matrix_poly_commits, matrix_poly_rands): (_, _) =
-            PC::commit(&committer_key, &polys, None).map_err(Error::from_pc_err)?;
+            PC::commit(&committer_key, &polys, Some(rng)).map_err(Error::from_pc_err)?;
 
         let matrix_poly_commits = matrix_poly_commits
             .iter()

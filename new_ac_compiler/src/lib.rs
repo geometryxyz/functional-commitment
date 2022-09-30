@@ -49,13 +49,6 @@ impl ark_ff::ToBytes for R1CSfIndex {
 }
 
 impl R1CSfIndex {
-    /// Iterate through the matrices of the index: A, B, C
-    // pub fn iter_matrices(&self) -> impl Iterator<Item = &Matrix<F>> {
-    //     iter::once(&self.a)
-    //         .chain(iter::once(&self.b))
-    //         .chain(iter::once(&self.c))
-    // }
-
     // since there are two domains: interpolation and input
     // for discrete log comparison it's required that input <= interpolation
     pub fn check_domains_sizes<F: PrimeField>(&self) -> bool {
