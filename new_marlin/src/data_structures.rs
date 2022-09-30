@@ -30,9 +30,10 @@ pub type UniversalSRS<F, PC> = <PC as PolynomialCommitment<F, DensePolynomial<F>
 pub struct ProverKey<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> {
     /// The index verifier key.
     pub vk: VerifierKey<F, PC>,
+    /// The randomness used for hiding matrix ldes
+    pub rands: Vec<PC::Randomness>,
     /// The index itself.
     pub index: Index<F>,
-    /// TODO: this should be changed to just PrivateIndex
     /// The committer key for this index, trimmed from the universal SRS.
     pub committer_key: PC::CommitterKey,
 }
@@ -44,9 +45,16 @@ where
     fn clone(&self) -> Self {
         Self {
             vk: self.vk.clone(),
+            rands: self.rands.clone(),
             index: self.index.clone(),
             committer_key: self.committer_key.clone(),
         }
+    }
+}
+
+impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>>ProverKey<F, PC> {
+    pub fn get_rands(&self) -> Vec<PC::Randomness> {
+        self.rands.clone()
     }
 }
 

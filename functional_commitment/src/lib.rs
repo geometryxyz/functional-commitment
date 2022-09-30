@@ -61,7 +61,7 @@ mod tests {
 
         let universal_srs = MarlinInst::universal_setup(&index_info, rng).unwrap();
 
-        let (pk, vk, rands) = MarlinInst::index(&universal_srs, &index_info, a, b, c, rng).unwrap();
+        let (pk, vk) = MarlinInst::index(&universal_srs, &index_info, a, b, c, rng).unwrap();
 
         // TEST MARLIN
         let proof = MarlinInst::prove(&pk, cb.assignment, rng).unwrap();
@@ -98,23 +98,23 @@ mod tests {
             &pk.index.a_arith.row, // col_a_poly,
             &commits[1], // row_a_commit,
             &commits[0],// col_a_commit,
-            &rands[1],// row_a_random,
-            &rands[0],// col_a_random,
+            &pk.rands[1],// row_a_random,
+            &pk.rands[0],// col_a_random,
             &pk.index.b_arith.col, // row_b_poly,
             &pk.index.b_arith.row, // col_b_poly,
             &commits[4], // row_b_commit,
             &commits[3], // col_b_commit,
-            &rands[4], // row_b_random,
-            &rands[3], // col_b_random,
+            &pk.rands[4], // row_b_random,
+            &pk.rands[3], // col_b_random,
             &pk.index.c_arith.row, // row_c_poly,
             &pk.index.c_arith.col, // col_c_poly,
             &pk.index.c_arith.val, // val_c_poly,
             &commits[6], // row_c_commit,
             &commits[7], // col_c_commit,
             &commits[8], // val_c_commit,
-            &rands[6],// row_c_random,
-            &rands[7],// col_c_random,
-            &rands[8],// val_c_random,
+            &pk.rands[6],// row_c_random,
+            &pk.rands[7],// col_c_random,
+            &pk.rands[8],// val_c_random,
             &mut fs_rng, // fs_rng,
             rng // rng,
         ).unwrap();

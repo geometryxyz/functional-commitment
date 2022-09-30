@@ -516,7 +516,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
     }
 
     /// Output the second round message and the next state for third round.
-    pub fn prover_index_private_third_round<'a>(
+    pub fn prover_third_round<'a>(
         // PC: HomomorphicPolynomialCommitment<F>, FS: FiatShamirRng>
         ver_message: &VerifierSecondMsg<F>,
         prover_state: ProverState<'a, F>,
@@ -652,7 +652,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
             f: LabeledPolynomial::new(
                 "f".to_string(),
                 f_poly.clone(),
-                None, // Some(domain_k.size() - 1) -> enable this bound in supported bounds,
+                None,
                 None,
             ),
             g_2: LabeledPolynomial::new(
@@ -661,7 +661,6 @@ impl<F: PrimeField> AHPForR1CS<F> {
                 Some(domain_k.size() - 2),
                 None,
             ),
-            // h_2: LabeledPolynomial::new("h_2".to_string(), h_2.clone(), None, None),
         };
 
         Ok((msg, oracles))

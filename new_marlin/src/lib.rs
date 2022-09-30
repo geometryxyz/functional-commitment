@@ -17,7 +17,7 @@ use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::{Evaluations, PCRandomness};
 use ark_poly_commit::{LabeledCommitment, PCUniversalParams};
 use ark_relations::r1cs::ConstraintSynthesizer;
-use ark_std::rand::{RngCore, Rng};
+use ark_std::{rand::{RngCore, Rng}, iter};
 use data_structures::{Proof, ProverKey, UniversalSRS, VerifierKey};
 use fiat_shamir_rng::FiatShamirRng;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
@@ -75,7 +75,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         b: Matrix<F>,
         c: Matrix<F>,
         rng: &mut R
-    ) -> Result<(ProverKey<F, PC>, VerifierKey<F, PC>, Vec<PC::Randomness>), Error<PC::Error>> {
+    ) -> Result<(ProverKey<F, PC>, VerifierKey<F, PC>), Error<PC::Error>> {
         if !index_info.check_domains_sizes::<F>() {
             return Err(Error::DomainHLargerThanDomainK);
         }
@@ -98,7 +98,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         .map_err(Error::from_pc_err)?;
 
         let degree_bound = Some(domain_k.size() + 1);
-        let hiding_bound = None;
+        let hiding_bound = Some(1);
         let a_arith = arithmetize_matrix(&a, domain_k, domain_h, "a", false, degree_bound, hiding_bound);
         let b_arith = arithmetize_matrix(&b, domain_k, domain_h, "b", false, degree_bound, hiding_bound);
         let c_arith = arithmetize_matrix(&c, domain_k, domain_h, "c", true, degree_bound, hiding_bound);
@@ -142,26 +142,27 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
 
         let pk = ProverKey {
             index: index.clone(),
+            rands: matrix_poly_rands.clone(),
             vk: vk.clone(),
             committer_key: committer_key.clone(),
         };
 
-        Ok((pk, vk, matrix_poly_rands))
+        Ok((pk, vk))
         // arith matrices
     }
 
     pub fn prove<R: RngCore>(
-        index_pk: &ProverKey<F, PC>,
+        pk: &ProverKey<F, PC>,
         assignment: Vec<F>,
         zk_rng: &mut R,
     ) -> Result<Proof<F, PC>, Error<PC::Error>> {
         let prover_time = start_timer!(|| "Marlin::Prover");
 
-        let prover_init_state = AHPForR1CS::prover_init(&index_pk.index, assignment)?;
+        let prover_init_state = AHPForR1CS::prover_init(&pk.index, assignment)?;
         let public_input = prover_init_state.public_input();
 
         let mut fs_rng =
-            FS::initialize(&to_bytes![&Self::PROTOCOL_NAME, &index_pk.vk, &public_input].unwrap());
+            FS::initialize(&to_bytes![&Self::PROTOCOL_NAME, &pk.vk, &public_input].unwrap());
 
         // --------------------------------------------------------------------
         // First round
@@ -171,7 +172,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
 
         let first_round_comm_time = start_timer!(|| "Committing to first round polys");
         let (first_comms, first_comm_rands) = PC::commit(
-            &index_pk.committer_key,
+            &pk.committer_key,
             prover_first_oracles.iter(),
             Some(zk_rng),
         )
@@ -181,7 +182,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         fs_rng.absorb(&to_bytes![first_comms, prover_first_msg].unwrap());
 
         let (verifier_first_msg, verifier_state) =
-            AHPForR1CS::verifier_first_round(&index_pk.vk.index_info, &mut fs_rng)?;
+            AHPForR1CS::verifier_first_round(&pk.vk.index_info, &mut fs_rng)?;
         // --------------------------------------------------------------------
 
         // --------------------------------------------------------------------
@@ -194,7 +195,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
 
         let second_round_comm_time = start_timer!(|| "Committing to second round polys");
         let (second_comms, second_comm_rands) = PC::commit(
-            &index_pk.committer_key,
+            &pk.committer_key,
             prover_second_oracles.iter(),
             Some(zk_rng),
         )
@@ -210,16 +211,18 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         // --------------------------------------------------------------------
         // Third round
         let (prover_third_msg, prover_third_oracles) =
-            AHPForR1CS::prover_index_private_third_round(&verifier_second_msg, prover_state)?;
+            AHPForR1CS::prover_third_round(&verifier_second_msg, prover_state)?;
 
         let third_round_comm_time = start_timer!(|| "Committing to third round polys");
         let (third_comms, third_comm_rands) = PC::commit(
-            &index_pk.committer_key,
+            &pk.committer_key,
             prover_third_oracles.iter(),
             Some(zk_rng),
         )
         .map_err(Error::from_pc_err)?;
         end_timer!(third_round_comm_time);
+
+        let f_rand = third_comm_rands[0].clone();
 
         fs_rng.absorb(&to_bytes![third_comms, prover_third_msg].unwrap());
 
@@ -285,15 +288,15 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         let opening_challenge: F = u128::rand(&mut fs_rng).into();
 
         let concrete_oracles = [
-            index_pk.index.a_arith.row.clone(),
-            index_pk.index.a_arith.col.clone(),
-            index_pk.index.a_arith.val.clone(),
-            index_pk.index.b_arith.row.clone(),
-            index_pk.index.b_arith.col.clone(),
-            index_pk.index.b_arith.val.clone(),
-            index_pk.index.c_arith.row.clone(),
-            index_pk.index.c_arith.col.clone(),
-            index_pk.index.c_arith.val.clone(),
+            pk.index.a_arith.row.clone(),
+            pk.index.a_arith.col.clone(),
+            pk.index.a_arith.val.clone(),
+            pk.index.b_arith.row.clone(),
+            pk.index.b_arith.col.clone(),
+            pk.index.b_arith.val.clone(),
+            pk.index.c_arith.row.clone(),
+            pk.index.c_arith.col.clone(),
+            pk.index.c_arith.val.clone(),
             prover_third_oracles.f.clone(), // f
         ];
 
@@ -306,7 +309,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         let labels = vec![
             "a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val",
         ];
-        let mut rational_sumcheck_commitments = index_pk
+        let mut rational_sumcheck_commitments = pk
             .vk
             .commits
             .iter()
@@ -322,21 +325,22 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
             None,
         ));
 
-        let empty_rands = vec![PC::Randomness::empty(); concrete_oracles.len()];
+
+        let rands = pk.get_rands().into_iter().chain(iter::once(f_rand)).collect::<Vec<PC::Randomness>>();
 
         let rational_sumcheck_proof = ZeroOverK::<F, PC, FS>::prove(
             &concrete_oracles,
             &rational_sumcheck_commitments,
-            empty_rands.as_slice(),
+            rands.as_slice(),
             None,
             &rational_sumcheck_vo,
             &domain_k,
-            &index_pk.committer_key,
+            &pk.committer_key,
             zk_rng,
         )?;
 
         let pc_proof = PC::open_combinations(
-            &index_pk.committer_key,
+            &pk.committer_key,
             &lc_s,
             polynomials.clone(),
             &labeled_comms,
@@ -371,18 +375,6 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         rng: &mut R,
     ) -> Result<bool, Error<PC::Error>> {
         let verifier_time = start_timer!(|| "Marlin::Verify");
-
-        // let public_input =
-        //     let domain_x = GeneralEvaluationDomain::<F>::new(public_input.len()).unwrap();
-
-        //     let mut unpadded_input = public_input.to_vec();
-        //     unpadded_input.resize(
-        //         core::cmp::max(public_input.len(), domain_x.size() - 1),
-        //         F::zero(),
-        //     );
-
-        //     unpadded_input
-        // };
 
         let mut fs_rng =
             FS::initialize(&to_bytes![&Self::PROTOCOL_NAME, &vk, &public_input].unwrap());
