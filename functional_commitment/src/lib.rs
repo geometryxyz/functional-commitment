@@ -69,8 +69,10 @@ mod tests {
         assert!(MarlinInst::verify(
             &vk,
             &vec![F::one(), F::from(2u64), F::from(5u64), F::from(7u64)],
+            &vec![F::from(362u64)],
             proof,
-            rng
+            rng,
+            &pk.committer_key
         )
         .unwrap());
 
@@ -82,11 +84,13 @@ mod tests {
             .commits
             .iter()
             .zip(labels.iter())
-            .map(|(cm, &label)| LabeledCommitment::new(label.into(), cm.clone(), Some(domain_k.size() + 1)))
+            .map(|(cm, &label)| {
+                LabeledCommitment::new(label.into(), cm.clone(), Some(domain_k.size() + 1))
+            })
             .collect();
 
         let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
-        
+
         //JUST REVERSE ROW A AND COL A TO GET STRICTLY UPPER TRIANGULAR
         let tft_proof = TFT::<F, PC, FS>::prove(
             &pk.committer_key,
@@ -94,30 +98,31 @@ mod tests {
             &domain_k,
             &domain_h,
             Some(domain_k.size() + 1), //enforced_degree_bound
-            &pk.index.a_arith.col, // row_a_poly,
-            &pk.index.a_arith.row, // col_a_poly,
-            &commits[1], // row_a_commit,
-            &commits[0],// col_a_commit,
-            &pk.rands[1],// row_a_random,
-            &pk.rands[0],// col_a_random,
-            &pk.index.b_arith.col, // row_b_poly,
-            &pk.index.b_arith.row, // col_b_poly,
-            &commits[4], // row_b_commit,
-            &commits[3], // col_b_commit,
-            &pk.rands[4], // row_b_random,
-            &pk.rands[3], // col_b_random,
-            &pk.index.c_arith.row, // row_c_poly,
-            &pk.index.c_arith.col, // col_c_poly,
-            &pk.index.c_arith.val, // val_c_poly,
-            &commits[6], // row_c_commit,
-            &commits[7], // col_c_commit,
-            &commits[8], // val_c_commit,
-            &pk.rands[6],// row_c_random,
-            &pk.rands[7],// col_c_random,
-            &pk.rands[8],// val_c_random,
-            &mut fs_rng, // fs_rng,
-            rng // rng,
-        ).unwrap();
+            &pk.index.a_arith.col,     // row_a_poly,
+            &pk.index.a_arith.row,     // col_a_poly,
+            &commits[1],               // row_a_commit,
+            &commits[0],               // col_a_commit,
+            &pk.rands[1],              // row_a_random,
+            &pk.rands[0],              // col_a_random,
+            &pk.index.b_arith.col,     // row_b_poly,
+            &pk.index.b_arith.row,     // col_b_poly,
+            &commits[4],               // row_b_commit,
+            &commits[3],               // col_b_commit,
+            &pk.rands[4],              // row_b_random,
+            &pk.rands[3],              // col_b_random,
+            &pk.index.c_arith.row,     // row_c_poly,
+            &pk.index.c_arith.col,     // col_c_poly,
+            &pk.index.c_arith.val,     // val_c_poly,
+            &commits[6],               // row_c_commit,
+            &commits[7],               // col_c_commit,
+            &commits[8],               // val_c_commit,
+            &pk.rands[6],              // row_c_random,
+            &pk.rands[7],              // col_c_random,
+            &pk.rands[8],              // val_c_random,
+            &mut fs_rng,               // fs_rng,
+            rng,                       // rng,
+        )
+        .unwrap();
 
         let mut fs_rng = FS::initialize(&to_bytes!(b"Testing :)").unwrap());
 
@@ -157,6 +162,7 @@ mod tests {
             let x_qubed_plus_2x =
                 cb.enforce_constraint(&x_cube, &two_x, GateType::Add, VariableType::Witness)?;
 
+            // output = dec: 362, hex: 16A
             let _ = cb.enforce_constraint(
                 &x_qubed_plus_2x,
                 &five,

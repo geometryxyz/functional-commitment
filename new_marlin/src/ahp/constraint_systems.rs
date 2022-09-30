@@ -51,7 +51,7 @@ pub fn arithmetize_matrix<F: PrimeField>(
     // input_domain: GeneralEvaluationDomain<F>,
     m_prefix: &str,
     is_diag_matrix: bool,
-    degree_bound: Option<usize>, 
+    degree_bound: Option<usize>,
     hiding_bound: Option<usize>,
 ) -> MatrixArithmetization<F> {
     let elems: Vec<_> = output_domain.elements().collect();
@@ -121,9 +121,24 @@ pub fn arithmetize_matrix<F: PrimeField>(
     };
 
     MatrixArithmetization {
-        row: LabeledPolynomial::new(format!("{}_row", m_prefix).into(), row, degree_bound, hiding_bound),
-        col: LabeledPolynomial::new(format!("{}_col", m_prefix).into(), col, degree_bound, hiding_bound),
-        val: LabeledPolynomial::new(format!("{}_val", m_prefix).into(), val, degree_bound, hiding_bound),
+        row: LabeledPolynomial::new(
+            format!("{}_row", m_prefix).into(),
+            row,
+            degree_bound,
+            hiding_bound,
+        ),
+        col: LabeledPolynomial::new(
+            format!("{}_col", m_prefix).into(),
+            col,
+            degree_bound,
+            hiding_bound,
+        ),
+        val: LabeledPolynomial::new(
+            format!("{}_val", m_prefix).into(),
+            val,
+            degree_bound,
+            hiding_bound,
+        ),
         evals_on_K,
     }
 }

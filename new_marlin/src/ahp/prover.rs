@@ -24,6 +24,7 @@ use super::{
 pub struct ProverState<'a, F: PrimeField> {
     assignment: Vec<F>,
     public_inputs: Vec<F>,
+    output: Vec<F>,
     // witness_assignment: Vec<F>,
     /// Az
     z_a: Option<Vec<F>>,
@@ -49,7 +50,7 @@ pub struct ProverState<'a, F: PrimeField> {
     // domain X, sized for the public input
     // domain_x: GeneralEvaluationDomain<F>,
     /// domain H, sized for constraints
-    domain_h: GeneralEvaluationDomain<F>,
+    pub domain_h: GeneralEvaluationDomain<F>,
 
     /// domain K, sized for matrix nonzero elements
     pub domain_k: GeneralEvaluationDomain<F>, // TODO: remove pub, it's just for easier testing
@@ -63,6 +64,10 @@ impl<'a, F: PrimeField> ProverState<'a, F> {
 
     pub fn get_assignment(&self) -> Vec<F> {
         self.assignment.clone()
+    }
+
+    pub fn output(&self) -> Vec<F> {
+        self.output.clone()
     }
 }
 
@@ -185,6 +190,10 @@ impl<F: Field> ProverFirstOracles<F> {
         ]
         .into_iter()
     }
+
+    pub fn get_z(&self) -> LabeledPolynomial<F> {
+        self.z.clone()
+    }
 }
 
 /// The second set of prover oracles.
@@ -261,11 +270,15 @@ impl<F: PrimeField> AHPForR1CS<F> {
         //     .ok_or(SynthesisError::PolynomialDegreeTooLarge)?;
 
         let public_inputs = assignment[..index.index_info.number_of_input_rows].to_vec();
-        // let witness_assignment = assignment[r1csf_index.number_of_input_rows..].to_vec();
+        let output = assignment
+            [index.index_info.number_of_constraints - index.index_info.number_of_outputs..]
+            .to_vec(); // num constraints is always
+                       // let witness_assignment = assignment[r1csf_index.number_of_input_rows..].to_vec();
 
         Ok(ProverState {
             assignment,
             public_inputs,
+            output,
             z_a: Some(z_a),
             z_b: Some(z_b),
             z_poly: None,
@@ -492,7 +505,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
             h_1: LabeledPolynomial::new("h_1".into(), h_1, None, None),
         };
 
-        state.z_poly = None;
+        state.z_poly = Some(z_poly);
         state.verifier_first_msg = Some(*ver_message);
         end_timer!(round_time);
 
@@ -519,8 +532,8 @@ impl<F: PrimeField> AHPForR1CS<F> {
     pub fn prover_third_round<'a>(
         // PC: HomomorphicPolynomialCommitment<F>, FS: FiatShamirRng>
         ver_message: &VerifierSecondMsg<F>,
-        prover_state: ProverState<'a, F>,
-    ) -> Result<(ProverMsg<F>, ProverThirdOracles<F>), Error> {
+        mut prover_state: ProverState<'a, F>,
+    ) -> Result<(ProverMsg<F>, ProverThirdOracles<F>, ProverState<'a, F>), Error> {
         let ProverState {
             index,
             verifier_first_msg,
@@ -649,12 +662,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
         assert!(g_2.degree() <= domain_k.size() - 2);
 
         let oracles = ProverThirdOracles {
-            f: LabeledPolynomial::new(
-                "f".to_string(),
-                f_poly.clone(),
-                None,
-                None,
-            ),
+            f: LabeledPolynomial::new("f".to_string(), f_poly.clone(), None, None),
             g_2: LabeledPolynomial::new(
                 "g_2".to_string(),
                 g_2.clone(),
@@ -663,7 +671,8 @@ impl<F: PrimeField> AHPForR1CS<F> {
             ),
         };
 
-        Ok((msg, oracles))
+        prover_state.inner_mask_poly = None;
+        Ok((msg, oracles, prover_state))
     }
 
     /// Output the number of oracles sent by the prover in the third round.

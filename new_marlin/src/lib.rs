@@ -1,8 +1,9 @@
 pub mod ahp;
 pub mod data_structures;
 pub mod error;
+pub mod well_formation;
 
-use crate::ahp::{AHPForR1CS, EvaluationsProvider};
+use crate::ahp::{AHPForR1CS, EvaluationsProvider, constraint_systems::LabeledPolynomial};
 use ::zero_over_k::{
     virtual_oracle::generic_shifting_vo::{vo_term::VOTerm, GenericShiftingVO},
     vo_constant,
@@ -17,7 +18,10 @@ use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::{Evaluations, PCRandomness};
 use ark_poly_commit::{LabeledCommitment, PCUniversalParams};
 use ark_relations::r1cs::ConstraintSynthesizer;
-use ark_std::{rand::{RngCore, Rng}, iter};
+use ark_std::{
+    iter,
+    rand::{Rng, RngCore},
+};
 use data_structures::{Proof, ProverKey, UniversalSRS, VerifierKey};
 use fiat_shamir_rng::FiatShamirRng;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
@@ -74,7 +78,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         a: Matrix<F>,
         b: Matrix<F>,
         c: Matrix<F>,
-        rng: &mut R
+        rng: &mut R,
     ) -> Result<(ProverKey<F, PC>, VerifierKey<F, PC>), Error<PC::Error>> {
         if !index_info.check_domains_sizes::<F>() {
             return Err(Error::DomainHLargerThanDomainK);
@@ -99,9 +103,33 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
 
         let degree_bound = Some(domain_k.size() + 1);
         let hiding_bound = Some(1);
-        let a_arith = arithmetize_matrix(&a, domain_k, domain_h, "a", false, degree_bound, hiding_bound);
-        let b_arith = arithmetize_matrix(&b, domain_k, domain_h, "b", false, degree_bound, hiding_bound);
-        let c_arith = arithmetize_matrix(&c, domain_k, domain_h, "c", true, degree_bound, hiding_bound);
+        let a_arith = arithmetize_matrix(
+            &a,
+            domain_k,
+            domain_h,
+            "a",
+            false,
+            degree_bound,
+            hiding_bound,
+        );
+        let b_arith = arithmetize_matrix(
+            &b,
+            domain_k,
+            domain_h,
+            "b",
+            false,
+            degree_bound,
+            hiding_bound,
+        );
+        let c_arith = arithmetize_matrix(
+            &c,
+            domain_k,
+            domain_h,
+            "c",
+            true,
+            degree_bound,
+            hiding_bound,
+        );
 
         let polys = [
             a_arith.row.clone(),
@@ -171,12 +199,9 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
             AHPForR1CS::prover_first_round(prover_init_state, zk_rng)?;
 
         let first_round_comm_time = start_timer!(|| "Committing to first round polys");
-        let (first_comms, first_comm_rands) = PC::commit(
-            &pk.committer_key,
-            prover_first_oracles.iter(),
-            Some(zk_rng),
-        )
-        .map_err(Error::from_pc_err)?;
+        let (first_comms, first_comm_rands) =
+            PC::commit(&pk.committer_key, prover_first_oracles.iter(), Some(zk_rng))
+                .map_err(Error::from_pc_err)?;
         end_timer!(first_round_comm_time);
 
         fs_rng.absorb(&to_bytes![first_comms, prover_first_msg].unwrap());
@@ -192,6 +217,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
             AHPForR1CS::prover_second_round(&verifier_first_msg, prover_state, zk_rng);
 
         let domain_k = prover_state.domain_k.clone();
+        let domain_h = prover_state.domain_h.clone();
 
         let second_round_comm_time = start_timer!(|| "Committing to second round polys");
         let (second_comms, second_comm_rands) = PC::commit(
@@ -210,16 +236,13 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
 
         // --------------------------------------------------------------------
         // Third round
-        let (prover_third_msg, prover_third_oracles) =
+        let (prover_third_msg, prover_third_oracles, prover_state) =
             AHPForR1CS::prover_third_round(&verifier_second_msg, prover_state)?;
 
         let third_round_comm_time = start_timer!(|| "Committing to third round polys");
-        let (third_comms, third_comm_rands) = PC::commit(
-            &pk.committer_key,
-            prover_third_oracles.iter(),
-            Some(zk_rng),
-        )
-        .map_err(Error::from_pc_err)?;
+        let (third_comms, third_comm_rands) =
+            PC::commit(&pk.committer_key, prover_third_oracles.iter(), Some(zk_rng))
+                .map_err(Error::from_pc_err)?;
         end_timer!(third_round_comm_time);
 
         let f_rand = third_comm_rands[0].clone();
@@ -323,16 +346,59 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
             None,
         ));
 
-
-        let rands = pk.get_rands().into_iter().chain(iter::once(f_rand)).collect::<Vec<PC::Randomness>>();
+        let matrix_poly_rands = pk
+            .get_rands()
+            .into_iter()
+            .chain(iter::once(f_rand))
+            .collect::<Vec<PC::Randomness>>();
 
         let rational_sumcheck_proof = ZeroOverK::<F, PC, FS>::prove(
             &concrete_oracles,
             &rational_sumcheck_commitments,
-            rands.as_slice(),
+            matrix_poly_rands.as_slice(),
             None,
             &rational_sumcheck_vo,
             &domain_k,
+            &pk.committer_key,
+            zk_rng,
+        )?;
+
+        /*
+            sample new challenge
+            check if we should absorb current challenge?
+        */
+
+        fs_rng.absorb(&opening_challenge);
+        let separation_challenge: F = u128::rand(&mut fs_rng).into();
+        let well_formation_oracles =
+            AHPForR1CS::verifier_well_formation_oracles(&pk.index.index_info, &prover_state.public_input(), &prover_state.output(), &verifier_state);
+
+        // TODO: this polys should not be committed to 
+        let (well_formation_commits, well_formation_rands) =
+        PC::commit(&pk.committer_key, well_formation_oracles.iter(), None)
+            .map_err(Error::from_pc_err)?;
+
+        let well_formation_vo = GenericShiftingVO::new(
+            &vec![0, 1, 2, 0, 3, 4],
+            &vec![F::one(); 6],
+            well_formation_vo!(separation_challenge),
+        )?;
+
+        let z_poly = prover_first_oracles.get_z();
+        let z_commit = labeled_comms[0].clone();
+        let z_rand = comm_rands[0].clone();
+
+        let well_formation_concrete_oracles = iter::once(&z_poly).chain(well_formation_oracles.iter()).map(|oracle| oracle.clone()).collect::<Vec<LabeledPolynomial<_>>>();
+        let well_formation_commits = iter::once(&z_commit).chain(well_formation_commits.iter()).map(|commit| commit.clone()).collect::<Vec<LabeledCommitment<_>>>();
+        let well_formation_rands = iter::once(&z_rand).chain(well_formation_rands.iter()).map(|rand| rand.clone()).collect::<Vec<PC::Randomness>>();
+
+        let well_formation_proof = ZeroOverK::<F, PC, FS>::prove(
+            &well_formation_concrete_oracles,
+            &well_formation_commits,
+            &well_formation_rands,
+            None,
+            &well_formation_vo,
+            &domain_h,
             &pk.committer_key,
             zk_rng,
         )?;
@@ -358,6 +424,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
             prover_messages,
             pc_proof,
             rational_sumcheck_proof,
+            well_formation_proof,
         );
         // proof.print_size_info();
         end_timer!(prover_time);
@@ -369,8 +436,10 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
     pub fn verify<R: RngCore>(
         vk: &data_structures::VerifierKey<F, PC>,
         public_input: &Vec<F>,
+        output: &Vec<F>,
         proof: Proof<F, PC>,
         rng: &mut R,
+        ck: &PC::CommitterKey //TODO: make sure to remove this once we introduce instance oracles in virtual oracle
     ) -> Result<bool, Error<PC::Error>> {
         let verifier_time = start_timer!(|| "Marlin::Verify");
 
@@ -463,6 +532,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         .map_err(Error::from_pc_err)?;
 
         let domain_k = verifier_state.domain_k.clone();
+        let domain_h = verifier_state.domain_h.clone();
 
         let rational_sumcheck_vo = GenericShiftingVO::new(
             &vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -492,6 +562,40 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
             None,
             &rational_sumcheck_vo,
             &domain_k,
+            &vk.verifier_key,
+        )?;
+
+        fs_rng.absorb(&opening_challenge);
+        let separation_challenge: F = u128::rand(&mut fs_rng).into();
+
+        let well_formation_vo = GenericShiftingVO::new(
+            &vec![0, 1, 2, 0, 3, 4],
+            &vec![F::one(); 6],
+            well_formation_vo!(separation_challenge),
+        )?;
+
+        let well_formation_oracles =
+            AHPForR1CS::verifier_well_formation_oracles(&vk.index_info, public_input, output, &verifier_state);
+
+        let (verifier_well_formation_commits, _) =
+        PC::commit(ck, well_formation_oracles.iter(), None)
+            .map_err(Error::from_pc_err)?;
+
+        let labels = AHPForR1CS::<F>::well_formation_labels();
+        let mut verifier_well_formation_commits: Vec<LabeledCommitment<_>> = verifier_well_formation_commits.iter().zip(labels).map(|(commit, label)| LabeledCommitment::new(label, commit.commitment().clone(), None)).collect();
+
+        // let z_commit = commitments[0].clone();
+        let mut well_formation_commits = vec![commitments[0].clone()];
+        well_formation_commits.append(&mut verifier_well_formation_commits);
+
+        // let well_formation_commits = iter::once(&z_commit).chain(well_formation_commits.iter()).map(|commit| commit.clone()).collect::<Vec<LabeledCommitment<_>>>();
+
+        ZeroOverK::<F, PC, FS>::verify(
+            proof.well_formation_proof,
+            &well_formation_commits,
+            None,
+            &well_formation_vo,
+            &domain_h,
             &vk.verifier_key,
         )?;
 
@@ -575,6 +679,23 @@ macro_rules! rational_sumcheck_oracle {
             };
 
             a_poly - b_poly * f
+        }
+    };
+}
+
+/// terms[0]: ignore, this by default becomes X
+/// terms[1]: z_poly(X)
+/// terms[2]: x_poly(X)
+/// terms[3]: vh_gt_x(X)
+/// terms[4]: z_poly(X)
+/// terms[5]: y_poly(X)
+/// terms[6]: vh_lt_y(X)
+#[macro_export]
+macro_rules! well_formation_vo {
+    ($separation_challenge:expr) => {
+        |terms: &[VOTerm<F>]| {
+            (terms[1].clone() - terms[2].clone()) * terms[3].clone()
+                + vo_constant!($separation_challenge) * (terms[4].clone() - terms[5].clone()) * terms[6].clone()
         }
     };
 }

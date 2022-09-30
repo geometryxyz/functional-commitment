@@ -31,7 +31,13 @@ impl<F: PrimeField> AHPForR1CS<F> {
     /// THe linear combinations that are statically known to evaluate to zero in index private version.
     pub const LC_WITH_ZERO_EVAL: [&'static str; 2] = ["outer_sumcheck", "f_sumcheck"];
 
-    pub const MATRIX_POLY_LABELS: [&'static str; 9] = ["a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val",];
+    pub const MATRIX_POLY_LABELS: [&'static str; 9] = [
+        "a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val",
+    ];
+
+    pub const WELL_FORMATION_LABELS: [&'static str; 4] = [
+        "pi_lde", "vh_gt_x", "output_lde", "vh_lt_y"
+    ];
 
     pub(crate) fn polynomial_labels() -> impl Iterator<Item = String> {
         Self::PROVER_POLYNOMIALS.iter().map(|s| s.to_string())
@@ -39,6 +45,10 @@ impl<F: PrimeField> AHPForR1CS<F> {
 
     pub(crate) fn matrix_poly_labels() -> impl Iterator<Item = String> {
         Self::MATRIX_POLY_LABELS.iter().map(|s| s.to_string())
+    }
+
+    pub(crate) fn well_formation_labels() -> impl Iterator<Item = String> {
+        Self::WELL_FORMATION_LABELS.iter().map(|s| s.to_string())
     }
 
     /// The maximum degree of polynomials produced by the indexer and prover
