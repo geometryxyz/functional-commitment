@@ -310,6 +310,18 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         fs_rng.absorb(&evaluations);
         let opening_challenge: F = u128::rand(&mut fs_rng).into();
 
+        let pc_proof = PC::open_combinations(
+            &pk.committer_key,
+            &lc_s,
+            polynomials.clone(),
+            &labeled_comms,
+            &query_set,
+            opening_challenge,
+            &comm_rands,
+            Some(zk_rng),
+        )
+        .map_err(Error::from_pc_err)?;
+
         let concrete_oracles = [
             pk.index.a_arith.row.clone(),
             pk.index.a_arith.col.clone(),
@@ -402,18 +414,6 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
             &pk.committer_key,
             zk_rng,
         )?;
-
-        let pc_proof = PC::open_combinations(
-            &pk.committer_key,
-            &lc_s,
-            polynomials.clone(),
-            &labeled_comms,
-            &query_set,
-            opening_challenge,
-            &comm_rands,
-            Some(zk_rng),
-        )
-        .map_err(Error::from_pc_err)?;
 
         // Gather prover messages together.
         let prover_messages = vec![prover_first_msg, prover_second_msg, prover_third_msg];
