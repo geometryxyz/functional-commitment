@@ -35,7 +35,6 @@ mod tests {
     type F = Fr;
     type PC = KZG10<Bn254>;
 
-    type MultiPC = MarlinKZG10<Bn254, DensePolynomial<Fr>>;
     type MarlinInst = Marlin<Fr, PC, FS>;
 
     fn circuit_test_template<Func>(constraints: Func)
