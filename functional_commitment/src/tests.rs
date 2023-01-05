@@ -1,33 +1,28 @@
 #[cfg(test)]
 mod tests {
+    use ac_compiler::constraint_builder::ConstraintBuilder;
+    use ac_compiler::error::Error;
+    use ac_compiler::gate::GateType;
+    use ac_compiler::variable::VariableType;
+    use ac_compiler::{circuit::Circuit, variable::Variable};
     use ark_bn254::{Bn254, Fr};
-    use ark_ff::{to_bytes, One, Field};
+    use ark_ff::bytes::ToBytes;
+    use ark_ff::PrimeField;
+    use ark_ff::{to_bytes, Field, One};
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
     use ark_poly_commit::LabeledCommitment;
     use ark_std::test_rng;
     use blake2::Blake2s;
     use fiat_shamir_rng::{FiatShamirRng, SimpleHashFiatShamirRng};
     use homomorphic_poly_commit::marlin_kzg::KZG10;
-    use ac_compiler::{circuit::Circuit, variable::Variable};
-    use ac_compiler::constraint_builder::ConstraintBuilder;
-    use ac_compiler::error::Error;
-    use ac_compiler::gate::GateType;
-    use ac_compiler::variable::VariableType;
     use index_private_marlin::Marlin;
     use proof_of_function_relation::t_functional_triple::TFT;
     use rand_chacha::ChaChaRng;
-    use ark_ff::bytes::ToBytes;
-    use ark_ff::PrimeField;
 
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
     use ac_compiler::circuit_compiler::{CircuitCompiler, VanillaCompiler};
 
     use crate::{diag_test, slt_test};
-    // use crate::test_circuits::{
-    //     build_mux1_circuit,
-    //     build_x4_circuit,
-    //     build_mimc7_circuit,
-    // };
 
     type F = Fr;
     type PC = KZG10<Bn254>;
@@ -44,33 +39,33 @@ mod tests {
         let b = cb.new_input_variable("b", b_val)?;
         let c = cb.new_input_variable("c", c_val)?;
         let minus_one = cb.new_input_variable("minus_one", F::zero() - F::one())?;
-    
+
         // b * c
         let bc = cb.enforce_constraint(&b, &c, GateType::Mul, VariableType::Witness)?;
-    
+
         // a * c
         let ac = cb.enforce_constraint(&a, &c, GateType::Mul, VariableType::Witness)?;
-    
+
         // - (a * c)
-        let neg_ac = cb.enforce_constraint(&ac, &minus_one, GateType::Mul, VariableType::Witness)?;
-    
+        let neg_ac =
+            cb.enforce_constraint(&ac, &minus_one, GateType::Mul, VariableType::Witness)?;
+
         // (b * c) - (a * c)
         let bcac = cb.enforce_constraint(&bc, &neg_ac, GateType::Add, VariableType::Witness)?;
-    
+
         // (b * c) - (a * c) + a
         let _ = cb.enforce_constraint(&bcac, &a, GateType::Add, VariableType::Output)?;
-    
+
         Ok(())
     }
-    
+
     pub fn enforce_square<F: Field>(
         cb: &mut ConstraintBuilder<F>,
         x: &Variable<F>,
     ) -> Result<Variable<F>, Error> {
-    
         cb.enforce_constraint(&x, &x, GateType::Mul, VariableType::Witness)
     }
-    
+
     pub fn enforce_x_7<F: Field>(
         cb: &mut ConstraintBuilder<F>,
         t: &Variable<F>,
@@ -81,7 +76,7 @@ mod tests {
         let t7 = cb.enforce_constraint(&t, &t6, GateType::Mul, VariableType::Witness)?;
         Ok(t7)
     }
-    
+
     // A circuit that composes enforce_square() such that the output = x^4
     pub fn build_x4_circuit<F: Field>(
         cb: &mut ConstraintBuilder<F>,
@@ -89,16 +84,15 @@ mod tests {
     ) -> Result<(), Error> {
         let one = cb.new_input_variable("one", F::one())?;
         let x = cb.new_input_variable("x", x_val)?;
-    
+
         let x2 = enforce_square(cb, &x)?;
         let x4 = enforce_square(cb, &x2)?;
-    
+
         let _ = cb.enforce_constraint(&x4, &one, GateType::Mul, VariableType::Output)?;
-    
+
         Ok(())
     }
-    
-    
+
     /// The mimc7 circuit where nRounds = 2 and k = 2
     pub fn build_mimc7_circuit<F: PrimeField>(
         cb: &mut ConstraintBuilder<F>,
@@ -106,35 +100,36 @@ mod tests {
         c: Vec<F>,
     ) -> Result<(), Error> {
         let n_rounds = 2;
-    
+
         let x = cb.new_input_variable("x", x_val)?;
         let k = cb.new_input_variable("k", F::from(2u64))?;
-    
-        let mut c_inputs: Vec::<Variable<F>> = vec![];
+
+        let mut c_inputs: Vec<Variable<F>> = vec![];
         for (i, val) in c.iter().enumerate() {
             let input = cb.new_input_variable(format!("c{}", i).as_str(), *val)?;
             c_inputs.push(input);
         }
-    
+
         let mut r;
         let t = cb.enforce_constraint(&x, &k, GateType::Add, VariableType::Witness)?;
         r = enforce_x_7(cb, &t)?;
         for i in 1..n_rounds {
             let r_plus_k = cb.enforce_constraint(&r, &k, GateType::Add, VariableType::Witness)?;
-            let t = cb.enforce_constraint(&r_plus_k, &c_inputs[i], GateType::Add, VariableType::Witness)?;
+            let t = cb.enforce_constraint(
+                &r_plus_k,
+                &c_inputs[i],
+                GateType::Add,
+                VariableType::Witness,
+            )?;
             r = enforce_x_7(cb, &t)?;
         }
-    
+
         let _ = cb.enforce_constraint(&r, &k, GateType::Add, VariableType::Output)?;
-    
+
         Ok(())
     }
 
-    fn circuit_test_template<Func>(
-        constraints: Func,
-        inputs: &Vec<F>,
-        outputs: &Vec<F>,
-    )
+    fn circuit_test_template<Func>(constraints: Func, inputs: &Vec<F>, outputs: &Vec<F>)
     where
         Func: FnOnce(&mut ConstraintBuilder<F>) -> Result<(), Error>,
     {
@@ -162,15 +157,7 @@ mod tests {
         // TEST MARLIN
         let proof = MarlinInst::prove(&pk, cb.assignment, rng).unwrap();
 
-        assert!(MarlinInst::verify(
-            &vk,
-            inputs,
-            outputs,
-            proof,
-            rng,
-            &pk.committer_key
-        )
-        .unwrap());
+        assert!(MarlinInst::verify(&vk, inputs, outputs, proof, rng, &pk.committer_key).unwrap());
 
         // TEST PROOF OF FUNCTION
         let labels = vec![
@@ -323,19 +310,28 @@ mod tests {
         let outputs = vec![expected_output];
         circuit_test_template(constraints, &inputs, &outputs);
     }
-    
+
     fn registers_to_f(registers: &[u64; 4]) -> F {
         let mut writer = vec![];
         let _ = registers.write(&mut writer);
         F::from_le_bytes_mod_order(&writer)
     }
 
-
     fn build_cts() -> Vec<F> {
         let cts_bigints = vec![
             [0, 0, 0, 0],
-            [3366560258570492133, 10070564347787222493, 15604622621500992217, 3327803545572961123,],
-            [2961805725237629769, 17895266365305129804, 3244298544786782209, 2431874893373010386,],
+            [
+                3366560258570492133,
+                10070564347787222493,
+                15604622621500992217,
+                3327803545572961123,
+            ],
+            [
+                2961805725237629769,
+                17895266365305129804,
+                3244298544786782209,
+                2431874893373010386,
+            ],
         ];
         let mut cts = vec![];
         for c in cts_bigints.iter() {
@@ -343,7 +339,7 @@ mod tests {
         }
         cts
     }
-    
+
     fn pow7(x: F) -> F {
         x * x * x * x * x * x * x
     }
@@ -354,11 +350,7 @@ mod tests {
         let x_val = F::from(2u64);
         let k = F::from(2u64);
         let cts = build_cts();
-        let mut inputs = vec![
-            F::one(), 
-            x_val,
-            k,
-        ];
+        let mut inputs = vec![F::one(), x_val, k];
         for c in cts.iter() {
             inputs.push(*c);
         }
