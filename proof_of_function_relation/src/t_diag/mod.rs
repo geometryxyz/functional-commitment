@@ -193,8 +193,6 @@ where
             )),
         )?;
 
-        let val_evals = domain_k.fft(val_m);
-
         let val_plus_h2_proof = NonZeroOverK::<F, PC, FS>::prove(
             ck,
             domain_k,

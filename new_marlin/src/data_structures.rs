@@ -6,7 +6,6 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::{BatchLCProof, PolynomialCommitment};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use ark_std::{
-    format,
     io::{Read, Write},
 };
 

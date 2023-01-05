@@ -1,30 +1,20 @@
 #[cfg(test)]
 mod tests {
-    use std::cmp::max;
-
-    use ac2tft::{printmatrix, sample_matrices, SparseMatrices};
-    use ark_bls12_381::Bls12_381;
     use ark_bn254::{Bn254, Fr};
-    use ark_ff::{to_bytes, One, PrimeField, Zero};
-    use ark_poly::univariate::DensePolynomial;
-    use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial};
-    use ark_poly_commit::PolynomialCommitment;
-    use ark_poly_commit::{marlin_pc::MarlinKZG10, LabeledCommitment};
-    use ark_std::rand::thread_rng;
+    use ark_ff::{to_bytes, One};
+    use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
+    use ark_poly_commit::LabeledCommitment;
     use ark_std::test_rng;
     use blake2::Blake2s;
     use fiat_shamir_rng::{FiatShamirRng, SimpleHashFiatShamirRng};
-    use homomorphic_poly_commit::{marlin_kzg::KZG10, AdditivelyHomomorphicPCS};
-    // use index_private_marlin::{fc_arith, AHPForR1CS, Marlin, fc_arith_withoud_reindexing};
+    use homomorphic_poly_commit::{marlin_kzg::KZG10};
     use new_ac_compiler::circuit::Circuit;
     use new_ac_compiler::constraint_builder::ConstraintBuilder;
     use new_ac_compiler::error::Error;
     use new_ac_compiler::gate::GateType;
     use new_ac_compiler::variable::VariableType;
     use new_marlin::Marlin;
-    use proof_of_function_relation::t_diag::TDiag;
     use proof_of_function_relation::t_functional_triple::TFT;
-    use proof_of_function_relation::t_strictly_lower_triangular_test::TStrictlyLowerTriangular;
     use rand_chacha::ChaChaRng;
 
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;

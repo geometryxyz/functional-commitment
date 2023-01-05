@@ -22,7 +22,7 @@ mod tests {
         let mut cb = ConstraintBuilder::<F>::new();
 
         let synthesized_circuit = Circuit::synthesize(constraints, &mut cb).unwrap();
-        let (r1csf_index_from_synthesized, a, b, c) =
+        let (_r1csf_index_from_synthesized, a, b, c) =
             VanillaCompiler::<F>::ac2tft(&synthesized_circuit);
 
         slt_test!(a, r1csf_index_from_synthesized.number_of_input_rows);

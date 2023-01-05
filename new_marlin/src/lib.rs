@@ -15,12 +15,11 @@ use ahp::{
 };
 use ark_ff::{to_bytes, PrimeField, UniformRand};
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
-use ark_poly_commit::{Evaluations, PCRandomness};
-use ark_poly_commit::{LabeledCommitment, PCUniversalParams};
-use ark_relations::r1cs::ConstraintSynthesizer;
+use ark_poly_commit::{Evaluations};
+use ark_poly_commit::{LabeledCommitment};
 use ark_std::{
     iter,
-    rand::{Rng, RngCore},
+    rand::{RngCore},
 };
 use data_structures::{Proof, ProverKey, UniversalSRS, VerifierKey};
 use fiat_shamir_rng::FiatShamirRng;
@@ -31,10 +30,9 @@ use new_ac_compiler::R1CSfIndex;
 extern crate ark_std;
 
 use ark_std::{
-    collections::BTreeMap,
     format,
     marker::PhantomData,
-    string::{String, ToString},
+    string::{ToString},
     vec,
     vec::Vec,
 };
@@ -631,14 +629,14 @@ macro_rules! rational_sumcheck_oracle {
 
             let vh_alpha = $domain_k.evaluate_vanishing_polynomial($verifier_first_msg.alpha);
             let vh_beta = $domain_k.evaluate_vanishing_polynomial($verifier_second_msg.beta);
-            let v_H_alpha_v_H_beta = vh_alpha * vh_beta;
+            let v_h_alpha_v_h_beta = vh_alpha * vh_beta;
 
-            let eta_a_times_v_H_alpha_v_H_beta =
-                vo_constant!($verifier_first_msg.eta_a * v_H_alpha_v_H_beta);
-            let eta_b_times_v_H_alpha_v_H_beta =
-                vo_constant!($verifier_first_msg.eta_b * v_H_alpha_v_H_beta);
-            let eta_c_times_v_H_alpha_v_H_beta =
-                vo_constant!($verifier_first_msg.eta_c * v_H_alpha_v_H_beta);
+            let eta_a_times_v_h_alpha_v_h_beta =
+                vo_constant!($verifier_first_msg.eta_a * v_h_alpha_v_h_beta);
+            let eta_b_times_v_h_alpha_v_h_beta =
+                vo_constant!($verifier_first_msg.eta_b * v_h_alpha_v_h_beta);
+            let eta_c_times_v_h_alpha_v_h_beta =
+                vo_constant!($verifier_first_msg.eta_c * v_h_alpha_v_h_beta);
 
             let alpha_beta = alpha.clone() * beta.clone();
 
@@ -666,9 +664,9 @@ macro_rules! rational_sumcheck_oracle {
 
             let b_poly = a_denom.clone() * b_denom.clone() * c_denom.clone();
 
-            let a_part_nom = eta_a_times_v_H_alpha_v_H_beta * a_val;
-            let b_part_nom = eta_b_times_v_H_alpha_v_H_beta * b_val;
-            let c_part_nom = eta_c_times_v_H_alpha_v_H_beta * c_val;
+            let a_part_nom = eta_a_times_v_h_alpha_v_h_beta * a_val;
+            let b_part_nom = eta_b_times_v_h_alpha_v_h_beta * b_val;
+            let c_part_nom = eta_c_times_v_h_alpha_v_h_beta * c_val;
 
             let a_poly = {
                 let summand_0 = a_part_nom * b_denom.clone() * c_denom.clone();

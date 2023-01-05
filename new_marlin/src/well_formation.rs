@@ -1,6 +1,5 @@
-use ark_ff::{FftField, PrimeField};
+use ark_ff::{FftField};
 use ark_poly::{univariate::DensePolynomial, UVPolynomial};
-use zero_over_k::virtual_oracle::generic_shifting_vo::vo_term::VOTerm;
 
 // given the x coords construct Li polynomials
 pub fn construct_lagrange_basis<F: FftField>(evaulation_domain: &[F]) -> Vec<DensePolynomial<F>> {
@@ -45,7 +44,7 @@ mod tests {
     use ark_bls12_381::Fr;
     use ark_ff::{One, Zero};
     use ark_poly::{
-        domain, univariate::DensePolynomial, EvaluationDomain, Evaluations,
+        univariate::DensePolynomial, EvaluationDomain, Evaluations,
         GeneralEvaluationDomain, MixedRadixEvaluationDomain, Polynomial, UVPolynomial,
     };
 
@@ -59,10 +58,10 @@ mod tests {
         let h_len = instance_len + wnts_len;
 
         let domain_h = GeneralEvaluationDomain::<F>::new(h_len).unwrap();
-        let domain_x = GeneralEvaluationDomain::<F>::new(instance_len).unwrap();
+        let _domain_x = GeneralEvaluationDomain::<F>::new(instance_len).unwrap();
 
         let mut instance_evals = vec![F::from(5u64), F::from(4u64), F::from(3u64), F::from(6u64)];
-        let wtns_evals = vec![
+        let _wtns_evals = vec![
             F::from(12u64),
             F::from(15u64),
             F::from(13u64),
@@ -81,7 +80,7 @@ mod tests {
             println!("x: {}", x);
         }
 
-        let x_poly =
+        let _x_poly =
             Evaluations::from_vec_and_domain(instance_evals.clone(), domain_h).interpolate();
         // let x_evals = domain_h.fft(&x_poly);
 
@@ -146,7 +145,7 @@ mod tests {
         // }
 
         let w_poly = DensePolynomial::<F>::from_coefficients_slice(&domain_h.ifft(&w_poly_evals));
-        let (w_poly, remainder) = w_poly.divide_by_vanishing_poly(domain_x).unwrap();
+        let (_w_poly, remainder) = w_poly.divide_by_vanishing_poly(domain_x).unwrap();
         assert!(remainder.is_zero());
 
         let w_poly_marlin = DensePolynomial::<F>::from_coefficients_slice(

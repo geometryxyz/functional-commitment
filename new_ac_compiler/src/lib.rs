@@ -1,7 +1,6 @@
 use ark_ff::PrimeField;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
-use std::iter;
 
 pub mod circuit;
 pub mod circuit_compiler;

@@ -41,7 +41,7 @@ pub struct MatrixArithmetization<F: PrimeField> {
     pub val: LabeledPolynomial<F>,
 
     /// Evaluation of `self.row`, `self.col`, and `self.val` on the domain `K`.
-    pub evals_on_K: MatrixEvals<F>,
+    pub evals_on_k: MatrixEvals<F>,
 }
 
 pub fn arithmetize_matrix<F: PrimeField>(
@@ -106,18 +106,18 @@ pub fn arithmetize_matrix<F: PrimeField>(
         val_vec.push(F::zero());
     }
 
-    let row_evals_on_K = EvaluationsOnDomain::from_vec_and_domain(row_vec, interpolation_domain);
-    let col_evals_on_K = EvaluationsOnDomain::from_vec_and_domain(col_vec, interpolation_domain);
-    let val_evals_on_K = EvaluationsOnDomain::from_vec_and_domain(val_vec, interpolation_domain);
+    let row_evals_on_k = EvaluationsOnDomain::from_vec_and_domain(row_vec, interpolation_domain);
+    let col_evals_on_k = EvaluationsOnDomain::from_vec_and_domain(col_vec, interpolation_domain);
+    let val_evals_on_k = EvaluationsOnDomain::from_vec_and_domain(val_vec, interpolation_domain);
 
-    let row = row_evals_on_K.clone().interpolate();
-    let col = col_evals_on_K.clone().interpolate();
-    let val = val_evals_on_K.clone().interpolate();
+    let row = row_evals_on_k.clone().interpolate();
+    let col = col_evals_on_k.clone().interpolate();
+    let val = val_evals_on_k.clone().interpolate();
 
-    let evals_on_K = MatrixEvals {
-        row: row_evals_on_K,
-        col: col_evals_on_K,
-        val: val_evals_on_K,
+    let evals_on_k = MatrixEvals {
+        row: row_evals_on_k,
+        col: col_evals_on_k,
+        val: val_evals_on_k,
     };
 
     MatrixArithmetization {
@@ -139,6 +139,6 @@ pub fn arithmetize_matrix<F: PrimeField>(
             degree_bound,
             hiding_bound,
         ),
-        evals_on_K,
+        evals_on_k,
     }
 }

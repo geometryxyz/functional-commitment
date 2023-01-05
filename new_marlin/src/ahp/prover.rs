@@ -1,5 +1,3 @@
-use std::cmp::max;
-
 use ark_ff::{Field, PrimeField, Zero};
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, Evaluations as EvaluationsOnDomain,
@@ -7,8 +5,7 @@ use ark_poly::{
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Read, SerializationError, Write};
 
-use ark_std::{cfg_into_iter, cfg_iter, cfg_iter_mut, end_timer, rand::RngCore, start_timer};
-use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
+use ark_std::{cfg_iter_mut, end_timer, rand::RngCore, start_timer};
 use new_ac_compiler::R1CSfIndex;
 
 use crate::ahp::UnnormalizedBivariateLagrangePoly;
@@ -302,22 +299,22 @@ impl<F: PrimeField> AHPForR1CS<F> {
         let domain_k = state.domain_k;
         let zk_bound = state.zk_bound;
 
-        let v_H = domain_h.vanishing_polynomial().into();
+        let v_h = domain_h.vanishing_polynomial().into();
 
         let mut z_poly =
             DensePolynomial::from_coefficients_slice(&domain_h.ifft(&state.get_assignment()));
-        z_poly += &(&DensePolynomial::from_coefficients_slice(&[F::rand(rng)]) * &v_H);
+        z_poly += &(&DensePolynomial::from_coefficients_slice(&[F::rand(rng)]) * &v_h);
 
         let z_a_poly_time = start_timer!(|| "Computing z_A polynomial");
         let z_a = state.z_a.clone().unwrap();
         let z_a_poly = &EvaluationsOnDomain::from_vec_and_domain(z_a, domain_h).interpolate()
-            + &(&DensePolynomial::from_coefficients_slice(&[F::rand(rng)]) * &v_H);
+            + &(&DensePolynomial::from_coefficients_slice(&[F::rand(rng)]) * &v_h);
         end_timer!(z_a_poly_time);
 
         let z_b_poly_time = start_timer!(|| "Computing z_B polynomial");
         let z_b = state.z_b.clone().unwrap();
         let z_b_poly = &EvaluationsOnDomain::from_vec_and_domain(z_b, domain_h).interpolate()
-            + &(&DensePolynomial::from_coefficients_slice(&[F::rand(rng)]) * &v_H);
+            + &(&DensePolynomial::from_coefficients_slice(&[F::rand(rng)]) * &v_h);
         end_timer!(z_b_poly_time);
 
         let mask_poly_time = start_timer!(|| "Computing mask polynomial");
@@ -556,13 +553,13 @@ impl<F: PrimeField> AHPForR1CS<F> {
 
         let beta = ver_message.beta;
 
-        let v_H_at_alpha = domain_h.evaluate_vanishing_polynomial(alpha);
-        let v_H_at_beta = domain_h.evaluate_vanishing_polynomial(beta);
+        let v_h_at_alpha = domain_h.evaluate_vanishing_polynomial(alpha);
+        let v_h_at_beta = domain_h.evaluate_vanishing_polynomial(beta);
 
-        let v_H_alpha_v_H_beta = v_H_at_alpha * v_H_at_beta;
-        let eta_a_times_v_H_alpha_v_H_beta = eta_a * v_H_alpha_v_H_beta;
-        let eta_b_times_v_H_alpha_v_H_beta = eta_b * v_H_alpha_v_H_beta;
-        let eta_c_times_v_H_alpha_v_H_beta = eta_c * v_H_alpha_v_H_beta;
+        let v_h_alpha_v_h_beta = v_h_at_alpha * v_h_at_beta;
+        let eta_a_times_v_h_alpha_v_h_beta = eta_a * v_h_alpha_v_h_beta;
+        let eta_b_times_v_h_alpha_v_h_beta = eta_b * v_h_alpha_v_h_beta;
+        let eta_c_times_v_h_alpha_v_h_beta = eta_c * v_h_alpha_v_h_beta;
 
         let a_row = index.a_arith.row.polynomial();
         let a_col = index.a_arith.col.polynomial();
@@ -588,11 +585,11 @@ impl<F: PrimeField> AHPForR1CS<F> {
         let b_poly = &(&a_part_denom * &b_part_denom) * &c_part_denom;
 
         let a_part_nom =
-            &(DensePolynomial::from_coefficients_slice(&[eta_a_times_v_H_alpha_v_H_beta])) * a_val;
+            &(DensePolynomial::from_coefficients_slice(&[eta_a_times_v_h_alpha_v_h_beta])) * a_val;
         let b_part_nom =
-            &(DensePolynomial::from_coefficients_slice(&[eta_b_times_v_H_alpha_v_H_beta])) * b_val;
+            &(DensePolynomial::from_coefficients_slice(&[eta_b_times_v_h_alpha_v_h_beta])) * b_val;
         let c_part_nom =
-            &(DensePolynomial::from_coefficients_slice(&[eta_c_times_v_H_alpha_v_H_beta])) * c_val;
+            &(DensePolynomial::from_coefficients_slice(&[eta_c_times_v_h_alpha_v_h_beta])) * c_val;
 
         let a_poly = {
             let summand_0 = &a_part_nom * &(&b_part_denom * &c_part_denom);

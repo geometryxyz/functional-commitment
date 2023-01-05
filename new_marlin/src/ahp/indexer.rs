@@ -1,12 +1,10 @@
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use derivative::Derivative;
-use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use new_ac_compiler::R1CSfIndex;
 
 use ark_std::{
     io::{Read, Write},
-    marker::PhantomData,
 };
 
 use super::constraint_systems::MatrixArithmetization;
