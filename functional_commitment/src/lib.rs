@@ -1,4 +1,3 @@
-mod test_circuits;
 mod tests;
 
 #[macro_export]
