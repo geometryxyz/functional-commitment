@@ -1,7 +1,7 @@
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use derivative::Derivative;
-use new_ac_compiler::R1CSfIndex;
+use ac_compiler::R1CSfIndex;
 
 use ark_std::{
     io::{Read, Write},

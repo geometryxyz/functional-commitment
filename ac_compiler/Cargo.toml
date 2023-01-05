@@ -1,5 +1,5 @@
 [package]
-name = "new_ac_compiler"
+name = "ac_compiler"
 version = "0.1.0"
 edition = "2021"
 

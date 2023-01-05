@@ -8,17 +8,17 @@ mod tests {
     use blake2::Blake2s;
     use fiat_shamir_rng::{FiatShamirRng, SimpleHashFiatShamirRng};
     use homomorphic_poly_commit::{marlin_kzg::KZG10};
-    use new_ac_compiler::circuit::Circuit;
-    use new_ac_compiler::constraint_builder::ConstraintBuilder;
-    use new_ac_compiler::error::Error;
-    use new_ac_compiler::gate::GateType;
-    use new_ac_compiler::variable::VariableType;
-    use new_marlin::Marlin;
+    use ac_compiler::circuit::Circuit;
+    use ac_compiler::constraint_builder::ConstraintBuilder;
+    use ac_compiler::error::Error;
+    use ac_compiler::gate::GateType;
+    use ac_compiler::variable::VariableType;
+    use index_private_marlin::Marlin;
     use proof_of_function_relation::t_functional_triple::TFT;
     use rand_chacha::ChaChaRng;
 
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
-    use new_ac_compiler::circuit_compiler::{CircuitCompiler, VanillaCompiler};
+    use ac_compiler::circuit_compiler::{CircuitCompiler, VanillaCompiler};
 
     use crate::{diag_test, slt_test};
 

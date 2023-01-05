@@ -11,7 +11,7 @@ use ark_std::{
 
 use ::zero_over_k::zero_over_k::proof::Proof as ZeroOverKProof;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
-use new_ac_compiler::R1CSfIndex;
+use ac_compiler::R1CSfIndex;
 
 /* ************************************************************************* */
 /* ************************************************************************* */

@@ -24,7 +24,7 @@ use ark_std::{
 use data_structures::{Proof, ProverKey, UniversalSRS, VerifierKey};
 use fiat_shamir_rng::FiatShamirRng;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
-use new_ac_compiler::R1CSfIndex;
+use ac_compiler::R1CSfIndex;
 
 #[macro_use]
 extern crate ark_std;

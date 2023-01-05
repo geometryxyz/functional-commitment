@@ -4,7 +4,7 @@ use ark_ff::{Field, PrimeField};
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::{LCTerm, LinearCombination};
 use ark_std::cfg_iter_mut;
-use new_ac_compiler::R1CSfIndex;
+use ac_compiler::R1CSfIndex;
 
 use self::constraint_systems::LabeledPolynomial;
 

@@ -7,7 +7,7 @@ use ark_poly::GeneralEvaluationDomain;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::QuerySet;
 use ark_std::rand::RngCore;
-use new_ac_compiler::R1CSfIndex;
+use ac_compiler::R1CSfIndex;
 use crate::well_formation::{construct_lagrange_basis, construct_vanishing};
 
 use super::AHPForR1CS;
