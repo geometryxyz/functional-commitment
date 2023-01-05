@@ -1,0 +1,24 @@
+[package]
+name = "functional_commitment"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ark-ff = { version = "^0.3.0", default-features = false }
+ark-poly = { version = "^0.3.0", default-features = false }
+homomorphic_poly_commit = { path = "../homomorphic_poly_commit"}
+index_private_marlin = { path = "../index_private_marlin"}
+proof_of_function_relation = { path = "../proof_of_function_relation"}
+fiat_shamir_rng = { path = "../fiat_shamir_rng"}
+rand_chacha = { version = "0.3.0", default-features = false }
+blake2 = { version = "0.9", default-features = false }
+ark-relations = { version = "^0.3.0", default-features = false }
+ark-poly-commit = { version = "^0.3.0", default-features = false }
+ark-std = { version = "^0.3.0", default-features = false }
+ac_compiler = { path = "../ac_compiler" }
+
+[dev-dependencies]
+ark-bn254 = { version = "^0.3.0", default-features = false }
+ark-bls12-381 = { version = "^0.3.0", default-features = false, features = [ "curve" ] }

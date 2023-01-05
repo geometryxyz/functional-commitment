@@ -1,0 +1,11 @@
+[workspace]
+
+members = [
+    "homomorphic_poly_commit",
+    "zero_over_k",
+    "fiat_shamir_rng",
+    "proof_of_function_relation",
+    "ac_compiler", 
+    "index_private_marlin",
+    "functional_commitment"
+]
