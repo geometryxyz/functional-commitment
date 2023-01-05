@@ -5,8 +5,8 @@ use ark_poly::{
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Read, SerializationError, Write};
 
-use ark_std::{cfg_iter_mut, end_timer, rand::RngCore, start_timer};
 use ac_compiler::R1CSfIndex;
+use ark_std::{cfg_iter_mut, end_timer, rand::RngCore, start_timer};
 
 use crate::ahp::UnnormalizedBivariateLagrangePoly;
 

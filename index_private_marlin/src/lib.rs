@@ -3,39 +3,30 @@ pub mod data_structures;
 pub mod error;
 pub mod well_formation;
 
-use crate::ahp::{AHPForR1CS, EvaluationsProvider, constraint_systems::LabeledPolynomial};
+use crate::ahp::{constraint_systems::LabeledPolynomial, AHPForR1CS, EvaluationsProvider};
 use ::zero_over_k::{
     virtual_oracle::generic_shifting_vo::{vo_term::VOTerm, GenericShiftingVO},
     vo_constant,
     zero_over_k::ZeroOverK,
 };
+use ac_compiler::R1CSfIndex;
 use ahp::{
     constraint_systems::arithmetize_matrix,
     indexer::{Index, Matrix},
 };
 use ark_ff::{to_bytes, PrimeField, UniformRand};
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
-use ark_poly_commit::{Evaluations};
-use ark_poly_commit::{LabeledCommitment};
-use ark_std::{
-    iter,
-    rand::{RngCore},
-};
+use ark_poly_commit::Evaluations;
+use ark_poly_commit::LabeledCommitment;
+use ark_std::{iter, rand::RngCore};
 use data_structures::{Proof, ProverKey, UniversalSRS, VerifierKey};
 use fiat_shamir_rng::FiatShamirRng;
 use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
-use ac_compiler::R1CSfIndex;
 
 #[macro_use]
 extern crate ark_std;
 
-use ark_std::{
-    format,
-    marker::PhantomData,
-    string::{ToString},
-    vec,
-    vec::Vec,
-};
+use ark_std::{format, marker::PhantomData, string::ToString, vec, vec::Vec};
 
 pub use error::*;
 
@@ -380,13 +371,17 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
 
         fs_rng.absorb(&opening_challenge);
         let separation_challenge: F = u128::rand(&mut fs_rng).into();
-        let well_formation_oracles =
-            AHPForR1CS::verifier_well_formation_oracles(&pk.index.index_info, &prover_state.public_input(), &prover_state.output(), &verifier_state);
+        let well_formation_oracles = AHPForR1CS::verifier_well_formation_oracles(
+            &pk.index.index_info,
+            &prover_state.public_input(),
+            &prover_state.output(),
+            &verifier_state,
+        );
 
-        // TODO: this polys should not be committed to 
+        // TODO: this polys should not be committed to
         let (well_formation_commits, well_formation_rands) =
-        PC::commit(&pk.committer_key, well_formation_oracles.iter(), None)
-            .map_err(Error::from_pc_err)?;
+            PC::commit(&pk.committer_key, well_formation_oracles.iter(), None)
+                .map_err(Error::from_pc_err)?;
 
         let well_formation_vo = GenericShiftingVO::new(
             &vec![0, 1, 2, 0, 3, 4],
@@ -398,9 +393,18 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         let z_commit = labeled_comms[0].clone();
         let z_rand = comm_rands[0].clone();
 
-        let well_formation_concrete_oracles = iter::once(&z_poly).chain(well_formation_oracles.iter()).map(|oracle| oracle.clone()).collect::<Vec<LabeledPolynomial<_>>>();
-        let well_formation_commits = iter::once(&z_commit).chain(well_formation_commits.iter()).map(|commit| commit.clone()).collect::<Vec<LabeledCommitment<_>>>();
-        let well_formation_rands = iter::once(&z_rand).chain(well_formation_rands.iter()).map(|rand| rand.clone()).collect::<Vec<PC::Randomness>>();
+        let well_formation_concrete_oracles = iter::once(&z_poly)
+            .chain(well_formation_oracles.iter())
+            .map(|oracle| oracle.clone())
+            .collect::<Vec<LabeledPolynomial<_>>>();
+        let well_formation_commits = iter::once(&z_commit)
+            .chain(well_formation_commits.iter())
+            .map(|commit| commit.clone())
+            .collect::<Vec<LabeledCommitment<_>>>();
+        let well_formation_rands = iter::once(&z_rand)
+            .chain(well_formation_rands.iter())
+            .map(|rand| rand.clone())
+            .collect::<Vec<PC::Randomness>>();
 
         let well_formation_proof = ZeroOverK::<F, PC, FS>::prove(
             &well_formation_concrete_oracles,
@@ -437,7 +441,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
         output: &Vec<F>,
         proof: Proof<F, PC>,
         rng: &mut R,
-        ck: &PC::CommitterKey //TODO: make sure to remove this once we introduce instance oracles in virtual oracle
+        ck: &PC::CommitterKey, //TODO: make sure to remove this once we introduce instance oracles in virtual oracle
     ) -> Result<bool, Error<PC::Error>> {
         let verifier_time = start_timer!(|| "Marlin::Verify");
 
@@ -572,15 +576,25 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>, FS: FiatShamirRng> Marlin<F
             well_formation_vo!(separation_challenge),
         )?;
 
-        let well_formation_oracles =
-            AHPForR1CS::verifier_well_formation_oracles(&vk.index_info, public_input, output, &verifier_state);
+        let well_formation_oracles = AHPForR1CS::verifier_well_formation_oracles(
+            &vk.index_info,
+            public_input,
+            output,
+            &verifier_state,
+        );
 
         let (verifier_well_formation_commits, _) =
-        PC::commit(ck, well_formation_oracles.iter(), None)
-            .map_err(Error::from_pc_err)?;
+            PC::commit(ck, well_formation_oracles.iter(), None).map_err(Error::from_pc_err)?;
 
         let labels = AHPForR1CS::<F>::well_formation_labels();
-        let mut verifier_well_formation_commits: Vec<LabeledCommitment<_>> = verifier_well_formation_commits.iter().zip(labels).map(|(commit, label)| LabeledCommitment::new(label, commit.commitment().clone(), None)).collect();
+        let mut verifier_well_formation_commits: Vec<LabeledCommitment<_>> =
+            verifier_well_formation_commits
+                .iter()
+                .zip(labels)
+                .map(|(commit, label)| {
+                    LabeledCommitment::new(label, commit.commitment().clone(), None)
+                })
+                .collect();
 
         // let z_commit = commitments[0].clone();
         let mut well_formation_commits = vec![commitments[0].clone()];
@@ -693,7 +707,9 @@ macro_rules! well_formation_vo {
     ($separation_challenge:expr) => {
         |terms: &[VOTerm<F>]| {
             (terms[1].clone() - terms[2].clone()) * terms[3].clone()
-                + vo_constant!($separation_challenge) * (terms[4].clone() - terms[5].clone()) * terms[6].clone()
+                + vo_constant!($separation_challenge)
+                    * (terms[4].clone() - terms[5].clone())
+                    * terms[6].clone()
         }
     };
 }

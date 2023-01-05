@@ -1,4 +1,4 @@
-use ark_ff::{FftField};
+use ark_ff::FftField;
 use ark_poly::{univariate::DensePolynomial, UVPolynomial};
 
 // given the x coords construct Li polynomials

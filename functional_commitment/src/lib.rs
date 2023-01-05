@@ -1,5 +1,10 @@
 #[cfg(test)]
 mod tests {
+    use ac_compiler::circuit::Circuit;
+    use ac_compiler::constraint_builder::ConstraintBuilder;
+    use ac_compiler::error::Error;
+    use ac_compiler::gate::GateType;
+    use ac_compiler::variable::VariableType;
     use ark_bn254::{Bn254, Fr};
     use ark_ff::{to_bytes, One};
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
@@ -7,12 +12,7 @@ mod tests {
     use ark_std::test_rng;
     use blake2::Blake2s;
     use fiat_shamir_rng::{FiatShamirRng, SimpleHashFiatShamirRng};
-    use homomorphic_poly_commit::{marlin_kzg::KZG10};
-    use ac_compiler::circuit::Circuit;
-    use ac_compiler::constraint_builder::ConstraintBuilder;
-    use ac_compiler::error::Error;
-    use ac_compiler::gate::GateType;
-    use ac_compiler::variable::VariableType;
+    use homomorphic_poly_commit::marlin_kzg::KZG10;
     use index_private_marlin::Marlin;
     use proof_of_function_relation::t_functional_triple::TFT;
     use rand_chacha::ChaChaRng;

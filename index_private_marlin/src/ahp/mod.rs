@@ -1,10 +1,10 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
+use ac_compiler::R1CSfIndex;
 use ark_ff::{Field, PrimeField};
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::{LCTerm, LinearCombination};
 use ark_std::cfg_iter_mut;
-use ac_compiler::R1CSfIndex;
 
 use self::constraint_systems::LabeledPolynomial;
 
@@ -35,9 +35,8 @@ impl<F: PrimeField> AHPForR1CS<F> {
         "a_row", "a_col", "a_val", "b_row", "b_col", "b_val", "c_row", "c_col", "c_val",
     ];
 
-    pub const WELL_FORMATION_LABELS: [&'static str; 4] = [
-        "pi_lde", "vh_gt_x", "output_lde", "vh_lt_y"
-    ];
+    pub const WELL_FORMATION_LABELS: [&'static str; 4] =
+        ["pi_lde", "vh_gt_x", "output_lde", "vh_lt_y"];
 
     pub(crate) fn polynomial_labels() -> impl Iterator<Item = String> {
         Self::PROVER_POLYNOMIALS.iter().map(|s| s.to_string())

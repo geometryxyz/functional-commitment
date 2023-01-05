@@ -1,14 +1,14 @@
-use super::Error;
 use super::constraint_systems::LabeledPolynomial;
+use super::Error;
+use crate::well_formation::{construct_lagrange_basis, construct_vanishing};
+use ac_compiler::R1CSfIndex;
 use ark_ff::PrimeField;
 use ark_ff::Zero;
+use ark_poly::univariate::DensePolynomial;
 use ark_poly::EvaluationDomain;
 use ark_poly::GeneralEvaluationDomain;
-use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::QuerySet;
 use ark_std::rand::RngCore;
-use ac_compiler::R1CSfIndex;
-use crate::well_formation::{construct_lagrange_basis, construct_vanishing};
 
 use super::AHPForR1CS;
 
@@ -143,7 +143,7 @@ impl<F: PrimeField> AHPForR1CS<F> {
 
     pub fn verifier_well_formation_oracles<'a>(
         info: &R1CSfIndex,
-        public_input: &Vec<F>, 
+        public_input: &Vec<F>,
         output: &Vec<F>,
         state: &VerifierState<F>,
     ) -> VerifierWellFormationOracles<F> {

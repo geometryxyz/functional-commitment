@@ -5,13 +5,11 @@ use ark_ff::PrimeField;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::{BatchLCProof, PolynomialCommitment};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
-use ark_std::{
-    io::{Read, Write},
-};
+use ark_std::io::{Read, Write};
 
 use ::zero_over_k::zero_over_k::proof::Proof as ZeroOverKProof;
-use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 use ac_compiler::R1CSfIndex;
+use homomorphic_poly_commit::AdditivelyHomomorphicPCS;
 
 /* ************************************************************************* */
 /* ************************************************************************* */
@@ -142,7 +140,7 @@ pub struct Proof<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> {
     pub pc_proof: BatchLCProof<F, DensePolynomial<F>, PC>,
 
     pub rational_sumcheck_zero_over_k_proof: ZeroOverKProof<F, PC>,
-    pub well_formation_proof: ZeroOverKProof<F, PC>
+    pub well_formation_proof: ZeroOverKProof<F, PC>,
 }
 
 impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> Proof<F, PC> {
@@ -153,7 +151,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> Proof<F, PC> {
         prover_messages: Vec<ProverMsg<F>>,
         pc_proof: BatchLCProof<F, DensePolynomial<F>, PC>,
         rational_sumcheck_zero_over_k_proof: ZeroOverKProof<F, PC>,
-        well_formation_proof: ZeroOverKProof<F, PC>
+        well_formation_proof: ZeroOverKProof<F, PC>,
     ) -> Self {
         Self {
             commitments,
@@ -161,7 +159,7 @@ impl<F: PrimeField, PC: AdditivelyHomomorphicPCS<F>> Proof<F, PC> {
             prover_messages,
             pc_proof,
             rational_sumcheck_zero_over_k_proof,
-            well_formation_proof
+            well_formation_proof,
         }
     }
 }

@@ -1,11 +1,9 @@
+use ac_compiler::R1CSfIndex;
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, SerializationError};
 use derivative::Derivative;
-use ac_compiler::R1CSfIndex;
 
-use ark_std::{
-    io::{Read, Write},
-};
+use ark_std::io::{Read, Write};
 
 use super::constraint_systems::MatrixArithmetization;
 
